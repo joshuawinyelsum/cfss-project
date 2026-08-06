@@ -4,7 +4,7 @@ from slowapi.util import get_remote_address
 from redis import Redis
 from app.logger import logger
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+from app.settings import REDIS_URL
 
 # Attempt to connect to Redis, gracefully degrade to memory if unavailable
 try:

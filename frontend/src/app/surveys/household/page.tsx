@@ -52,24 +52,42 @@ export default function HouseholdSurvey() {
       return;
     }
 
-    const unique_id = uuidv4();
-    const data = {
-      population_total: p,
-      male: m,
-      female: f,
-      households: h,
-      dependency_ratio_inputs: {}
-    };
+    if (!user || user.community_id == null) {
+      setError("You have no assigned community, so surveys cannot be submitted.");
+      setStatus('');
+      return;
+    }
 
+    const answers = [
+      { question_id: 'population_total', answer: p },
+      { question_id: 'male', answer: m },
+      { question_id: 'female', answer: f },
+      { question_id: 'households', answer: h },
+      { question_id: 'dependency_ratio_inputs', answer: {} },
+    ];
+
+    const now = new Date().toISOString();
     const isOnline = navigator.onLine;
-    const queued = await syncEngine.queueSubmission('Household', data, unique_id, token);
-    
-    if (queued === false && !isOnline) {
+
+    await syncEngine.queueSurvey({
+      id: uuidv4(),
+      survey_type: 'HOUSEHOLD',
+      community_id: user.community_id,
+      house_number: null,
+      answers,
+      status: 'SUBMITTED',
+      sync_status: 'pending',
+      created_at: now,
+      updated_at: now,
+      submitted_at: now,
+    }, token);
+
+    if (!isOnline) {
       setStatus('Saved offline. Will sync when connection is restored.');
     } else {
       setStatus('Submitted successfully!');
     }
-    
+
     setTimeout(() => {
       router.push('/dashboard');
     }, 2000);

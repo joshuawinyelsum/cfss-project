@@ -1,10 +1,10 @@
-import { api } from "./api";
+import { API_BASE_URL } from "./api";
 
 export async function downloadExport(endpoint: string, filename: string, token: string) {
   try {
-    const isBrowser = typeof window !== "undefined";
-    const apiHost = isBrowser ? window.location.hostname : "127.0.0.1";
-    const url = endpoint.startsWith('http') ? endpoint : `http://${apiHost}:8000${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+    const url = endpoint.startsWith('http')
+      ? endpoint
+      : `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
     const response = await fetch(url, {
       method: "GET",
       headers: {

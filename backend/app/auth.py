@@ -10,8 +10,8 @@ from sqlalchemy.future import select
 from app.database import get_db
 from app.models import User
 
-# In production, this should be a secure random string from environment variables
-SECRET_KEY = "cfss-super-secret-key-for-local-dev"
+from app.settings import SECRET_KEY
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 7 days
 

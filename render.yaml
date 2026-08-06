@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: cfss-api
+    runtime: python
+    plan: free
+    # Root Directory is left at the repo root so `.python-version` and
+    # `requirements.txt` (both at the root) are picked up.
+    buildCommand: pip install -r requirements.txt
+    startCommand: ./backend/start.sh
+    healthCheckPath: /docs
+    envVars:
+      - key: DATABASE_URL
+        sync: false          # set in the Render dashboard — never commit this
+      - key: SECRET_KEY
+        generateValue: true
+      # 3.12 is the only version requirements.txt fully resolves on:
+      # wrapt==2.2.2 has no 3.11 wheel, numpy==1.26.4 has no 3.13 wheel.
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: WEB_CONCURRENCY
+        value: "2"

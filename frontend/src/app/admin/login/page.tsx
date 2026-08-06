@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
 import { useAuthStore } from '@/lib/store';
+import { api } from '@/lib/api';
 
 export default function AdminLoginPage() {
   const [username, setUsername] = useState('');
@@ -21,19 +21,19 @@ export default function AdminLoginPage() {
       formData.append('username', username);
       formData.append('password', password);
 
-      const isBrowser = typeof window !== "undefined";
-      const apiHost = isBrowser ? window.location.hostname : "127.0.0.1";
-      const res = await axios.post(`http://${apiHost}:8000/api/auth/admin/login`, formData, {
+      const res = await api.post('/api/auth/admin/login', formData, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       });
       
       const token = res.data.access_token;
       
       setAuth(token, {
+        id: null,
         student_id: 'admin',
         full_name: 'Administrator',
         program: 'System Admin',
         community: null,
+        community_id: null,
         group_number: null,
         registered_at: new Date().toISOString(),
         role: 'admin'

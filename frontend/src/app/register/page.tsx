@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
+import { api } from '@/lib/api';
 
 export default function RegisterPage() {
   const [studentId, setStudentId] = useState('');
@@ -24,7 +24,7 @@ export default function RegisterPage() {
       
       console.log("Register payload:", { ...payload, password: "***" });
       
-      const res = await axios.post('http://127.0.0.1:8000/api/v2/students/register', payload);
+      const res = await api.post('/api/v2/students/register', payload);
       console.log("Register response:", res.data);
       
       router.push('/login?registered=true');

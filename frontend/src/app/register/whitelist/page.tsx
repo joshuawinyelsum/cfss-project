@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
+import { api } from '@/lib/api';
 
 export default function StudentRegistration() {
   const router = useRouter();
@@ -30,7 +30,7 @@ export default function StudentRegistration() {
     setSuccess('');
 
     try {
-      const response = await axios.post('http://localhost:8000/auth/register', formData);
+      const response = await api.post('/auth/register', formData);
       
       if (response.data.message) {
         setSuccess('Registration successful! Redirecting to login...');

@@ -154,6 +154,7 @@ async def get_student_me(current_user: models.User = Depends(auth.get_current_us
             )).scalars().first()
 
         return {
+            "id": current_user.id,
             "student_id": current_user.student_id,
             "full_name": current_user.name,
             "program": current_user.program or "",

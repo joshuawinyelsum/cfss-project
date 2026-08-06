@@ -118,7 +118,17 @@ export default function QuestionnairePage() {
   const saveAnswers = async (isSubmit: boolean) => {
     if (record?.status === 'SUBMITTED' || !user || !record) return;
     setError('');
-    
+
+    if (!token) {
+      setError("Your session has expired. Please log in again.");
+      return;
+    }
+
+    if (user.community_id == null) {
+      setError("You have no assigned community, so surveys cannot be saved.");
+      return;
+    }
+
     const formattedAnswers = Object.keys(answers).map(qid => ({
       question_id: qid,
       answer: answers[qid]

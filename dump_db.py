@@ -4,7 +4,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import Column, Integer, String
 
-DATABASE_URL = "postgresql+asyncpg://postgres.pglovosjndpaonfxngng:Cfss%402026Strong@aws-0-eu-west-1.pooler.supabase.com:6543/postgres"
+import os
+
+DATABASE_URL = os.environ["DATABASE_URL"]
 
 engine = create_async_engine(DATABASE_URL, echo=False)
 SessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine)

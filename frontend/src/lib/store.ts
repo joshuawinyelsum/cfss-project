@@ -4,10 +4,12 @@ import { persist } from 'zustand/middleware';
 interface AuthState {
   token: string | null;
   user: {
+    id: number | null;
     student_id: string;
     full_name: string;
     program: string;
     community: string | null;
+    community_id: number | null;
     group_number: number | null;
     registered_at: string | null;
     role: string;

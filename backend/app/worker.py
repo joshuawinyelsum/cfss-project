@@ -3,7 +3,7 @@ from celery import Celery
 from app.logger import logger, trace_id_ctx_var
 import json
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+from app.settings import REDIS_URL
 
 celery_app = Celery(
     "cfss_worker",

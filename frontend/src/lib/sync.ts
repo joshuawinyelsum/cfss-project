@@ -78,12 +78,9 @@ export const syncEngine = {
     survey.sync_status = 'pending';
     survey.updated_at = new Date().toISOString();
     
-    const existing = await db.surveys.get(survey.id);
-    if (existing) {
-      await db.surveys.update(survey.id, survey);
-    } else {
-      await db.surveys.add(survey);
-    }
+    // put() inserts or fully replaces — .update() rejects a whole LocalSurvey
+    // because Dexie expects a partial update spec, not the complete record.
+    await db.surveys.put(survey);
 
     // Emit event so UI updates immediately
     window.dispatchEvent(new Event('sync-queued'));

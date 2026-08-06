@@ -1,10 +1,20 @@
 import axios from "axios";
 
 const isBrowser = typeof window !== "undefined";
-const apiHost = isBrowser ? window.location.hostname : "127.0.0.1";
+
+/**
+ * Base URL of the FastAPI backend.
+ *
+ * In production this MUST come from NEXT_PUBLIC_API_URL (e.g. the Render URL),
+ * because the deployed frontend and backend live on different hosts. The
+ * localhost fallback only exists so `next dev` keeps working with no setup.
+ */
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") ||
+  `http://${isBrowser ? window.location.hostname : "127.0.0.1"}:8000`;
 
 export const api = axios.create({
-  baseURL: `http://${apiHost}:8000`, 
+  baseURL: API_BASE_URL,
   withCredentials: true,
 });
 

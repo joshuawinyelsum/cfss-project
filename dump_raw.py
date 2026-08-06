@@ -1,7 +1,9 @@
 import asyncio
 import asyncpg
 
-DATABASE_URL = "postgresql://postgres.pglovosjndpaonfxngng:Cfss%402026Strong@aws-0-eu-west-1.pooler.supabase.com:6543/postgres"
+import os
+
+DATABASE_URL = os.environ["DATABASE_URL"]
 
 async def main():
     conn = await asyncpg.connect(DATABASE_URL)

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
+import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
 import { Loader2, Download, Trash2 } from 'lucide-react';
 import { downloadExport } from '@/lib/export';
@@ -46,7 +46,7 @@ export default function WhitelistUploadPage() {
     if (!token) return;
     try {
       setLoadingLists(true);
-      const response = await axios.get<Whitelist[]>('http://127.0.0.1:8000/admin/whitelist', {
+      const response = await api.get<Whitelist[]>('/admin/whitelist', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setWhitelists(response.data);
@@ -104,8 +104,8 @@ export default function WhitelistUploadPage() {
     formData.append('name', name);
 
     try {
-      const response = await axios.post<UploadResponse>(
-        'http://127.0.0.1:8000/admin/whitelist/upload',
+      const response = await api.post<UploadResponse>(
+        '/admin/whitelist/upload',
         formData,
         {
           headers: {
@@ -156,7 +156,7 @@ export default function WhitelistUploadPage() {
     
     try {
       setDeletingId(id);
-      await axios.delete(`http://127.0.0.1:8000/admin/whitelist/${id}`, {
+      await api.delete(`/admin/whitelist/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       showToast('Whitelist deleted successfully', 'success');

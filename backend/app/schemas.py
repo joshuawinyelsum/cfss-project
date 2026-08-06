@@ -175,10 +175,12 @@ class StudentLogin(BaseModel):
     password: str
 
 class StudentMeResponse(BaseModel):
+    id: int
     student_id: str
     full_name: str
     program: str
     community: Optional[str] = None
+    community_id: Optional[int] = None
     group_number: Optional[int] = None
     registered_at: Optional[str] = None
 

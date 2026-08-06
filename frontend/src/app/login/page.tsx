@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
 import { useAuthStore } from '@/lib/store';
-import { getErrorMessage } from '@/lib/api';
+import { api, getErrorMessage } from '@/lib/api';
 
 export default function LoginPage() {
   const [studentId, setStudentId] = useState('');
@@ -29,12 +28,12 @@ export default function LoginPage() {
       };
       console.log("Login payload:", { student_id: payload.student_id, password: "***" });
       
-      const res = await axios.post('http://127.0.0.1:8000/api/v2/students/login', payload);
+      const res = await api.post('/api/v2/students/login', payload);
       console.log("Login response:", res.data);
-      
+
       const token = res.data.access_token;
-      
-      const userRes = await axios.get('http://127.0.0.1:8000/api/v2/students/me', {
+
+      const userRes = await api.get('/api/v2/students/me', {
         headers: { Authorization: `Bearer ${token}` }
       });
       

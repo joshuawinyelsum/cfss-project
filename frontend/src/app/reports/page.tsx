@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
+import { api } from '@/lib/api';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import Link from 'next/link';
@@ -28,8 +28,8 @@ export default function StudentReports() {
       try {
         const opts = { headers: { Authorization: `Bearer ${token}` } };
         const [memRes, statsRes] = await Promise.all([
-          axios.get('http://127.0.0.1:8000/api/student/community/members', opts),
-          axios.get('http://127.0.0.1:8000/api/student/community/stats', opts)
+          api.get('/api/student/community/members', opts),
+          api.get('/api/student/community/stats', opts)
         ]);
         setMembers(memRes.data);
         setStats(statsRes.data);
