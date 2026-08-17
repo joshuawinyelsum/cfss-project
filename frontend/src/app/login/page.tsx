@@ -36,7 +36,22 @@ export default function LoginPage() {
       const userRes = await api.get('/api/v2/students/me', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
+      // Admin accounts can authenticate through this endpoint too — route
+      // them to the admin portal instead of the student dashboard.
+      const payload64 = token.split('.')[1];
+      const role = JSON.parse(atob(payload64)).role;
+      if (role === 'admin') {
+        setAuth(token, {
+          ...userRes.data,
+          role: 'admin',
+          full_name: 'Administrator',
+          program: 'System Admin'
+        });
+        router.push('/admin');
+        return;
+      }
+
       // Add role manually since it's implied for students in this portal
       const userData = { ...userRes.data, role: 'student' };
       
