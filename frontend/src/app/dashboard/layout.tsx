@@ -10,7 +10,6 @@ import {
   FileEdit, 
   CheckSquare, 
   BarChart2, 
-  Mail, 
   User as UserIcon, 
   Settings, 
   Bell, 
@@ -96,13 +95,28 @@ export default function DashboardLayout({
     router.push('/login');
   };
 
+  useEffect(() => {
+    if (!token || !user || user.role === 'admin') return;
+
+    // Sessions created before the admin routing fix can hold a stale
+    // 'student' role. Decode the token and kick admins to the admin portal.
+    try {
+      const role = JSON.parse(atob(token.split('.')[1])).role;
+      if (role === 'admin') {
+        useAuthStore.getState().setAuth(token, { ...user, role: 'admin' });
+        router.replace('/admin');
+      }
+    } catch (e) {
+      // malformed token — let the page's own auth checks handle it
+    }
+  }, [token, user, router]);
+
   const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'Surveys', href: '/surveys', icon: ClipboardList },
     { name: 'Drafts', href: '/dashboard/surveys/drafts', icon: FileEdit, badge: 3 },
     { name: 'Submitted', href: '/dashboard/surveys/submitted', icon: CheckSquare },
     { name: 'Reports', href: '/reports', icon: BarChart2 },
-    { name: 'Inbox', href: '/inbox', icon: Mail, badge: 2 },
     { name: 'Profile', href: '/profile', icon: UserIcon },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
