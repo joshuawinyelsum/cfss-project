@@ -213,6 +213,24 @@ async def update_registration_setting(request: schemas.RegistrationToggleRequest
     await db.refresh(settings)
     return settings
 
+@router.post("/change-password")
+async def change_admin_password(
+    payload: schemas.AdminChangePasswordRequest,
+    db: AsyncSession = Depends(get_db_and_admin)
+):
+    result = await db.execute(select(models.User).filter(models.User.student_id == "admin"))
+    admin = result.scalars().first()
+
+    if not admin or not auth.verify_password(payload.current_password, admin.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    admin.password_hash = auth.get_password_hash(payload.new_password)
+    db.add(admin)
+    await db.commit()
+
+    return {"message": "Password changed successfully"}
+
+
 @router.get("/settings", response_model=schemas.SettingsResponse)
 async def get_settings(db: AsyncSession = Depends(get_db_and_admin)):
     result = await db.execute(select(models.SystemSettings).limit(1))

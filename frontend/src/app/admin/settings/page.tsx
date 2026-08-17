@@ -41,6 +41,38 @@ export default function AdminSettingsPage() {
   const [adminPassword, setAdminPassword] = useState('');
   const [modalError, setModalError] = useState('');
 
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordMsg, setPasswordMsg] = useState('');
+  const [passwordMsgType, setPasswordMsgType] = useState<'success' | 'error'>('success');
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    setPasswordSaving(true);
+    setPasswordMsg('');
+    try {
+      await api.post('/api/admin/change-password', {
+        current_password: currentPassword,
+        new_password: newPassword
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setPasswordMsgType('success');
+      setPasswordMsg('Password changed successfully. Use it on your next login.');
+      setCurrentPassword('');
+      setNewPassword('');
+    } catch (err: any) {
+      console.error(err);
+      setPasswordMsgType('error');
+      setPasswordMsg(getErrorMessage(err, 'Failed to change password'));
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
   useEffect(() => {
     if (!user || user.role !== 'admin') {
       router.push('/admin/login');
@@ -395,6 +427,52 @@ export default function AdminSettingsPage() {
         </div>
 
       </form>
+
+      {/* SECTION: Change Admin Password */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden mt-8">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Change Admin Password</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Update the administrator login credentials.</p>
+        </div>
+        <form
+          className="p-6 space-y-4 max-w-md"
+          onSubmit={handlePasswordChange}
+        >
+          {passwordMsg && (
+            <p className={`text-sm font-medium ${passwordMsgType === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+              {passwordMsg}
+            </p>
+          )}
+          <div>
+            <label className="block text-sm font-semibold text-slate-900 dark:text-white mb-1">Current Password</label>
+            <input
+              type="password"
+              required
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-900 dark:text-white mb-1">New Password</label>
+            <input
+              type="password"
+              required
+              minLength={8}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={passwordSaving}
+            className="px-5 py-2 rounded-lg font-semibold text-sm transition-all shadow-sm bg-red-600 text-white hover:bg-red-700 hover:shadow-md disabled:opacity-50"
+          >
+            {passwordSaving ? 'Updating...' : 'Change Password'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

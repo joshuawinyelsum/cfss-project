@@ -69,6 +69,11 @@ class RegistrationToggleRequest(BaseModel):
     registration_enabled: bool
     admin_password: str
 
+
+class AdminChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
 class SettingsResponse(SettingsBase):
     pass
 
