@@ -13,6 +13,16 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 async def get_db_and_admin(db: AsyncSession = Depends(get_db), admin: models.User = Depends(auth.get_current_admin)):
     return db
 
+
+async def verify_admin_password(db: AsyncSession, password: str):
+    result = await db.execute(select(models.User).filter(models.User.student_id == "admin"))
+    admin = result.scalars().first()
+    if admin is None or not auth.verify_password(password, admin.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Incorrect admin password. Cannot save settings."
+        )
+
 @router.post("/communities", response_model=schemas.CommunityResponse)
 async def create_community(comm: schemas.CommunityCreate, db: AsyncSession = Depends(get_db_and_admin)):
     # Check if exists
@@ -160,11 +170,7 @@ async def admin_logout(current_user: models.User = Depends(auth.get_current_admi
 @router.put("/settings", response_model=schemas.SettingsResponse)
 async def update_settings(settings_update: schemas.SettingsUpdate, db: AsyncSession = Depends(get_db_and_admin)):
     # Validate Admin Password for Sensitive Action
-    if settings_update.admin_password != "admin123":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Incorrect admin password. Cannot save settings."
-        )
+    await verify_admin_password(db, settings_update.admin_password)
 
     result = await db.execute(select(models.SystemSettings).limit(1))
     settings = result.scalars().first()
@@ -192,11 +198,7 @@ async def update_settings(settings_update: schemas.SettingsUpdate, db: AsyncSess
 @router.put("/settings/registration", response_model=schemas.SettingsResponse)
 async def update_registration_setting(request: schemas.RegistrationToggleRequest, db: AsyncSession = Depends(get_db_and_admin)):
     # Validate Admin Password for Sensitive Action
-    if request.admin_password != "admin123":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Incorrect admin password. Cannot save settings."
-        )
+    await verify_admin_password(db, request.admin_password)
 
     result = await db.execute(select(models.SystemSettings).limit(1))
     settings = result.scalars().first()

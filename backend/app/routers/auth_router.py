@@ -28,17 +28,22 @@ async def student_login(form_data: OAuth2PasswordRequestForm = Depends(), db: As
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/admin/login", response_model=schemas.Token)
-async def admin_login(form_data: OAuth2PasswordRequestForm = Depends()):
-    if form_data.username != "admin" or form_data.password != "admin123":
+async def admin_login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(models.User).filter(
+        models.User.student_id == form_data.username, models.User.role == "admin"
+    ))
+    user = result.scalars().first()
+
+    if not user or not auth.verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect admin credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
+
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
-        data={"sub": "0", "role": "admin"}, expires_delta=access_token_expires
+        data={"sub": str(user.id), "role": "admin"}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
