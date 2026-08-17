@@ -5,6 +5,10 @@ set -euo pipefail
 # Render's Root Directory is the repo root or `backend`.
 cd "$(dirname "$0")"
 
+# Create tables from app/models.py and seed the survey question bank on a
+# fresh database. Idempotent: no-op on subsequent boots.
+python init_db.py
+
 exec gunicorn app.main:app \
   --worker-class uvicorn.workers.UvicornWorker \
   --workers "${WEB_CONCURRENCY:-2}" \

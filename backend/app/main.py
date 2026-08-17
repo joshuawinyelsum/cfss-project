@@ -14,7 +14,7 @@ from slowapi.errors import RateLimitExceeded
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Alembic handles table creation, so we removed Base.metadata.create_all
+    # Tables are created by backend/init_db.py (run from start.sh).
         
     # Create default admin if not exists (using SystemUser)
     from app.database import SessionLocal
