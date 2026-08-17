@@ -146,7 +146,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           <NavSection title="SYSTEM" />
           <NavItem href="/admin/settings" icon={Settings} label="Settings" />
-          <NavItem href="/admin/activity" icon={Activity} label="Activity Logs" />
+          <NavItem href="/admin/notifications" icon={Activity} label="Activity Logs" />
         </div>
 
         {/* User Profile */}
