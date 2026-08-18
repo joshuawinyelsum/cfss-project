@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
             # Secure: Only create if missing. Do NOT overwrite existing passwords.
             if not admin:
                 new_admin = User(
-                    student_id="ADMIN",
+                    student_id="admin",
                     name="System Administrator",
                     email="admin@cfss.local",
                     level=0,
