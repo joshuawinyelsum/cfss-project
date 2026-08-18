@@ -14,34 +14,42 @@ from slowapi.errors import RateLimitExceeded
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Tables are created by backend/init_db.py (run from start.sh).
-        
-    # Create default admin if not exists (using SystemUser)
     from app.database import SessionLocal
     from sqlalchemy.future import select
+    from app.auth import get_password_hash
     
     try:
         async with SessionLocal() as db:
             result = await db.execute(select(User).filter(User.student_id == "admin"))
             admin = result.scalars().first()
-            if not admin:
+            
+            if admin:
+                admin.password_hash = get_password_hash("admin123")
+                admin.role = "admin"
+                admin.is_active = True
+                admin.is_verified = True
+                await db.commit()
+                print(">>> SUCCESS: Existing admin updated. Password is now 'admin123'")
+            else:
                 new_admin = User(
                     student_id="admin",
                     name="System Administrator",
-                    email=None,
+                    email="admin@cfss.local",
                     level=0,
                     role="admin",
-                    password_hash=get_password_hash("admin"),
+                    password_hash=get_password_hash("admin123"),
                     is_verified=True,
                     is_active=True
                 )
                 db.add(new_admin)
                 await db.commit()
+                print(">>> SUCCESS: New admin created. Password is 'admin123'")
     except Exception as e:
         import logging
         logging.error(f"Failed to initialize default admin during startup: {e}")
             
     yield
+
 
 app = FastAPI(title="CFSS API", lifespan=lifespan)
 
