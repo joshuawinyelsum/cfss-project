@@ -49,9 +49,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     except jwt.PyJWTError:
         raise credentials_exception
         
-    if role == "admin":
-        return User(id=0, student_id="admin", email=None, name="Administrator", level=0, role="admin", password_hash="")
-        
     try:
         user_id_int = int(user_id)
     except ValueError:
@@ -68,6 +65,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
         raise credentials_exception
         
     return user
+
 
 async def get_current_admin(current_user: User = Depends(get_current_user)):
     if current_user.role != "admin":
