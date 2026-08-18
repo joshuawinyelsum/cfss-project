@@ -20,7 +20,8 @@ async def lifespan(app: FastAPI):
     
     try:
         async with SessionLocal() as db:
-            result = await db.execute(select(User).filter(User.student_id == "admin"))
+            # Query for uppercase ADMIN
+            result = await db.execute(select(User).filter(User.student_id == "ADMIN"))
             admin = result.scalars().first()
             
             if admin:
@@ -29,10 +30,10 @@ async def lifespan(app: FastAPI):
                 admin.is_active = True
                 admin.is_verified = True
                 await db.commit()
-                print(">>> SUCCESS: Existing admin updated. Password is now 'admin123'")
+                print(">>> SUCCESS: Existing ADMIN updated. Password is now 'admin123'")
             else:
                 new_admin = User(
-                    student_id="admin",
+                    student_id="ADMIN",
                     name="System Administrator",
                     email="admin@cfss.local",
                     level=0,
@@ -43,12 +44,13 @@ async def lifespan(app: FastAPI):
                 )
                 db.add(new_admin)
                 await db.commit()
-                print(">>> SUCCESS: New admin created. Password is 'admin123'")
+                print(">>> SUCCESS: New ADMIN created. Password is 'admin123'")
     except Exception as e:
         import logging
         logging.error(f"Failed to initialize default admin during startup: {e}")
             
     yield
+
 
 
 app = FastAPI(title="CFSS API", lifespan=lifespan)
