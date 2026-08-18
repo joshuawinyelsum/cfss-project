@@ -15,13 +15,14 @@ async def get_db_and_admin(db: AsyncSession = Depends(get_db), admin: models.Use
 
 
 async def verify_admin_password(db: AsyncSession, password: str):
-    result = await db.execute(select(models.User).filter(models.User.student_id == "admin"))
+    result = await db.execute(select(models.User).filter(models.User.role == "admin"))
     admin = result.scalars().first()
     if admin is None or not auth.verify_password(password, admin.password_hash):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Incorrect admin password. Cannot save settings."
         )
+
 
 @router.post("/communities", response_model=schemas.CommunityResponse)
 async def create_community(comm: schemas.CommunityCreate, db: AsyncSession = Depends(get_db_and_admin)):
@@ -218,7 +219,7 @@ async def change_admin_password(
     payload: schemas.AdminChangePasswordRequest,
     db: AsyncSession = Depends(get_db_and_admin)
 ):
-    result = await db.execute(select(models.User).filter(models.User.student_id == "admin"))
+    result = await db.execute(select(models.User).filter(models.User.role == "admin"))
     admin = result.scalars().first()
 
     if not admin or not auth.verify_password(payload.current_password, admin.password_hash):
@@ -229,6 +230,7 @@ async def change_admin_password(
     await db.commit()
 
     return {"message": "Password changed successfully"}
+
 
 
 @router.get("/settings", response_model=schemas.SettingsResponse)
