@@ -20,18 +20,11 @@ async def lifespan(app: FastAPI):
     
     try:
         async with SessionLocal() as db:
-            # Query for uppercase ADMIN
             result = await db.execute(select(User).filter(User.student_id == "ADMIN"))
             admin = result.scalars().first()
             
-            if admin:
-                admin.password_hash = get_password_hash("admin123")
-                admin.role = "admin"
-                admin.is_active = True
-                admin.is_verified = True
-                await db.commit()
-                print(">>> SUCCESS: Existing ADMIN updated. Password is now 'admin123'")
-            else:
+            # Secure: Only create if missing. Do NOT overwrite existing passwords.
+            if not admin:
                 new_admin = User(
                     student_id="ADMIN",
                     name="System Administrator",
@@ -44,12 +37,13 @@ async def lifespan(app: FastAPI):
                 )
                 db.add(new_admin)
                 await db.commit()
-                print(">>> SUCCESS: New ADMIN created. Password is 'admin123'")
+                print(">>> SUCCESS: Default ADMIN created.")
     except Exception as e:
         import logging
         logging.error(f"Failed to initialize default admin during startup: {e}")
             
     yield
+
 
 
 
