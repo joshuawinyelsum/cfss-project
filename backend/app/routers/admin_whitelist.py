@@ -53,7 +53,7 @@ async def upload_whitelist(request: Request, db: AsyncSession = Depends(get_db_a
         else:
             df = pd.read_excel(io.BytesIO(contents))
             
-        expected_cols = ["studentId", "email", "program", "level"]
+        expected_cols = ["studentId", "email", "faculty", "program", "level"]
         
         total = len(df)
         success = 0
@@ -86,12 +86,35 @@ async def upload_whitelist(request: Request, db: AsyncSession = Depends(get_db_a
             full_name_raw  = row.get('full_name') if 'full_name' in row else (row.get('name') if 'name' in row else row.get('Name'))
             program_raw    = row.get('program') if 'program' in row else row.get('Program')
             email_raw      = row.get('email') if 'email' in row else None
+            faculty_raw    = row.get('faculty') if 'faculty' in row else (row.get('school') if 'school' in row else row.get('Faculty'))
+            phone_raw      = (row.get('phone_number') if 'phone_number' in row else
+                              row.get('phone') if 'phone' in row else
+                              row.get('Phone Number') if 'Phone Number' in row else
+                              row.get('mobile') if 'mobile' in row else
+                              row.get('Phone') if 'Phone' in row else None)
+            gender_raw     = (row.get('gender') if 'gender' in row else
+                              row.get('Gender') if 'Gender' in row else
+                              row.get('sex') if 'sex' in row else
+                              row.get('Sex') if 'Sex' in row else None)
             
             # Normalize
             student_id = str(student_id_raw).strip().upper() if student_id_raw and str(student_id_raw) != 'nan' else None
             full_name  = str(full_name_raw).strip() if full_name_raw and str(full_name_raw) != 'nan' else None
             program    = re.sub(r'\s+', ' ', str(program_raw).strip().lower()) if program_raw and str(program_raw) != 'nan' else None
             email      = str(email_raw).strip() if email_raw and str(email_raw) != 'nan' else None
+            faculty    = str(faculty_raw).strip() if faculty_raw and str(faculty_raw) != 'nan' else None
+            phone_number = re.sub(r'\s+', ' ', str(phone_raw).strip()) if phone_raw and str(phone_raw) != 'nan' else None
+            
+            # Normalize gender to canonical form
+            gender = None
+            if gender_raw and str(gender_raw) != 'nan':
+                g = str(gender_raw).strip().lower()
+                if g in ('m', 'male'):
+                    gender = 'Male'
+                elif g in ('f', 'female'):
+                    gender = 'Female'
+                else:
+                    gender = 'Other'
             
             level_raw = row.get('level')
             level = None
@@ -105,17 +128,27 @@ async def upload_whitelist(request: Request, db: AsyncSession = Depends(get_db_a
                 failed += 1
                 errors.append({"row": row_num, "error": "Must provide student_id"})
                 continue
+            
+            # Phone number is required for new whitelist entries
+            if not phone_number:
+                failed += 1
+                errors.append({"row": row_num, "error": f"Phone number is required (row {row_num}, student_id={student_id})"})
+                continue
                 
             entry = WhitelistEntry(
                 whitelist_id=new_whitelist.id,
                 student_id=student_id,
                 full_name=full_name,
                 email=email,
+                faculty=faculty,
                 program=program,
+                gender=gender,
+                phone_number=phone_number,
                 level=level
             )
             entries.append(entry)
             success += 1
+
 
         if entries:
             db.add_all(entries)

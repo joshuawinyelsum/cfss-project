@@ -50,8 +50,8 @@ async def export_students(db: AsyncSession = Depends(get_db), admin=Depends(get_
     return Response(content=output.getvalue(), media_type="text/csv", headers=headers)
 
 @router.get("/whitelist/{whitelist_id}")
-async def export_whitelist(whitelist_id: str, db: AsyncSession = Depends(get_db), admin=Depends(get_current_admin)):
-    """Export a whitelist as CSV with flattened metadata."""
+async def export_whitelist(whitelist_id: int, db: AsyncSession = Depends(get_db), admin=Depends(get_current_admin)):
+    """Export a whitelist as CSV."""
     result = await db.execute(select(WhitelistV2).filter(WhitelistV2.id == whitelist_id))
     whitelist = result.scalars().first()
     if not whitelist:
@@ -59,56 +59,39 @@ async def export_whitelist(whitelist_id: str, db: AsyncSession = Depends(get_db)
 
     output = io.StringIO()
     writer = csv.writer(output)
-    
-    base_headers = ["email", "student_id", "program", "level", "created_at"]
-    
+
+    writer.writerow(["student_id", "full_name", "email", "phone_number", "gender", "faculty", "program", "level"])
+
     query = select(WhitelistEntry).filter(WhitelistEntry.whitelist_id == whitelist_id).order_by(WhitelistEntry.id)
-    
+
     batch_size = 1000
     offset = 0
-    
-    metadata_keys = set()
-    first_batch_result = await db.execute(query.limit(batch_size).offset(0))
-    first_batch = first_batch_result.scalars().all()
-    
-    if first_batch:
-        for entry in first_batch:
-            if entry.metadata_json and isinstance(entry.metadata_json, dict):
-                metadata_keys.update(entry.metadata_json.keys())
-    
-    metadata_headers = sorted(list(metadata_keys))
-    all_headers = base_headers + metadata_headers
-    writer.writerow(all_headers)
-    
-    created_at_str = whitelist.created_at.isoformat() if whitelist.created_at else ""
-    
+
     while True:
         res = await db.execute(query.limit(batch_size).offset(offset))
         entries = res.scalars().all()
         if not entries:
             break
-        
+
         for entry in entries:
-            row = [
-                entry.email or "",
+            writer.writerow([
                 entry.student_id or "",
+                entry.full_name or "",
+                entry.email or "",
+                entry.phone_number or "",
+                entry.gender or "",
+                entry.faculty or "",
                 entry.program or "",
-                entry.level or "",
-                created_at_str
-            ]
-            
-            meta = entry.metadata_json if entry.metadata_json and isinstance(entry.metadata_json, dict) else {}
-            for key in metadata_headers:
-                row.append(str(meta.get(key, "")))
-                
-            writer.writerow(row)
-            
+                entry.level if entry.level is not None else "",
+            ])
+
         offset += batch_size
 
     headers = {
         "Content-Disposition": f"attachment; filename=whitelist_{whitelist_id}.csv"
     }
     return Response(content=output.getvalue(), media_type="text/csv", headers=headers)
+
 
 @router.get("/surveys")
 async def export_surveys(db: AsyncSession = Depends(get_db), admin=Depends(get_current_admin)):

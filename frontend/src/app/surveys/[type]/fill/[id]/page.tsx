@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useAuthStore } from '@/lib/store';
+import { getEntityLabel } from '@/lib/entityLabel';
 import { useRouter, useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import DashboardLayout from '@/app/dashboard/layout';
@@ -46,7 +47,7 @@ export default function QuestionnairePage() {
             id: crypto.randomUUID(), // New UUID for offline sync mapping
             survey_type: typeStr.toUpperCase(),
             community_id: user.community_id,
-            house_number: null,
+            entity_id: null,
             status: 'DRAFT',
             sync_status: 'pending',
             created_at: new Date().toISOString(),
@@ -145,7 +146,8 @@ export default function QuestionnairePage() {
         id: record.id,
         survey_type: record.survey_type,
         community_id: user.community_id,
-        house_number: record.house_number,
+        student_id: user.id as number,
+        entity_id: record.entity_id,
         answers: formattedAnswers,
         status: isSubmit ? 'SUBMITTED' : 'DRAFT',
         sync_status: 'pending',
@@ -198,7 +200,7 @@ export default function QuestionnairePage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-900 capitalize">{typeStr.toLowerCase()} Survey</h1>
-            <p className="text-gray-500 mt-0.5">House Number: <strong className="text-gray-900 bg-gray-100 px-2 py-0.5 rounded font-mono text-sm border border-gray-200">{record?.house_number}</strong></p>
+            <p className="text-gray-500 mt-0.5">{getEntityLabel(typeStr)}: <strong className="text-gray-900 bg-gray-100 px-2 py-0.5 rounded font-mono text-sm border border-gray-200">{record?.entity_id}</strong></p>
           </div>
           
           {isReadonly && (

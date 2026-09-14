@@ -240,7 +240,7 @@ export default function StudentDashboard() {
                            <ClipboardList size={20} />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-gray-900 truncate">{survey.survey_type} Survey #{survey.house_number || survey.id.slice(0, 8)}</h4>
+                          <h4 className="font-semibold text-gray-900 truncate">{survey.survey_type} Survey #{survey.entity_id || survey.id.slice(0, 8)}</h4>
                           <p className="text-sm text-gray-500 truncate mt-0.5">
                             Status: {survey.status} {survey.sync_status === 'pending' ? '(Pending Sync)' : ''}
                           </p>

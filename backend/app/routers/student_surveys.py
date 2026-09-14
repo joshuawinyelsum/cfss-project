@@ -58,6 +58,17 @@ async def get_survey_stats(
                 
     return stats
 
+def get_entity_prefix(survey_type: str) -> str:
+    if survey_type == "HOUSEHOLD":
+        return ""
+    elif survey_type == "EDUCATION":
+        return "SCH/"
+    elif survey_type == "HEALTH":
+        return "HF/"
+    elif survey_type == "GOVERNANCE":
+        return "GOV/"
+    return "ENT/"
+
 @router.get("/dashboard/stats")
 async def get_dashboard_stats(
     db: AsyncSession = Depends(get_db), 
@@ -106,7 +117,7 @@ async def get_dashboard_stats(
         {
             "id": r.id,
             "survey_type": r.survey_type,
-            "house_number": r.house_number,
+            "entity_id": r.entity_id,
             "status": r.status,
             "sync_status": r.sync_status,
             "updated_at": r.updated_at.isoformat() if r.updated_at else None
@@ -157,7 +168,7 @@ async def get_all_drafts(
     ).group_by(models.SurveyRecord.id)
 
     if search:
-        query = query.where(models.SurveyRecord.house_number.ilike(f"%{search}%"))
+        query = query.where(models.SurveyRecord.entity_id.ilike(f"%{search}%"))
     if survey_type:
         query = query.where(models.SurveyRecord.survey_type == survey_type.upper())
 
@@ -167,7 +178,7 @@ async def get_all_drafts(
             models.SurveyRecord.community_id == community.id,
             models.SurveyRecord.created_by_student_id == current_user.id,
             models.SurveyRecord.status == "DRAFT",
-            models.SurveyRecord.house_number.ilike(f"%{search}%") if search else True,
+            models.SurveyRecord.entity_id.ilike(f"%{search}%") if search else True,
             models.SurveyRecord.survey_type == survey_type.upper() if survey_type else True
         ).subquery()
     )
@@ -184,7 +195,7 @@ async def get_all_drafts(
         data.append({
             "id": record.id,
             "survey_type": record.survey_type,
-            "house_number": record.house_number,
+            "entity_id": record.entity_id,
             "progress": progress,
             "updated_at": record.updated_at,
             "status": record.status
@@ -216,7 +227,7 @@ async def get_all_submitted(
     )
     
     if search:
-        query = query.where(models.SurveyRecord.house_number.ilike(f"%{search}%"))
+        query = query.where(models.SurveyRecord.entity_id.ilike(f"%{search}%"))
     if survey_type:
         query = query.where(models.SurveyRecord.survey_type == survey_type.upper())
         
@@ -231,7 +242,7 @@ async def get_all_submitted(
         data.append({
             "id": record.id,
             "survey_type": record.survey_type,
-            "house_number": record.house_number,
+            "entity_id": record.entity_id,
             "submitted_at": record.updated_at,
             "updated_at": record.updated_at,
             "status": record.status
@@ -280,55 +291,67 @@ async def get_surveys_by_type(
             models.SurveyRecord.community_id == community.id,
             models.SurveyRecord.survey_type == s_type
         )
-        .order_by(models.SurveyRecord.house_number)
+        .order_by(models.SurveyRecord.entity_id)
     )
     return result.scalars().all()
 
+class CreateSurveyRequest(BaseModel):
+    survey_type: str
+
 @router.post("/create")
 async def create_survey(
-    payload: dict,
+    survey_data: CreateSurveyRequest,
     db: AsyncSession = Depends(get_db), 
     user_data: tuple = Depends(get_current_student)
 ):
     current_user, community = user_data
-    s_type = payload.get("survey_type", "").upper()
+    s_type = survey_data.survey_type.upper()
     if s_type not in SURVEY_TYPES:
         raise HTTPException(status_code=400, detail="Invalid survey type")
         
     from sqlalchemy.exc import IntegrityError
     
     clean_comm_name = re.sub(r'[^A-Za-z0-9]', '', community.name)
+    prefix = get_entity_prefix(s_type)
     
-    # Retry mechanism for generating house number safely
-    for _ in range(5):
-        # Get count
-        result = await db.execute(
-            select(func.count())
-            .where(
-                models.SurveyRecord.community_id == community.id,
-                models.SurveyRecord.survey_type == s_type
-            )
+    # Retry mechanism for generating entity_id safely
+    result = await db.execute(
+        select(func.count())
+        .where(
+            models.SurveyRecord.community_id == community.id,
+            models.SurveyRecord.survey_type == s_type
         )
-        count = result.scalar() or 0
-        next_num = count + 1
-        house_number = f"{clean_comm_name}/TTFPP/{next_num:04d}"
+    )
+    count = result.scalar() or 0
+    next_num = count + 1
+    
+    while True:
+        entity_id = f"{clean_comm_name}/TTFPP/{prefix}{next_num:04d}"
         
-        record = models.SurveyRecord(
-            community_id=community.id,
-            created_by_student_id=current_user.id,
-            survey_type=s_type,
-            house_number=house_number,
-            status="DRAFT"
+        # Check if exists
+        exists_check = await db.execute(
+            select(models.SurveyRecord.id).where(models.SurveyRecord.entity_id == entity_id)
         )
-        db.add(record)
-        try:
-            await db.commit()
-            await db.refresh(record)
-            return record
-        except IntegrityError:
-            await db.rollback()
-            continue
-            
+        if not exists_check.scalars().first():
+            # Available
+            record = models.SurveyRecord(
+                community_id=community.id,
+                created_by_student_id=current_user.id,
+                survey_type=s_type,
+                entity_id=entity_id,
+                status="DRAFT"
+            )
+            db.add(record)
+            try:
+                await db.commit()
+                await db.refresh(record)
+                return record
+            except IntegrityError:
+                await db.rollback()
+                next_num += 1
+                continue
+                
+        next_num += 1
     raise HTTPException(status_code=500, detail="Failed to generate unique house number after multiple attempts")
 
 @router.get("/record/{record_id}")

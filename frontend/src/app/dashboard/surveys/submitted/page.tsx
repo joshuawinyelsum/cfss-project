@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { db } from '@/lib/db';
+import { getEntityLabel } from '@/lib/entityLabel';
 import Link from 'next/link';
 import { Search, Filter, Loader2, ArrowRight } from 'lucide-react';
 
-export default function SubmittedPage() {
+export default function SubmittedSurveysPage() {
   const { user, token } = useAuthStore();
   const router = useRouter();
   
@@ -21,7 +23,7 @@ export default function SubmittedPage() {
   const limit = 20;
 
   const loadSubmitted = async (reset = false) => {
-    if (!token) return;
+    if (!user) return;
     setLoading(true);
     try {
       const currentSkip = reset ? 0 : skip;
@@ -30,8 +32,8 @@ export default function SubmittedPage() {
       const { db } = await import('@/lib/db');
       const allLocal = await db.surveys.where('status').equals('SUBMITTED').toArray();
       // Simple local filtering
-      let localSubmitted = allLocal;
-      if (search) localSubmitted = localSubmitted.filter(d => d.house_number?.toLowerCase().includes(search.toLowerCase()));
+      let localSubmitted = allLocal.filter(d => d.student_id === user?.id);
+      if (search) localSubmitted = localSubmitted.filter(d => d.entity_id?.toLowerCase().includes(search.toLowerCase()));
       if (typeFilter) localSubmitted = localSubmitted.filter(d => d.survey_type.toLowerCase() === typeFilter.toLowerCase());
 
       let serverItems = [];
@@ -158,8 +160,8 @@ export default function SubmittedPage() {
                 
                 <div className="p-5 space-y-4">
                   <div>
-                    <div className="text-sm text-gray-500 mb-1">House Number:</div>
-                    <div className="font-mono text-gray-900 font-medium bg-gray-50 inline-block px-2 py-1 rounded border border-gray-100">{record.house_number}</div>
+                    <div className="text-sm text-gray-500 mb-1">{getEntityLabel(record.survey_type)}:</div>
+                    <div className="font-mono text-gray-900 font-medium bg-gray-50 inline-block px-2 py-1 rounded border border-gray-100">{record.entity_id}</div>
                   </div>
                   
                   <div>

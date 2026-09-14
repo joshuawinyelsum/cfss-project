@@ -82,45 +82,47 @@ async def sync_surveys(
                 await db.execute(delete(models.SurveyAnswer).where(models.SurveyAnswer.survey_record_id == record.id))
             else:
                 # Create new
-                house_number = survey.house_number
+                entity_id = survey.house_number
                 
-                # If no house number (offline creation), generate one
-                if not house_number or house_number.startswith("TEMP"):
+                # If no entity_id (offline creation), generate one
+                if not entity_id or entity_id.startswith("TEMP"):
+                    from app.routers.student_surveys import get_entity_prefix
                     clean_comm_name = re.sub(r'[^A-Za-z0-9]', '', community.name)
-                    # Retry logic for unique house number
-                    from sqlalchemy.exc import IntegrityError
-                    for _ in range(5):
-                        count_res = await db.execute(
-                            select(func.count()).where(
-                                models.SurveyRecord.community_id == community.id,
-                                models.SurveyRecord.survey_type == survey.survey_type.upper()
-                            )
+                    prefix = get_entity_prefix(survey.survey_type.upper())
+                    
+                    # Robust logic for unique entity_id
+                    count_res = await db.execute(
+                        select(func.count()).where(
+                            models.SurveyRecord.community_id == community.id,
+                            models.SurveyRecord.survey_type == survey.survey_type.upper()
                         )
-                        count = count_res.scalar() or 0
-                        next_num = count + 1
-                        generated_num = f"{clean_comm_name}/TTFPP/{next_num:04d}"
+                    )
+                    count = count_res.scalar() or 0
+                    next_num = count + 1
+                    
+                    while True:
+                        generated_num = f"{clean_comm_name}/TTFPP/{prefix}{next_num:04d}"
                         
                         # Verify uniqueness in DB just in case
                         existing_hn = await db.execute(
                             select(models.SurveyRecord.id).where(
-                                models.SurveyRecord.community_id == community.id,
-                                models.SurveyRecord.survey_type == survey.survey_type.upper(),
-                                models.SurveyRecord.house_number == generated_num
+                                models.SurveyRecord.entity_id == generated_num
                             )
                         )
                         if not existing_hn.scalars().first():
-                            house_number = generated_num
+                            entity_id = generated_num
                             break
+                        next_num += 1
                             
-                    if not house_number or house_number.startswith("TEMP"):
-                        raise ValueError("Failed to generate unique house number")
+                    if not entity_id or entity_id.startswith("TEMP"):
+                        raise ValueError("Failed to generate unique entity id")
 
                 record = models.SurveyRecord(
                     id=survey.survey_id,
                     community_id=community.id,
                     created_by_student_id=current_user.id,
                     survey_type=survey.survey_type.upper(),
-                    house_number=house_number,
+                    entity_id=entity_id,
                     status=survey.status,
                     sync_status="synced",
                     last_synced_at=func.now(),
@@ -148,7 +150,7 @@ async def sync_surveys(
                 notif = models.AdminNotification(
                     type="survey_submit",
                     title="Survey Submitted",
-                    message=f"{current_user.name} submitted {record.survey_type.capitalize()} Survey\nCommunity: {community.name}\nHouse Number: {record.house_number}"
+                    message=f"{current_user.name} submitted {record.survey_type.capitalize()} Survey\nCommunity: {community.name}\nEntity ID: {record.entity_id}"
                 )
                 db.add(notif)
                 await db.commit()
@@ -156,7 +158,7 @@ async def sync_surveys(
             results.append({
                 "client_id": survey.survey_id,
                 "server_id": record.id,
-                "house_number": record.house_number,
+                "house_number": record.entity_id, # keep house_number in payload to avoid breaking old apps, or Dexie payload compatibility
                 "success": True
             })
             

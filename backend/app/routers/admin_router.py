@@ -332,7 +332,10 @@ async def get_all_students(skip: int = 0, limit: int = 100, db: AsyncSession = D
             "student_id": user.student_id,
             "name": user.name,
             "email": user.email or "",
+            "faculty": user.faculty,
             "program": user.program,
+            "gender": user.gender,
+            "phone_number": user.phone_number,
             "level": user.level,
             "role": user.role,
             "community_id": str(user.community_id),
@@ -343,6 +346,7 @@ async def get_all_students(skip: int = 0, limit: int = 100, db: AsyncSession = D
             "region": comm.region
         })
     return response
+
 
 @router.get("/students/{student_id}", response_model=schemas.UserResponse)
 async def get_student(student_id: str, db: AsyncSession = Depends(get_db_and_admin)):
@@ -368,7 +372,10 @@ async def get_student(student_id: str, db: AsyncSession = Depends(get_db_and_adm
         "student_id": user.student_id,
         "name": user.name,
         "email": user.email or "",
+        "faculty": user.faculty,
         "program": user.program,
+        "gender": user.gender,
+        "phone_number": user.phone_number,
         "level": user.level,
         "role": user.role,
         "community_id": str(user.community_id),
@@ -378,6 +385,7 @@ async def get_student(student_id: str, db: AsyncSession = Depends(get_db_and_adm
         "district": comm.district,
         "region": comm.region
     }
+
 
 @router.get("/sync/overview")
 async def get_sync_overview(db: AsyncSession = Depends(get_db_and_admin)):

@@ -102,7 +102,7 @@ export default function SurveyViewPage() {
             </div>
             <div>
               <p className="text-sm text-gray-500 mb-1">House Number</p>
-              <p className="font-mono font-bold text-gray-900 bg-gray-50 inline-block px-2 py-0.5 rounded border border-gray-100">{record.house_number}</p>
+              <p className="font-mono font-bold text-gray-900 bg-gray-50 inline-block px-2 py-0.5 rounded border border-gray-100">{record.entity_id}</p>
             </div>
             <div>
               <p className="text-sm text-gray-500 mb-1">Community</p>

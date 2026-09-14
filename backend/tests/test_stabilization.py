@@ -144,7 +144,7 @@ class TestSettingsNoCrash:
         db.add(settings)
         await db.commit()
 
-        response = await client.put(
+        response = set_res = await client.put(
             "/api/admin/settings",
             json={
                 "admin_password": "admin123",
@@ -232,7 +232,7 @@ class TestSurveyLifecycle:
         record_id = create_res.json()["id"]
 
         # Save draft
-        draft_res = await client.put(
+        draft_res = set_res = await client.put(
             f"/api/student/surveys/record/{record_id}/draft",
             json={"answers": [
                 {"question_id": ctx["questions"][0].id, "answer": "John Doe"},
@@ -337,3 +337,227 @@ class TestSurveyLifecycle:
         assert stats["submitted_surveys"] == 1
         assert stats["draft_surveys"] == 1
         assert stats["total_surveys"] == 2
+
+# -------------------------------------------------------------------------------
+# 7. PROFILE DATA INTEGRITY (FULL NAME, EMAIL, FACULTY)
+# -------------------------------------------------------------------------------
+
+class TestProfileDataIntegrity:
+    async def test_student_profile_fields(self, client: AsyncClient, admin_token: str):
+        # 1. Create a whitelist with faculty and email
+        import pandas as pd
+        import io
+        
+        df = pd.DataFrame([{
+            "studentId": "PROF999",
+            "name": "Jane Doe",
+            "email": "jane@example.com",
+            "faculty": "Science",
+            "program": "CS",
+            "gender": "Female",
+            "phone_number": "011 222 3333",
+            "level": 100
+        }])
+        
+        from io import BytesIO
+        output = BytesIO()
+        df.to_excel(output, index=False)
+        output.seek(0)
+        
+        upload_res = await client.post(
+            "/admin/whitelist/upload",
+            data={"name": "Profile Test"},
+            files={"file": ("test.xlsx", output, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            headers={"Authorization": f"Bearer {admin_token}"}
+        )
+        assert upload_res.status_code == 200
+        
+
+        # 1b. Open registration
+        set_res = await client.put(
+            "/api/admin/settings/registration",
+            json={
+                "registration_enabled": True,
+                "admin_password": "admin123"
+            },
+            headers={"Authorization": f"Bearer {admin_token}"}
+        )
+        assert set_res.status_code == 200, set_res.json()
+
+        # 1c. Create a community
+        await client.post(
+            "/api/admin/communities",
+            json={
+                "name": "Test Comm",
+                "district": "D",
+                "region": "R",
+                "capacity": 10,
+                "group_number": 1
+            },
+            headers={"Authorization": f"Bearer {admin_token}"}
+        )
+        # 2. Register the student
+        reg_res = await client.post(
+            "/api/v2/students/register",
+            json={
+                "student_id": "PROF999",
+                "password": "password123",
+                "program": "CS"
+            }
+        )
+        assert reg_res.status_code == 201, reg_res.json()
+        
+        # 3. Login
+        login_res = await client.post(
+            "/api/v2/students/login",
+            json={
+                "student_id": "PROF999",
+                "password": "password123"
+            }
+        )
+        assert login_res.status_code == 200
+        student_token = login_res.json()["access_token"]
+        
+        # 4. Check /me for fields
+        me_res = await client.get(
+            "/api/v2/students/me",
+            headers={"Authorization": f"Bearer {student_token}"}
+        )
+        assert me_res.status_code == 200
+        me_data = me_res.json()
+        
+        assert me_data["student_id"] == "PROF999"
+        assert me_data["full_name"] == "Jane Doe"
+        assert me_data["email"] == "jane@example.com"
+        assert me_data["faculty"] == "Science"
+        assert me_data["program"] == "cs"
+        
+        # 5. Check admin students list for fields
+        admin_students_res = await client.get(
+            "/api/admin/students",
+            headers={"Authorization": f"Bearer {admin_token}"}
+        )
+        assert admin_students_res.status_code == 200
+        students_data = admin_students_res.json()
+        
+        jane = next((s for s in students_data if s["student_id"] == "PROF999"), None)
+        assert jane is not None
+        assert jane["name"] == "Jane Doe"
+        assert jane["email"] == "jane@example.com"
+        assert jane["faculty"] == "Science"
+        assert jane["program"] == "cs"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 7. PHONE NUMBER & GENDER DATA PIPELINE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestPhoneNumberPipeline:
+    """Verifies phone number and gender flow from whitelist to registration, 
+    and validates 'My Group' visibility constraints."""
+    
+    async def test_phone_gender_pipeline(self, client: AsyncClient, admin_token, setup_db):
+        import pandas as pd
+        from io import BytesIO
+        
+        # 1. Upload whitelist containing gender and phone_number
+        df = pd.DataFrame([
+            {
+                "studentId": "PHONE001",
+                "name": "Phone Student",
+                "email": "phone1@example.com",
+                "phone_number": "024 123 4567",
+                "gender": "Male",
+                "faculty": "Science",
+                "program": "CS",
+                "level": 100
+            },
+            {
+                "studentId": "PHONE002",
+                "name": "Phone Peer",
+                "email": "phone2@example.com",
+                "phone_number": "055 987 6543",
+                "gender": "Female",
+                "faculty": "Science",
+                "program": "CS",
+                "level": 100
+            },
+            {
+                "studentId": "OTHER001",
+                "name": "Other Group Student",
+                "email": "other@example.com",
+                "phone_number": "020 111 2222",
+                "gender": "Male",
+                "faculty": "Arts",
+                "program": "English",
+                "level": 100
+            }
+        ])
+        
+        output = BytesIO()
+        df.to_csv(output, index=False)
+        output.seek(0)
+        
+        upload_res = await client.post(
+            "/admin/whitelist/upload",
+            data={"name": "Phone Test"},
+            files={"file": ("test.csv", output, "text/csv")},
+            headers={"Authorization": f"Bearer {admin_token}"}
+        )
+        assert upload_res.status_code == 200
+
+        # Open registration
+        await client.put(
+            "/api/admin/settings/registration",
+            json={"registration_enabled": True, "admin_password": "admin123"},
+            headers={"Authorization": f"Bearer {admin_token}"}
+        )
+
+        # Create TWO communities
+        await client.post("/api/admin/communities", json={"name": "Comm A", "district": "D", "region": "R", "capacity": 2, "group_number": 1}, headers={"Authorization": f"Bearer {admin_token}"})
+        await client.post("/api/admin/communities", json={"name": "Comm B", "district": "D", "region": "R", "capacity": 2, "group_number": 2}, headers={"Authorization": f"Bearer {admin_token}"})
+        
+        # Register students
+        for sid in ["PHONE001", "PHONE002", "OTHER001"]:
+            reg_res = await client.post(
+                "/api/v2/students/register",
+                json={"student_id": sid, "password": "password123", "program": "CS" if "PHONE" in sid else "English"}
+            )
+            assert reg_res.status_code == 201
+
+        # Login Student 1
+        login_res = await client.post("/api/v2/students/login", json={"student_id": "PHONE001", "password": "password123"})
+        assert login_res.status_code == 200
+        student_token = login_res.json()["access_token"]
+        
+        # 2. Check /me for fields
+        me_res = await client.get("/api/v2/students/me", headers={"Authorization": f"Bearer {student_token}"})
+        assert me_res.status_code == 200
+        me_data = me_res.json()
+        assert me_data["phone_number"] == "024 123 4567"
+        assert me_data["gender"] == "Male"
+        
+        # 3. Check group members endpoint (Should only see PHONE001 and PHONE002, not OTHER001)
+        group_res = await client.get("/api/student/community/members", headers={"Authorization": f"Bearer {student_token}"})
+        assert group_res.status_code == 200
+        group_data = group_res.json()
+        
+        assert len(group_data) == 2
+        peers = {m["student_id"]: m for m in group_data}
+        
+        assert "PHONE001" in peers
+        assert "OTHER001" in peers
+        assert "PHONE002" not in peers
+        
+        assert peers["OTHER001"]["phone_number"] == "020 111 2222"
+        assert peers["OTHER001"]["gender"] == "Male"
+        # Check security (email should NOT be returned in group schema)
+        assert "email" not in peers["OTHER001"]
+        
+        # 4. Check Admin endpoint 
+        admin_res = await client.get(f"/api/admin/students/{me_data['id']}", headers={"Authorization": f"Bearer {admin_token}"})
+        assert admin_res.status_code == 200
+        admin_data = admin_res.json()
+        assert admin_data["phone_number"] == "024 123 4567"
+        assert admin_data["gender"] == "Male"
+

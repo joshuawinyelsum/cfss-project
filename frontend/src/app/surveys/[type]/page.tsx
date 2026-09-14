@@ -117,7 +117,7 @@ export default function SurveyWorkspace() {
                         <Home size={20} />
                       </div>
                       <div>
-                        <h4 className="font-bold text-gray-900">{record.house_number}</h4>
+                        <h4 className="font-bold text-gray-900">{record.entity_id}</h4>
                         <div className="flex items-center gap-2 mt-1">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold ${record.status === 'SUBMITTED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                             {record.status === 'SUBMITTED' ? <CheckCircle size={12} /> : <Clock size={12} />}

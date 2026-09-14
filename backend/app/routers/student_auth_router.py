@@ -72,14 +72,16 @@ async def register_student(request: Request, data: schemas.StudentRegister, db: 
         # 8. Create User
         new_user = models.User(
             student_id=student_id,
-            name=entry.full_name or student_id,
-            program=entry.program,
+            name=entry.full_name or data.student_id,
             password_hash=auth.get_password_hash(data.password),
+            faculty=entry.faculty,
+            program=program,
+            gender=entry.gender,
+            phone_number=entry.phone_number,
             role="student",
-            is_active=True,
             community_id=community.id,
-            email=None,
-            level=0,
+            email=entry.email,
+            level=entry.level or 0,
             is_verified=True
         )
         db.add(new_user)
@@ -157,12 +159,17 @@ async def get_student_me(current_user: models.User = Depends(auth.get_current_us
             "id": current_user.id,
             "student_id": current_user.student_id,
             "full_name": current_user.name,
+            "email": current_user.email,
+            "faculty": current_user.faculty,
+            "gender": current_user.gender,
+            "phone_number": current_user.phone_number,
             "program": current_user.program or "",
             "community": community.name if community else None,
             "community_id": current_user.community_id,
             "group_number": community.group_number if community else None,
             "registered_at": current_user.created_at.isoformat() if current_user.created_at else None
         }
+
     except HTTPException:
         raise
     except Exception as e:

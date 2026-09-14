@@ -1,10 +1,11 @@
 import Dexie, { type EntityTable } from 'dexie';
 
 export interface LocalSurvey {
+  student_id: number;
   id: string; // Generated client-side (UUID)
   survey_type: string;
   community_id: number;
-  house_number: string | null;
+  entity_id: string | null;
   answers: { question_id: string; answer: any }[];
   status: 'DRAFT' | 'SUBMITTED';
   sync_status: 'pending' | 'syncing' | 'synced' | 'failed';
@@ -19,9 +20,21 @@ class CFSSDatabase extends Dexie {
 
   constructor() {
     super('CFSSDatabase');
-    // Version 2 overhauls the schema for the new offline-first sync engine
-    this.version(2).stores({
-      surveys: 'id, survey_type, status, sync_status, updated_at'
+    // Version 3 added student_id
+    this.version(3).stores({
+      surveys: 'id, student_id, survey_type, status, sync_status, updated_at'
+    });
+    
+    // Version 4 renames house_number to entity_id for conceptual clarity
+    this.version(4).stores({
+      surveys: 'id, student_id, survey_type, status, sync_status, updated_at'
+    }).upgrade(tx => {
+      return tx.table('surveys').toCollection().modify(survey => {
+        if (survey.house_number !== undefined) {
+          survey.entity_id = survey.house_number;
+          delete survey.house_number;
+        }
+      });
     });
   }
 }

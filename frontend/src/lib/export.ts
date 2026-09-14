@@ -1,23 +1,19 @@
-import { API_BASE_URL } from "./api";
+import { api } from "./api";
 
 export async function downloadExport(endpoint: string, filename: string, token: string) {
   try {
-    const url = endpoint.startsWith('http')
-      ? endpoint
-      : `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
-    const response = await fetch(url, {
-      method: "GET",
+    const url = endpoint.startsWith('http') ? endpoint : endpoint.startsWith('/') ? endpoint : '/' + endpoint;
+    console.log("Exporting from URL via Axios:", url);
+    
+    const response = await api.get(url, {
       headers: {
         Authorization: `Bearer ${token}`
-      }
+      },
+      responseType: 'blob' // Important for downloading files!
     });
 
-    if (!response.ok) {
-      throw new Error(`Export failed with status: ${response.status}`);
-    }
-
     let finalFilename = filename;
-    const disposition = response.headers.get("content-disposition");
+    const disposition = response.headers["content-disposition"];
     if (disposition && disposition.indexOf("attachment") !== -1) {
       const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
       const matches = filenameRegex.exec(disposition);
@@ -26,7 +22,7 @@ export async function downloadExport(endpoint: string, filename: string, token: 
       }
     }
 
-    const blob = await response.blob();
+    const blob = response.data;
     const objectUrl = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = objectUrl;
@@ -36,8 +32,13 @@ export async function downloadExport(endpoint: string, filename: string, token: 
     
     link.parentNode?.removeChild(link);
     window.URL.revokeObjectURL(objectUrl);
-  } catch (error) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (error: any) {
     console.error("Export failed:", error);
+    if (error.response) {
+      console.error("Backend error response:", error.response.data);
+      throw new Error(`Export failed: ${JSON.stringify(error.response.data)}`);
+    }
     throw new Error("Export failed. Check server.");
   }
 }

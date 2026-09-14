@@ -10,7 +10,10 @@ interface Student {
   student_id: string;
   name: string;
   email: string;
+  faculty: string | null;
   program: string;
+  gender: string | null;
+  phone_number: string | null;
   level: number;
   role: string;
   community_id: string;
@@ -273,16 +276,32 @@ export default function AdminStudentsPage() {
                               <span className="text-sm font-semibold text-slate-900 col-span-2">{selectedStudent.name}</span>
                             </div>
                             <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-slate-500">Email:</span>
-                              <span className="text-sm text-slate-900 col-span-2">{selectedStudent.email || "N/A"}</span>
+                              <span className="text-sm font-medium text-slate-500">Index Number:</span>
+                              <span className="text-sm font-semibold text-slate-900 col-span-2">{selectedStudent.student_id}</span>
                             </div>
                             <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-slate-500">Program:</span>
-                              <span className="text-sm text-slate-900 col-span-2">{selectedStudent.program || "N/A"}</span>
+                              <span className="text-sm font-medium text-slate-500">Gender:</span>
+                              <span className="text-sm text-slate-900 col-span-2">{selectedStudent.gender || 'Not provided'}</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              <span className="text-sm font-medium text-slate-500">Phone:</span>
+                              <span className="text-sm text-slate-900 col-span-2">{selectedStudent.phone_number || 'Not provided'}</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              <span className="text-sm font-medium text-slate-500">Email:</span>
+                              <span className="text-sm text-slate-900 col-span-2">{selectedStudent.email || 'N/A'}</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              <span className="text-sm font-medium text-slate-500">Faculty/School:</span>
+                              <span className="text-sm text-slate-900 col-span-2">{selectedStudent.faculty || 'Not provided'}</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              <span className="text-sm font-medium text-slate-500">Department:</span>
+                              <span className="text-sm text-slate-900 col-span-2">{selectedStudent.program || 'N/A'}</span>
                             </div>
                             <div className="grid grid-cols-3 gap-2">
                               <span className="text-sm font-medium text-slate-500">Level:</span>
-                              <span className="text-sm text-slate-900 col-span-2">{selectedStudent.level || "N/A"}</span>
+                              <span className="text-sm text-slate-900 col-span-2">{selectedStudent.level || 'N/A'}</span>
                             </div>
                           </div>
                           

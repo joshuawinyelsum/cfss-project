@@ -15,15 +15,33 @@ async def get_db_and_student(db: AsyncSession = Depends(get_db), current_user: m
         raise HTTPException(status_code=403, detail="Student has no assigned community")
     return db, current_user
 
-@router.get("/community/members", response_model=List[schemas.UserResponse])
+@router.get("/community/members", response_model=List[schemas.GroupMemberResponse])
 async def get_community_members(deps: tuple = Depends(get_db_and_student)):
     db, current_user = deps
+    # Security: only returns members of the authenticated student's own community.
+    # Cross-group access is impossible — community_id is sourced from the JWT, not a query param.
     result = await db.execute(
-        select(models.User)
+        select(models.User, models.Community)
+        .join(models.Community, models.User.community_id == models.Community.id)
         .filter(models.User.community_id == current_user.community_id)
         .filter(models.User.role == "student")
+        .order_by(models.User.name)
     )
-    return result.scalars().all()
+    members = []
+    for user, community in result.all():
+        members.append({
+            "id": user.id,
+            "student_id": user.student_id,
+            "full_name": user.name,
+            "faculty": user.faculty,
+            "program": user.program,
+            "gender": user.gender,
+            "phone_number": user.phone_number,
+            "community_name": community.name,
+            "group_number": community.group_number,
+        })
+    return members
+
 
 @router.post("/surveys", response_model=schemas.SurveyResponse)
 async def submit_survey(survey: schemas.SurveySubmission, deps: tuple = Depends(get_db_and_student)):

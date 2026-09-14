@@ -15,7 +15,8 @@ import {
   Bell, 
   LogOut,
   Menu,
-  X
+  X,
+  Users
 } from 'lucide-react';
 import { syncEngine } from '@/lib/sync';
 
@@ -111,15 +112,39 @@ export default function DashboardLayout({
     }
   }, [token, user, router]);
 
+  const [draftCount, setDraftCount] = useState(0);
+  
+  useEffect(() => {
+    if (!user) return;
+    const fetchCount = async () => {
+      try {
+        const { db } = await import('@/lib/db');
+        const drafts = await db.surveys.where('status').equals('DRAFT').toArray();
+        setDraftCount(drafts.filter(d => d.student_id === user.id).length);
+      } catch (e) {
+        // Ignored
+      }
+    };
+    fetchCount();
+    window.addEventListener('sync-queued', fetchCount);
+    window.addEventListener('sync-completed', fetchCount);
+    return () => {
+      window.removeEventListener('sync-queued', fetchCount);
+      window.removeEventListener('sync-completed', fetchCount);
+    };
+  }, [user]);
+
   const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
+    { name: 'My Group', href: '/dashboard/group', icon: Users },
     { name: 'Surveys', href: '/surveys', icon: ClipboardList },
-    { name: 'Drafts', href: '/dashboard/surveys/drafts', icon: FileEdit, badge: 3 },
+    { name: 'Drafts', href: '/dashboard/surveys/drafts', icon: FileEdit, badge: draftCount > 0 ? draftCount : undefined },
     { name: 'Submitted', href: '/dashboard/surveys/submitted', icon: CheckSquare },
     { name: 'Reports', href: '/reports', icon: BarChart2 },
     { name: 'Profile', href: '/profile', icon: UserIcon },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
+
 
   if (!user) return null;
 

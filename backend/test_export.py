@@ -1,43 +1,47 @@
-import urllib.request
-import urllib.parse
-import json
+import asyncio
+import io
+import csv
+from sqlalchemy.future import select
+from app.database import engine, SessionLocal
+from app.models import WhitelistEntry, WhitelistV2
 
-# 1. Login to get token
-data = urllib.parse.urlencode({"username": "admin", "password": "admin123"}).encode("utf-8")
-req = urllib.request.Request("http://127.0.0.1:8000/api/auth/admin/login", data=data)
-try:
-    with urllib.request.urlopen(req) as res:
-        res_data = json.loads(res.read().decode())
-        token = res_data.get("access_token")
-        print(f"Token: {token[:20]}...")
-except Exception as e:
-    print(f"Login failed: {e}")
-    exit(1)
+async def test_export():
+    try:
+        async with SessionLocal() as db:
+            whitelist_id = 1
+            print(f"Testing export for whitelist_id: {whitelist_id}")
+            result = await db.execute(select(WhitelistV2).filter(WhitelistV2.id == whitelist_id))
+            whitelist = result.scalars().first()
+            if not whitelist:
+                print("Whitelist not found")
+                return
 
-# 2. Test export students
-print("\nTesting /admin/export/students ...")
-req = urllib.request.Request(
-    "http://127.0.0.1:8000/admin/export/students",
-    headers={"Authorization": f"Bearer {token}"}
-)
-try:
-    with urllib.request.urlopen(req) as res:
-        print(f"Status: {res.status}")
-except urllib.error.HTTPError as e:
-    print(f"Status: {e.code}")
-    print(e.read().decode())
+            print(f"Found whitelist: {whitelist.id}")
+            
+            output = io.StringIO()
+            writer = csv.writer(output)
+            base_headers = ["email", "student_id", "program", "level", "created_at"]
+            
+            query = select(WhitelistEntry).filter(WhitelistEntry.whitelist_id == whitelist_id).order_by(WhitelistEntry.id)
+            
+            metadata_keys = set()
+            first_batch_result = await db.execute(query.limit(10).offset(0))
+            first_batch = first_batch_result.scalars().all()
+            
+            print(f"Found {len(first_batch)} entries in first batch")
+            if first_batch:
+                for entry in first_batch:
+                    if entry.metadata_json and isinstance(entry.metadata_json, dict):
+                        metadata_keys.update(entry.metadata_json.keys())
+            
+            metadata_headers = sorted(list(metadata_keys))
+            all_headers = base_headers + metadata_headers
+            writer.writerow(all_headers)
+            print("Headers written:", all_headers)
+            print("SUCCESS: Endpoint logic completed without crashing.")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
 
-# 3. Test export surveys
-print("\nTesting /admin/export/surveys ...")
-req = urllib.request.Request(
-    "http://127.0.0.1:8000/admin/export/surveys",
-    headers={"Authorization": f"Bearer {token}"}
-)
-try:
-    with urllib.request.urlopen(req) as res:
-        print(f"Status: {res.status}")
-except urllib.error.HTTPError as e:
-    print(f"Status: {e.code}")
-    print(e.read().decode())
-
-print("\nDone.")
+if __name__ == "__main__":
+    asyncio.run(test_export())

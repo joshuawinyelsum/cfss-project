@@ -12,9 +12,11 @@ export default function LoginPage() {
   const [registered, setRegistered] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setAuth = useAuthStore((state: any) => state.setAuth);
   
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRegistered(new URLSearchParams(window.location.search).get('registered') === 'true');
   }, []);
 
@@ -59,9 +61,16 @@ export default function LoginPage() {
       
       setAuth(token, userData);
       router.push('/dashboard');
-    } catch (err: any) {
-      console.error("Login error:", err?.response?.data || err.message);
-      setError(getErrorMessage(err, 'Invalid student ID or password'));
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const error = err as any;
+      console.error("Login error object:", error);
+      if (error.response) {
+        console.error("Response data:", error.response.data);
+      } else {
+        console.error("Network or parsing error. Backend might not be reachable.");
+      }
+      setError(getErrorMessage(error, 'Invalid student ID or password (or backend is unreachable)'));
       setIsLoading(false);
     }
   };
@@ -118,7 +127,7 @@ export default function LoginPage() {
       
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-600">
-          Don't have an account? <a href="/register" className="text-blue-600 hover:underline">Register here</a>
+          Don&apos;t have an account? <a href="/register" className="text-blue-600 hover:underline">Register here</a>
         </p>
       </div>
       </div>

@@ -147,7 +147,7 @@ export default function SyncPage() {
                     )}
                   </div>
                   <p className="text-sm text-gray-500">
-                    House Number: <span className="font-medium text-gray-700">{item.house_number || 'Pending Assignment'}</span>
+                    ID: <span className="font-medium text-gray-700">{item.entity_id || 'Pending Assignment'}</span>
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
                     Saved: {new Date(item.updated_at).toLocaleString()}
@@ -184,7 +184,7 @@ export default function SyncPage() {
               <div key={item.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-gray-50">
                 <div>
                   <p className="font-medium text-gray-900 text-sm">{item.survey_type.toUpperCase()} Survey</p>
-                  <p className="text-xs text-gray-500">House: {item.house_number}</p>
+                  <p className="text-xs text-gray-500">ID: {item.entity_id}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-emerald-600 font-medium flex items-center justify-end gap-1">

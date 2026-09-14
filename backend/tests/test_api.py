@@ -10,16 +10,20 @@ def event_loop():
     yield loop
     loop.close()
 
-@pytest.fixture(autouse=True)
+import pytest_asyncio
+
+@pytest_asyncio.fixture(autouse=True)
 async def setup_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield
 
+from httpx import ASGITransport
+
 @pytest.mark.asyncio
 async def test_full_flow():
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # 1. Login as admin (default admin created on lifespan start, but wait, lifespan isn't triggered in tests usually unless using LifespanManager or ASGITestClient, we'll manually create or rely on route if needed. Let's just test basic structure first)
         
         # Actually, using httpx with ASGITestClient doesn't trigger lifespan by default in some setups. Let's just create an admin directly or we can use the default test db setup.

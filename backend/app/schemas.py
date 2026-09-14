@@ -11,7 +11,10 @@ class UserResponse(BaseModel):
     student_id: str
     name: str
     email: Optional[str] = None
+    faculty: Optional[str] = None
     program: Optional[str] = None
+    gender: Optional[str] = None
+    phone_number: Optional[str] = None
     level: int
     role: str
     community_id: Optional[str] = None
@@ -23,6 +26,26 @@ class UserResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+class GroupMemberResponse(BaseModel):
+    """Scoped response for student-facing group member list.
+    Only exposes fields group peers are authorised to see.
+    Phone numbers are visible to group members only — enforced at the API layer.
+    """
+    id: int
+    student_id: str       # index number
+    full_name: str        # maps from User.name
+    faculty: Optional[str] = None
+    program: Optional[str] = None  # department
+    gender: Optional[str] = None
+    phone_number: Optional[str] = None
+    community_name: str
+    group_number: int
+
+    class Config:
+        from_attributes = True
+
+
 
 class WhitelistCreate(BaseModel):
     student_id: str
@@ -183,11 +206,16 @@ class StudentMeResponse(BaseModel):
     id: int
     student_id: str
     full_name: str
+    email: Optional[str] = None
+    faculty: Optional[str] = None
+    gender: Optional[str] = None
+    phone_number: Optional[str] = None
     program: str
     community: Optional[str] = None
     community_id: Optional[int] = None
     group_number: Optional[int] = None
     registered_at: Optional[str] = None
+
 
 class ChangePasswordRequest(BaseModel):
     current_password: str

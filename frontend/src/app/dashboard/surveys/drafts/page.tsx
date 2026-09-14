@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { db } from '@/lib/db';
+import { getEntityLabel } from '@/lib/entityLabel';
 import Link from 'next/link';
 import { Search, Filter, Loader2, ArrowRight } from 'lucide-react';
 
@@ -30,8 +32,8 @@ export default function DraftsPage() {
       const { db } = await import('@/lib/db');
       const allLocal = await db.surveys.where('status').equals('DRAFT').toArray();
       // Simple local filtering
-      let localDrafts = allLocal;
-      if (search) localDrafts = localDrafts.filter(d => d.house_number?.toLowerCase().includes(search.toLowerCase()));
+      let localDrafts = allLocal.filter(d => d.student_id === user?.id);
+      if (search) localDrafts = localDrafts.filter(d => d.entity_id?.toLowerCase().includes(search.toLowerCase()));
       if (typeFilter) localDrafts = localDrafts.filter(d => d.survey_type.toLowerCase() === typeFilter.toLowerCase());
 
       let serverItems = [];
@@ -75,6 +77,17 @@ export default function DraftsPage() {
            isLocal: true // flag for UI to know it's local
          });
       });
+
+      // Critical: remove any server draft that is already SUBMITTED locally.
+      // This handles the race condition where the server still has status=DRAFT
+      // but the student already submitted it locally (sync pending).
+      const localSubmitted = await db.surveys.where('status').equals('SUBMITTED').toArray();
+      const localSubmittedIds = new Set(localSubmitted.map(s => s.id));
+      for (const id of localSubmittedIds) {
+        if (mergedMap.has(id)) {
+          mergedMap.delete(id);
+        }
+      }
       
       const mergedArray = Array.from(mergedMap.values()).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
@@ -85,6 +98,7 @@ export default function DraftsPage() {
       }
       setTotal(Math.max(serverTotal, mergedArray.length));
       setSkip(currentSkip + limit);
+
     } catch (e) {
       console.error("Failed to load drafts", e);
     } finally {
@@ -172,8 +186,8 @@ export default function DraftsPage() {
                 
                 <div className="p-5 space-y-4">
                   <div>
-                    <div className="text-sm text-gray-500 mb-1">House Number:</div>
-                    <div className="font-mono text-gray-900 font-medium bg-gray-50 inline-block px-2 py-1 rounded border border-gray-100">{record.house_number}</div>
+                    <div className="text-sm text-gray-500 mb-1">{getEntityLabel(record.survey_type)}:</div>
+                    <div className="font-mono text-gray-900 font-medium bg-gray-50 inline-block px-2 py-1 rounded border border-gray-100">{record.entity_id}</div>
                   </div>
                   
                   <div>

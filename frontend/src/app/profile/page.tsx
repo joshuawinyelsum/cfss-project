@@ -80,7 +80,7 @@ export default function StudentProfile() {
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-500 mb-1.5">Student ID</label>
+              <label className="block text-sm text-gray-500 mb-1.5">Index Number</label>
               <input 
                 type="text" 
                 value={user.student_id || ''} 
@@ -88,8 +88,47 @@ export default function StudentProfile() {
                 className="w-full bg-gray-100 border border-gray-200 rounded-lg p-2.5 text-gray-700 font-medium cursor-not-allowed"
               />
             </div>
+            <div>
+              <label className="block text-sm text-gray-500 mb-1.5">Gender</label>
+              <input 
+                type="text" 
+                value={user.gender || 'Not provided'} 
+                disabled 
+                className="w-full bg-gray-100 border border-gray-200 rounded-lg p-2.5 text-gray-700 font-medium cursor-not-allowed"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-500 mb-1.5">
+                Phone Number
+                <span className="ml-2 text-xs font-normal text-gray-400">(set by whitelist — contact admin to update)</span>
+              </label>
+              <input 
+                type="text" 
+                value={user.phone_number || 'Not provided'} 
+                disabled 
+                className="w-full bg-gray-100 border border-gray-200 rounded-lg p-2.5 text-gray-700 font-medium cursor-not-allowed"
+              />
+            </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm text-gray-500 mb-1.5">Program</label>
+              <label className="block text-sm text-gray-500 mb-1.5">Email</label>
+              <input 
+                type="text" 
+                value={user.email || 'No email provided'} 
+                disabled 
+                className="w-full bg-gray-100 border border-gray-200 rounded-lg p-2.5 text-gray-700 font-medium cursor-not-allowed"
+              />
+            </div>
+            <div className="sm:col-span-1">
+              <label className="block text-sm text-gray-500 mb-1.5">Faculty/School</label>
+              <input 
+                type="text" 
+                value={user.faculty || 'Not provided'} 
+                disabled 
+                className="w-full bg-gray-100 border border-gray-200 rounded-lg p-2.5 text-gray-700 font-medium cursor-not-allowed"
+              />
+            </div>
+            <div className="sm:col-span-1">
+              <label className="block text-sm text-gray-500 mb-1.5">Department</label>
               <input 
                 type="text" 
                 value={user.program || ''} 
@@ -98,6 +137,7 @@ export default function StudentProfile() {
               />
             </div>
           </div>
+
         </div>
 
         {/* SECTION 3: ACADEMIC / COMMUNITY INFO */}

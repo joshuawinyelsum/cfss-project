@@ -15,7 +15,10 @@ class User(Base):
     name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=True)
     password_hash = Column(String, nullable=False)
+    faculty = Column(String, nullable=True)
     program = Column(String, nullable=True)
+    gender = Column(String, nullable=True)       # Male | Female | Other — sourced from whitelist
+    phone_number = Column(String, nullable=True) # Canonical contact number — sourced from whitelist
     level = Column(Integer, nullable=False)
     role = Column(String, nullable=False, default="student")
     is_verified = Column(Boolean, default=False)
@@ -25,6 +28,7 @@ class User(Base):
     community_id = Column(Integer, ForeignKey("communities.id"), index=True, nullable=True) # Nullable for Admin only
 
     community = relationship("Community")
+
 
 class Community(Base):
     __tablename__ = "communities"
@@ -54,9 +58,13 @@ class WhitelistEntry(Base):
     student_id = Column(String, index=True, nullable=True)
     full_name = Column(String, nullable=True)
     email = Column(String, index=True, nullable=True)
+    faculty = Column(String, nullable=True)
     program = Column(String, nullable=True)
+    gender = Column(String, nullable=True)       # Male | Female | Other
+    phone_number = Column(String, nullable=True) # Required for new uploads
     level = Column(Integer, nullable=True)
     metadata_json = Column(JSONB, nullable=True)
+
 
 class Survey(Base):
     __tablename__ = "surveys"
@@ -118,13 +126,13 @@ class AuditLog(Base):
 
 class SurveyRecord(Base):
     __tablename__ = "survey_records"
-    __table_args__ = (UniqueConstraint('community_id', 'survey_type', 'house_number', name='uq_survey_record_house'),)
+    __table_args__ = (UniqueConstraint('community_id', 'survey_type', 'entity_id', name='uq_survey_record_entity'),)
     
     id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     community_id = Column(Integer, ForeignKey("communities.id"), nullable=False, index=True)
     created_by_student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     survey_type = Column(String, nullable=False, index=True) # HOUSEHOLD, EDUCATION, HEALTH, GOVERNANCE
-    house_number = Column(String, nullable=False, index=True)
+    entity_id = Column(String, nullable=False, index=True)
     status = Column(String, nullable=False, default="DRAFT") # DRAFT, SUBMITTED
     sync_status = Column(String, nullable=False, default="synced") # pending, syncing, synced, failed
     last_synced_at = Column(DateTime(timezone=True), nullable=True)
