@@ -9,12 +9,14 @@ export default function AdminLoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const setAuth = useAuthStore((state: any) => state.setAuth);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
     
     try {
       const formData = new URLSearchParams();
@@ -50,6 +52,7 @@ export default function AdminLoginPage() {
         msg = err.message;
       }
       setError(msg);
+      setIsLoading(false);
     }
   };
 
@@ -71,7 +74,8 @@ export default function AdminLoginPage() {
               required 
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="mt-1 block w-full border border-gray-300 rounded-md p-2 text-sm"
+              disabled={isLoading}
+              className="mt-1 block w-full border border-gray-300 rounded-md p-2 text-sm text-gray-900 bg-white placeholder-gray-400 disabled:opacity-60 disabled:cursor-not-allowed"
               placeholder="Admin Username"
             />
           </div>
@@ -82,18 +86,20 @@ export default function AdminLoginPage() {
               required 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 block w-full border border-gray-300 rounded-md p-2 text-sm"
+              disabled={isLoading}
+              className="mt-1 block w-full border border-gray-300 rounded-md p-2 text-sm text-gray-900 bg-white placeholder-gray-400 disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
           <button 
-            type="submit" 
-            className="w-full bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 text-sm font-medium"
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 text-sm font-medium disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Sign In to Admin Portal
+            {isLoading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+            {isLoading ? 'Signing In...' : 'Sign In to Admin Portal'}
           </button>
         </form>
       </div>
     </div>
   );
 }
- 

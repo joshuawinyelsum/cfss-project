@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [registered, setRegistered] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const setAuth = useAuthStore((state: any) => state.setAuth);
   
@@ -20,6 +21,7 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
     
     try {
       const payload = {
@@ -60,6 +62,7 @@ export default function LoginPage() {
     } catch (err: any) {
       console.error("Login error:", err?.response?.data || err.message);
       setError(getErrorMessage(err, 'Invalid student ID or password'));
+      setIsLoading(false);
     }
   };
 
@@ -87,7 +90,8 @@ export default function LoginPage() {
             required 
             value={studentId}
             onChange={(e) => setStudentId(e.target.value.toUpperCase())}
-            className="mt-1 block w-full border border-gray-300 rounded-md p-2 text-sm"
+            disabled={isLoading}
+            className="mt-1 block w-full border border-gray-300 rounded-md p-2 text-sm text-gray-900 bg-white placeholder-gray-400 disabled:opacity-60 disabled:cursor-not-allowed"
             placeholder="e.g. ABC/1234/5678"
           />
         </div>
@@ -98,14 +102,17 @@ export default function LoginPage() {
             required 
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md p-2 text-sm"
+            disabled={isLoading}
+            className="mt-1 block w-full border border-gray-300 rounded-md p-2 text-sm text-gray-900 bg-white placeholder-gray-400 disabled:opacity-60 disabled:cursor-not-allowed"
           />
         </div>
         <button 
-          type="submit" 
-          className="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 text-sm font-medium"
+          type="submit"
+          disabled={isLoading}
+          className="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 text-sm font-medium disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          Sign In
+          {isLoading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+          {isLoading ? 'Signing In...' : 'Sign In'}
         </button>
       </form>
       

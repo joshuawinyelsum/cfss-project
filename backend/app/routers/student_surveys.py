@@ -125,11 +125,6 @@ async def get_dashboard_stats(
         "recent_surveys": recent_data
     }
 
-@router.get("/debug_records")
-async def debug_records(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(models.SurveyRecord).limit(10))
-    records = result.scalars().all()
-    return [{"id": r.id, "community_id": r.community_id, "created_by_student_id": r.created_by_student_id, "status": r.status} for r in records]
 
 @router.get("/drafts/all")
 async def get_all_drafts(

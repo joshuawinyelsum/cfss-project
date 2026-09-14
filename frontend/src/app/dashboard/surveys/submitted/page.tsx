@@ -39,7 +39,7 @@ export default function SubmittedPage() {
       
       if (navigator.onLine) {
         try {
-          const res = await api.get('/api/student/surveys/submitted', { 
+          const res = await api.get('/api/student/surveys/submitted/all', { 
             headers: { Authorization: `Bearer ${token}` },
             params: {
               skip: currentSkip,

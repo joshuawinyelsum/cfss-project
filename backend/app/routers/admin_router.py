@@ -147,20 +147,7 @@ async def update_community(community_id: str, comm_update: schemas.CommunityCrea
         "group_label": f"Group {community.group_number}"
     }
 
-@router.delete("/communities/{community_id}")
-async def delete_community(community_id: str, db: AsyncSession = Depends(get_db_and_admin)):
-    result = await db.execute(select(models.Community).filter(models.Community.id == community_id))
-    community = result.scalars().first()
-    
-    if not community:
-        raise HTTPException(status_code=404, detail="Community not found")
-        
-    if community.current_count > 0:
-        raise HTTPException(status_code=409, detail="Cannot delete community with assigned students")
-        
-    await db.delete(community)
-    await db.commit()
-    return {"message": "Community deleted successfully"}
+
 
 @router.post("/logout")
 async def admin_logout(current_user: models.User = Depends(auth.get_current_admin)):
@@ -189,8 +176,8 @@ async def update_settings(settings_update: schemas.SettingsUpdate, db: AsyncSess
     settings.allow_multiple_submissions = settings_update.allow_multiple_submissions
     settings.default_page_size = settings_update.default_page_size
     
-    if settings_update.registration_password:
-        settings.registration_password_hash = auth.get_password_hash(settings_update.registration_password)
+
+
         
     await db.commit()
     await db.refresh(settings)

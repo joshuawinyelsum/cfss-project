@@ -11,9 +11,13 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from app.database import get_db
-from app.models import WhitelistV2, WhitelistEntry
+from app.models import WhitelistV2, WhitelistEntry, User
+from app import auth
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+async def get_db_and_admin(db: AsyncSession = Depends(get_db), admin: User = Depends(auth.get_current_admin)):
+    return db
 
 class WhitelistResponse(BaseModel):
     id: int
@@ -29,7 +33,7 @@ class WhitelistUpdate(BaseModel):
     status: str
 
 @router.post("/whitelist/upload")
-async def upload_whitelist(request: Request, db: AsyncSession = Depends(get_db)):
+async def upload_whitelist(request: Request, db: AsyncSession = Depends(get_db_and_admin)):
     try:
         form = await request.form()
         name = form.get("name")
@@ -139,19 +143,19 @@ async def upload_whitelist(request: Request, db: AsyncSession = Depends(get_db))
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 @router.get("/whitelist", response_model=List[WhitelistResponse])
-async def get_whitelists(db: AsyncSession = Depends(get_db)):
+async def get_whitelists(db: AsyncSession = Depends(get_db_and_admin)):
     result = await db.execute(select(WhitelistV2).where(WhitelistV2.status != 'DELETED').order_by(WhitelistV2.created_at.desc()))
     return result.scalars().all()
 
 @router.get("/whitelist/active")
-async def get_active_whitelist_entries(db: AsyncSession = Depends(get_db)):
+async def get_active_whitelist_entries(db: AsyncSession = Depends(get_db_and_admin)):
     from sqlalchemy import text
     result = await db.execute(text("SELECT * FROM active_whitelist_entries"))
     rows = result.mappings().all()
     return {"entries": [dict(r) for r in rows]}
 
 @router.get("/whitelist/{id}")
-async def get_whitelist_entries(id: int, page: int = 1, limit: int = 50, db: AsyncSession = Depends(get_db)):
+async def get_whitelist_entries(id: int, page: int = 1, limit: int = 50, db: AsyncSession = Depends(get_db_and_admin)):
     offset = (page - 1) * limit
     result = await db.execute(
         select(WhitelistEntry)
@@ -173,7 +177,7 @@ async def get_whitelist_entries(id: int, page: int = 1, limit: int = 50, db: Asy
     }
 
 @router.patch("/whitelist/{id}", response_model=WhitelistResponse)
-async def update_whitelist(id: int, payload: WhitelistUpdate, db: AsyncSession = Depends(get_db)):
+async def update_whitelist(id: int, payload: WhitelistUpdate, db: AsyncSession = Depends(get_db_and_admin)):
     result = await db.execute(select(WhitelistV2).where(WhitelistV2.id == id, WhitelistV2.status != 'DELETED'))
     whitelist = result.scalars().first()
     if not whitelist:
@@ -192,7 +196,7 @@ async def update_whitelist(id: int, payload: WhitelistUpdate, db: AsyncSession =
     return whitelist
 
 @router.delete("/whitelist/{id}")
-async def delete_whitelist(id: int, db: AsyncSession = Depends(get_db)):
+async def delete_whitelist(id: int, db: AsyncSession = Depends(get_db_and_admin)):
     result = await db.execute(select(WhitelistV2).where(WhitelistV2.id == id, WhitelistV2.status != 'DELETED'))
     whitelist = result.scalars().first()
     if not whitelist:
