@@ -149,7 +149,7 @@ export default function WorkWorkspacePage() {
              ) : (
                 <div className="bg-surface border border-border-strong rounded-xl overflow-hidden shadow-sm divide-y divide-border">
                   {drafts.map(record => (
-                    <Link key={record.id} href={`/surveys/${record.survey_type.toLowerCase()}/fill/${record.id}`} className="block p-4 sm:p-5 hover:bg-page transition-colors group">
+                    <Link key={record.id} href={`/surveys/${record.survey_type.toLowerCase()}/fill?id=${record.id}`} className="block p-4 sm:p-5 hover:bg-page transition-colors group">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">

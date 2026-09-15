@@ -53,7 +53,7 @@ export default function SurveyWorkspace() {
       if (navigator.onLine) {
         const res = await api.post('/api/student/surveys/create', { survey_type: typeStr }, { headers: { Authorization: `Bearer ${token}` } });
         const newRecord = res.data;
-        router.push(`/surveys/${typeStr}/fill/${newRecord.id}`);
+        router.push(`/surveys/${typeStr}/fill?id=${newRecord.id}`);
       } else {
         // Offline fallback creation
         const { db } = await import('@/lib/db');
@@ -71,7 +71,7 @@ export default function SurveyWorkspace() {
           created_at: now,
           updated_at: now
         });
-        router.push(`/surveys/${typeStr}/fill/${pseudoId}`);
+        router.push(`/surveys/${typeStr}/fill?id=${pseudoId}`);
       }
     } catch (e) {
       console.error("Failed to create survey", e);
@@ -172,3 +172,5 @@ export default function SurveyWorkspace() {
     </DashboardLayout>
   );
 }
+
+

@@ -155,7 +155,7 @@ export default function SubmittedSurveysPage() {
               {records.map(record => (
                 <Link 
                   key={record.id}
-                  href={`/surveys/${record.survey_type.toLowerCase()}/view/${record.id}`}
+                  href={`/surveys/${record.survey_type.toLowerCase()}/view?id=${record.id}`}
                   className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 hover:bg-page transition-colors group cursor-pointer gap-4"
                 >
                   <div className="flex-1">

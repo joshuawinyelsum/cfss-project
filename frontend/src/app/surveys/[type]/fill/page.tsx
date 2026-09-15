@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useAuthStore } from '@/lib/store';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import { api } from '@/lib/api';
 import DashboardLayout from '@/app/dashboard/layout';
 import Link from 'next/link';
@@ -10,12 +11,13 @@ import { ArrowLeft, Save, CheckCircle, ChevronLeft, ChevronRight, AlertCircle } 
 
 import { syncEngine } from '@/lib/sync';
 
-export default function QuestionnairePage() {
+function QuestionnaireContent() {
   const { user, token } = useAuthStore();
   const router = useRouter();
   const params = useParams();
   const typeStr = params.type as string;
-  const recordId = params.id as string;
+  const searchParams = useSearchParams();
+  const recordId = searchParams.get('id') as string;
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -409,5 +411,13 @@ export default function QuestionnairePage() {
         </div>
       )}
     </DashboardLayout>
+  );
+}
+
+export default function QuestionnairePage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-gray-500">Loading survey...</div>}>
+      <QuestionnaireContent />
+    </Suspense>
   );
 }

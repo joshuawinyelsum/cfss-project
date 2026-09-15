@@ -5,6 +5,26 @@ const withSerwist = withSerwistInit({
   swSrc: "src/app/sw.ts",
   swDest: "public/sw.js",
   disable: process.env.NODE_ENV === "development",
+  additionalPrecacheEntries: [
+    "/dashboard",
+    "/dashboard/work",
+    "/dashboard/surveys/drafts",
+    "/dashboard/surveys/submitted",
+    "/dashboard/sync",
+    "/dashboard/more",
+    "/surveys",
+    "/surveys/household",
+    "/surveys/education",
+    "/surveys/health",
+    "/surveys/governance",
+    "/surveys/household/fill",
+    "/surveys/education/fill",
+    "/surveys/health/fill",
+    "/surveys/governance/fill",
+    "/~offline",
+    "/profile",
+    "/settings"
+  ],
 });
 
 const nextConfig: NextConfig = {
