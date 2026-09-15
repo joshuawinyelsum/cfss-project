@@ -60,19 +60,19 @@ export default function MyGroupPage() {
     <div className="space-y-6 pb-12">
       {/* Mobile Back Navigation */}
       <div className="lg:hidden mb-4">
-        <Link href="/dashboard/more" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors">
+        <Link href="/dashboard/more" className="inline-flex items-center text-sm font-medium text-muted hover:text-primary transition-colors">
           <ArrowLeft size={16} className="mr-1" /> Back to More
         </Link>
       </div>
 
       {/* Header */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-surface rounded-xl shadow-sm border border-border-strong p-6">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center shrink-0">
             <Users size={24} className="text-emerald-700" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-primary">
               My Group
               {user.group_number != null && (
                 <span className="ml-3 text-lg font-semibold text-emerald-700">
@@ -80,10 +80,10 @@ export default function MyGroupPage() {
                 </span>
               )}
             </h1>
-            <p className="text-gray-500 mt-0.5">
-              Community: <strong className="text-gray-800">{user.community || 'Not assigned'}</strong>
+            <p className="text-muted mt-0.5">
+              Community: <strong className="text-primary">{user.community || 'Not assigned'}</strong>
               {!loading && members.length > 0 && (
-                <span className="ml-3 text-gray-400">· {members.length} member{members.length !== 1 ? 's' : ''}</span>
+                <span className="ml-3 text-muted">· {members.length} member{members.length !== 1 ? 's' : ''}</span>
               )}
             </p>
           </div>
@@ -105,19 +105,19 @@ export default function MyGroupPage() {
       )}
 
       {!loading && !error && members.length === 0 && (
-        <div className="py-16 text-center border-2 border-dashed border-gray-200 rounded-xl bg-white">
+        <div className="py-16 text-center border-2 border-dashed border-border-strong rounded-xl bg-surface">
           <UserIcon size={40} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-gray-500 font-medium">No group members found.</p>
-          <p className="text-sm text-gray-400 mt-1">You may not yet be assigned to a community.</p>
+          <p className="text-muted font-medium">No group members found.</p>
+          <p className="text-sm text-muted mt-1">You may not yet be assigned to a community.</p>
         </div>
       )}
 
       {/* Member Table */}
       {!loading && !error && members.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-surface rounded-xl shadow-sm border border-border-strong overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-200">
+              <thead className="bg-page text-muted font-medium border-b border-border-strong">
                 <tr>
                   <th className="px-6 py-3 w-16">#</th>
                   <th className="px-6 py-3">Full Name</th>
@@ -128,18 +128,18 @@ export default function MyGroupPage() {
                   <th className="px-6 py-3">Phone</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 text-gray-700">
+              <tbody className="divide-y divide-border text-secondary">
                 {members.map((member, i) => {
                   const isMe = member.id === user.id;
                   return (
-                    <tr key={member.id} className={isMe ? 'bg-emerald-50/50' : 'hover:bg-gray-50/50 transition-colors'}>
-                      <td className="px-6 py-4 text-gray-400 font-medium">{i + 1}</td>
-                      <td className="px-6 py-4 font-semibold text-gray-900">
+                    <tr key={member.id} className={isMe ? 'bg-emerald-50/50' : 'hover:bg-page/50 transition-colors'}>
+                      <td className="px-6 py-4 text-muted font-medium">{i + 1}</td>
+                      <td className="px-6 py-4 font-semibold text-primary">
                         {member.full_name}
                         {isMe && <span className="ml-2 text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">(You)</span>}
                       </td>
                       <td className="px-6 py-4">{member.gender || '-'}</td>
-                      <td className="px-6 py-4 font-mono text-gray-500">{member.student_id}</td>
+                      <td className="px-6 py-4 font-mono text-muted">{member.student_id}</td>
                       <td className="px-6 py-4">{member.faculty || '-'}</td>
                       <td className="px-6 py-4">{member.program || '-'}</td>
                       <td className="px-6 py-4">
@@ -148,7 +148,7 @@ export default function MyGroupPage() {
                             {member.phone_number}
                           </a>
                         ) : (
-                          <span className="text-gray-400 italic">Not provided</span>
+                          <span className="text-muted italic">Not provided</span>
                         )}
                       </td>
                     </tr>

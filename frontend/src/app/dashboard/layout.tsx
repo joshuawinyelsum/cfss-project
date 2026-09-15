@@ -323,14 +323,14 @@ export default function DashboardLayout({
         </header>
 
         {/* Scrollable Main Content */}
-        <main className="flex-1 overflow-y-auto bg-page p-4 pb-24 lg:pb-4 lg:p-8">
+        <main className="flex-1 overflow-y-auto bg-page p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-4 lg:p-8">
           <div className="max-w-6xl mx-auto h-full">
             {children}
           </div>
         </main>
 
         {/* Mobile Bottom Navigation */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-border-strong flex items-center justify-around h-16 z-50 pb-safe">
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-border-strong flex items-center justify-around h-[calc(4rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] z-50">
           {mobileNavItems.map((item) => {
             const isActive = pathname === item.href || (pathname.startsWith(item.href + '/') && item.href !== '/dashboard');
             

@@ -14,33 +14,33 @@ export default function MorePage() {
   return (
     <div className="max-w-2xl mx-auto lg:hidden">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">More</h1>
-        <p className="text-sm text-gray-500 mt-1">Secondary functions and settings</p>
+        <h1 className="text-2xl font-bold text-primary">More</h1>
+        <p className="text-sm text-muted mt-1">Secondary functions and settings</p>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-surface border border-border-strong rounded-xl overflow-hidden shadow-sm">
         {menuItems.map((item, index) => (
           <Link
             key={item.name}
             href={item.href}
-            className={`flex items-center p-4 hover:bg-gray-50 transition-colors ${
-              index !== menuItems.length - 1 ? 'border-b border-gray-100' : ''
+            className={`flex items-center p-4 hover:bg-page transition-colors ${
+              index !== menuItems.length - 1 ? 'border-b border-border' : ''
             }`}
           >
             <div className="w-10 h-10 rounded-full bg-[#093C22]/10 flex items-center justify-center shrink-0 mr-4">
               <item.icon size={20} className="text-[#093C22]" />
             </div>
             <div className="flex-1">
-              <h3 className="text-sm font-medium text-gray-900">{item.name}</h3>
-              <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>
+              <h3 className="text-sm font-medium text-primary">{item.name}</h3>
+              <p className="text-xs text-muted mt-0.5">{item.description}</p>
             </div>
-            <ChevronRight size={20} className="text-gray-400" />
+            <ChevronRight size={20} className="text-muted" />
           </Link>
         ))}
       </div>
       
       <div className="mt-8 text-center">
-         <p className="text-xs text-gray-400">CFSS Fieldwork Application</p>
+         <p className="text-xs text-muted">CFSS Fieldwork Application</p>
       </div>
     </div>
   );

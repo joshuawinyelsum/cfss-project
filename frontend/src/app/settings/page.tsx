@@ -98,11 +98,11 @@ export default function SettingsPage() {
 
   if (!user || loading) return (
     <DashboardLayout>
-      <div className="flex justify-center items-center h-full text-gray-500">
+      <div className="flex justify-center items-center h-full text-muted">
 
         {/* Mobile Back Navigation */}
         <div className="lg:hidden mb-4">
-          <Link href="/dashboard/more" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors">
+          <Link href="/dashboard/more" className="inline-flex items-center text-sm font-medium text-muted hover:text-primary transition-colors">
             <ArrowLeft size={16} className="mr-1" /> Back to More
           </Link>
         </div>
@@ -115,25 +115,25 @@ Loading settings...</div>
       <div className="max-w-4xl mx-auto space-y-8 pb-12 dark:text-gray-200">
         
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Manage your account preferences and security.</p>
+          <h1 className="text-2xl font-bold text-primary dark:text-white">Settings</h1>
+          <p className="text-muted dark:text-muted mt-1">Manage your account preferences and security.</p>
         </div>
 
         {/* ACCOUNT SECURITY */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
+        <div className="bg-surface dark:bg-gray-800 rounded-xl shadow-sm border border-border dark:border-gray-700 overflow-hidden">
+          <div className="p-6 border-b border-border dark:border-gray-700 flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
               <Shield className="text-blue-600 dark:text-blue-400" size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Account Security</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Update your password to keep your account secure.</p>
+              <h2 className="text-lg font-bold text-primary dark:text-white">Account Security</h2>
+              <p className="text-sm text-muted dark:text-muted">Update your password to keep your account secure.</p>
             </div>
           </div>
           <div className="p-6">
             <button 
               onClick={() => setShowPasswordModal(true)}
-              className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              className="px-4 py-2 bg-surface dark:bg-gray-800 border border-border-strong dark:border-gray-600 rounded-lg text-sm font-semibold text-secondary dark:text-gray-200 hover:bg-page dark:hover:bg-gray-700 transition-colors"
             >
               Change Password
             </button>
@@ -141,43 +141,43 @@ Loading settings...</div>
         </div>
 
         {/* APPEARANCE PREFERENCES */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
+        <div className="bg-surface dark:bg-gray-800 rounded-xl shadow-sm border border-border dark:border-gray-700 overflow-hidden">
+          <div className="p-6 border-b border-border dark:border-gray-700 flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
               <Monitor className="text-purple-600 dark:text-purple-400" size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Appearance</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Customize the dashboard appearance.</p>
+              <h2 className="text-lg font-bold text-primary dark:text-white">Appearance</h2>
+              <p className="text-sm text-muted dark:text-muted">Customize the dashboard appearance.</p>
             </div>
           </div>
           <div className="p-6 flex flex-col sm:flex-row gap-4">
-            <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors flex-1 ${theme === 'light' ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-emerald-200 dark:hover:border-gray-500'}`}>
+            <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors flex-1 ${theme === 'light' ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-900/20' : 'border-border-strong dark:border-gray-700 hover:border-emerald-200 dark:hover:border-gray-500'}`}>
               <input type="radio" name="theme" value="light" checked={theme === 'light'} onChange={() => handleThemeChange('light')} className="hidden" />
-              <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${theme === 'light' ? 'border-emerald-600' : 'border-gray-300 dark:border-gray-500'}`}>
+              <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${theme === 'light' ? 'border-emerald-600' : 'border-border-strong dark:border-gray-500'}`}>
                 {theme === 'light' && <div className="w-2.5 h-2.5 bg-emerald-600 rounded-full"></div>}
               </div>
-              <span className="font-medium text-gray-900 dark:text-gray-100">Light Mode</span>
+              <span className="font-medium text-primary dark:text-gray-100">Light Mode</span>
             </label>
-            <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors flex-1 ${theme === 'dark' ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-emerald-200 dark:hover:border-gray-500'}`}>
+            <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors flex-1 ${theme === 'dark' ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-900/20' : 'border-border-strong dark:border-gray-700 hover:border-emerald-200 dark:hover:border-gray-500'}`}>
               <input type="radio" name="theme" value="dark" checked={theme === 'dark'} onChange={() => handleThemeChange('dark')} className="hidden" />
-              <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${theme === 'dark' ? 'border-emerald-600' : 'border-gray-300 dark:border-gray-500'}`}>
+              <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${theme === 'dark' ? 'border-emerald-600' : 'border-border-strong dark:border-gray-500'}`}>
                 {theme === 'dark' && <div className="w-2.5 h-2.5 bg-emerald-600 rounded-full"></div>}
               </div>
-              <span className="font-medium text-gray-900 dark:text-gray-100">Dark Mode</span>
+              <span className="font-medium text-primary dark:text-gray-100">Dark Mode</span>
             </label>
           </div>
         </div>
 
         {/* HELP & SUPPORT */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
+        <div className="bg-surface dark:bg-gray-800 rounded-xl shadow-sm border border-border dark:border-gray-700 overflow-hidden">
+          <div className="p-6 border-b border-border dark:border-gray-700 flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
               <HelpCircle className="text-amber-600 dark:text-amber-400" size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Help & Support</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Get assistance and read frequently asked questions.</p>
+              <h2 className="text-lg font-bold text-primary dark:text-white">Help & Support</h2>
+              <p className="text-sm text-muted dark:text-muted">Get assistance and read frequently asked questions.</p>
             </div>
           </div>
           <div className="p-6 space-y-6">
@@ -192,54 +192,54 @@ Loading settings...</div>
             </div>
             
             <div className="space-y-4">
-              <h3 className="font-bold text-gray-900 dark:text-white">Frequently Asked Questions</h3>
+              <h3 className="font-bold text-primary dark:text-white">Frequently Asked Questions</h3>
               
-              <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                <h4 className="font-semibold text-gray-800 dark:text-gray-200">How do I start a survey?</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Go to Surveys and select the survey type assigned to your field work.</p>
+              <div className="p-4 bg-page dark:bg-gray-700/50 rounded-lg">
+                <h4 className="font-semibold text-primary dark:text-gray-200">How do I start a survey?</h4>
+                <p className="text-sm text-secondary dark:text-muted mt-1">Go to Surveys and select the survey type assigned to your field work.</p>
               </div>
               
-              <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                <h4 className="font-semibold text-gray-800 dark:text-gray-200">Can I edit submitted surveys?</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Submitted surveys cannot be edited unless approved by the coordinator.</p>
+              <div className="p-4 bg-page dark:bg-gray-700/50 rounded-lg">
+                <h4 className="font-semibold text-primary dark:text-gray-200">Can I edit submitted surveys?</h4>
+                <p className="text-sm text-secondary dark:text-muted mt-1">Submitted surveys cannot be edited unless approved by the coordinator.</p>
               </div>
               
-              <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                <h4 className="font-semibold text-gray-800 dark:text-gray-200">How do I save unfinished surveys?</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Use Save Draft and continue later from Draft Surveys.</p>
+              <div className="p-4 bg-page dark:bg-gray-700/50 rounded-lg">
+                <h4 className="font-semibold text-primary dark:text-gray-200">How do I save unfinished surveys?</h4>
+                <p className="text-sm text-secondary dark:text-muted mt-1">Use Save Draft and continue later from Draft Surveys.</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* ABOUT */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
+        <div className="bg-surface dark:bg-gray-800 rounded-xl shadow-sm border border-border dark:border-gray-700 overflow-hidden">
+          <div className="p-6 border-b border-border dark:border-gray-700 flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
               <Info className="text-emerald-600 dark:text-emerald-400" size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">About CFSS</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">System information and details.</p>
+              <h2 className="text-lg font-bold text-primary dark:text-white">About CFSS</h2>
+              <p className="text-sm text-muted dark:text-muted">System information and details.</p>
             </div>
           </div>
           <div className="p-6">
-            <h3 className="font-bold text-gray-900 dark:text-white">Community Field Survey System (CFSS)</h3>
-            <p className="text-gray-600 dark:text-gray-400 mt-2 text-sm leading-relaxed max-w-3xl">
+            <h3 className="font-bold text-primary dark:text-white">Community Field Survey System (CFSS)</h3>
+            <p className="text-secondary dark:text-muted mt-2 text-sm leading-relaxed max-w-3xl">
               CFSS is a digital field data collection platform designed to simplify university field practical surveys, student coordination, and community data management.
             </p>
-            <div className="mt-4 inline-block px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300">
+            <div className="mt-4 inline-block px-3 py-1 bg-page dark:bg-gray-700 rounded-lg text-sm font-medium text-secondary dark:text-gray-300">
               Version: v1.0
             </div>
           </div>
         </div>
 
         {/* LOGOUT */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-red-100 dark:border-red-900/30 overflow-hidden">
+        <div className="bg-surface dark:bg-gray-800 rounded-xl shadow-sm border border-red-100 dark:border-red-900/30 overflow-hidden">
           <div className="p-6 flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold text-red-600 dark:text-red-400">Sign Out</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Log out of your account on this device.</p>
+              <p className="text-sm text-muted dark:text-muted mt-1">Log out of your account on this device.</p>
             </div>
             <button 
               onClick={() => setShowLogoutModal(true)}
@@ -256,10 +256,10 @@ Loading settings...</div>
       {/* PASSWORD MODAL */}
       {showPasswordModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Change Password</h2>
-              <button onClick={() => setShowPasswordModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+          <div className="bg-surface dark:bg-gray-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-border dark:border-gray-700 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-primary dark:text-white">Change Password</h2>
+              <button onClick={() => setShowPasswordModal(false)} className="text-muted hover:text-secondary dark:hover:text-gray-200">
                 <X size={20} />
               </button>
             </div>
@@ -280,35 +280,35 @@ Loading settings...</div>
               )}
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Current Password</label>
+                <label className="block text-sm font-medium text-secondary dark:text-gray-300 mb-1">Current Password</label>
                 <input 
                   type="password"
                   required
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                  className="w-full px-4 py-2 border border-border-strong dark:border-gray-600 bg-surface dark:bg-gray-700 text-primary dark:text-white rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Password</label>
+                <label className="block text-sm font-medium text-secondary dark:text-gray-300 mb-1">New Password</label>
                 <input 
                   type="password"
                   required
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                  className="w-full px-4 py-2 border border-border-strong dark:border-gray-600 bg-surface dark:bg-gray-700 text-primary dark:text-white rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm New Password</label>
+                <label className="block text-sm font-medium text-secondary dark:text-gray-300 mb-1">Confirm New Password</label>
                 <input 
                   type="password"
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                  className="w-full px-4 py-2 border border-border-strong dark:border-gray-600 bg-surface dark:bg-gray-700 text-primary dark:text-white rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                 />
               </div>
               
@@ -316,7 +316,7 @@ Loading settings...</div>
                 <button 
                   type="button"
                   onClick={() => setShowPasswordModal(false)}
-                  className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg font-semibold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  className="flex-1 px-4 py-2 bg-page dark:bg-gray-700 text-secondary dark:text-gray-200 rounded-lg font-semibold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 >
                   Cancel
                 </button>
@@ -336,17 +336,17 @@ Loading settings...</div>
       {/* LOGOUT CONFIRMATION MODAL */}
       {showLogoutModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center">
+          <div className="bg-surface dark:bg-gray-800 rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center">
             <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <LogOut size={28} className="text-red-500" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Are you sure?</h2>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">Are you sure you want to logout? You will need to sign in again to access the system.</p>
+            <h2 className="text-xl font-bold text-primary dark:text-white mb-2">Are you sure?</h2>
+            <p className="text-muted dark:text-muted mb-6">Are you sure you want to logout? You will need to sign in again to access the system.</p>
             
             <div className="flex gap-3">
               <button 
                 onClick={() => setShowLogoutModal(false)}
-                className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                className="flex-1 px-4 py-2.5 bg-page dark:bg-gray-700 text-secondary dark:text-gray-200 rounded-xl font-semibold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
               >
                 Cancel
               </button>
