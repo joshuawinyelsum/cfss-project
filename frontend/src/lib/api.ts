@@ -10,7 +10,8 @@ const isBrowser = typeof window !== "undefined";
  * localhost fallback only exists so `next dev` keeps working with no setup.
  */
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") || "";
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") || 
+  (process.env.NODE_ENV === "production" ? "https://cfss-api.onrender.com" : "");
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
