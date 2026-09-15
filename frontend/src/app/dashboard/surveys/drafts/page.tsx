@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import { db } from '@/lib/db';
 import { getEntityLabel } from '@/lib/entityLabel';
 import Link from 'next/link';
-import { Search, Filter, Loader2, ArrowRight } from 'lucide-react';
+import { Search, Filter, Loader2, ArrowRight, Trash2 } from 'lucide-react';
 
 export default function DraftsPage() {
   const { user, token } = useAuthStore();
@@ -15,6 +15,22 @@ export default function DraftsPage() {
   
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (confirm("Delete draft? This action cannot be undone.")) {
+      try {
+        await db.surveys.delete(id);
+        setRecords(records.filter(r => r.id !== id));
+        setTotal(total - 1);
+      } catch (err) {
+        console.error("Failed to delete draft:", err);
+      }
+    }
+  };
+
   
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -30,9 +46,9 @@ export default function DraftsPage() {
       
       // Load local drafts
       const { db } = await import('@/lib/db');
-      const allLocal = await db.surveys.where('status').equals('DRAFT').toArray();
-      // Simple local filtering
-      let localDrafts = allLocal.filter(d => d.student_id === user?.id);
+      const userSurveys = await db.surveys.where('student_id').equals(user?.id as number).toArray();
+      const allLocal = userSurveys.filter(s => s.status === 'DRAFT');
+      let localDrafts = allLocal;
       if (search) localDrafts = localDrafts.filter(d => d.entity_id?.toLowerCase().includes(search.toLowerCase()));
       if (typeFilter) localDrafts = localDrafts.filter(d => d.survey_type.toLowerCase() === typeFilter.toLowerCase());
 
@@ -81,8 +97,7 @@ export default function DraftsPage() {
       // Critical: remove any server draft that is already SUBMITTED locally.
       // This handles the race condition where the server still has status=DRAFT
       // but the student already submitted it locally (sync pending).
-      const localSubmitted = await db.surveys.where('status').equals('SUBMITTED').toArray();
-      const localSubmittedIds = new Set(localSubmitted.map(s => s.id));
+      const localSubmittedIds = new Set(userSurveys.filter(s => s.status === 'SUBMITTED').map(s => s.id));
       for (const id of localSubmittedIds) {
         if (mergedMap.has(id)) {
           mergedMap.delete(id);
@@ -137,29 +152,29 @@ export default function DraftsPage() {
       <div className="space-y-6 max-w-3xl mx-auto pb-12">
         
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Draft Surveys</h1>
-          <p className="text-gray-500 mt-1">Pick up where you left off. Only you can see and edit your drafts.</p>
+          <h1 className="text-2xl font-bold text-primary">Draft Surveys</h1>
+          <p className="text-muted mt-1">Pick up where you left off. Only you can see and edit your drafts.</p>
         </div>
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4">
           <form onSubmit={handleSearch} className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
             <input 
               type="text"
               placeholder="Search house number..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm text-gray-900"
+              className="w-full pl-10 pr-4 py-2 border border-border-strong rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm text-primary"
             />
           </form>
           
           <div className="relative shrink-0 w-full sm:w-48">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
             <select
               value={typeFilter}
               onChange={handleTypeChange}
-              className="w-full pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm appearance-none bg-white text-gray-900"
+              className="w-full pl-10 pr-8 py-2 border border-border-strong rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm appearance-none bg-surface text-primary"
             >
               <option value="">All Types</option>
               <option value="HOUSEHOLD">Household</option>
@@ -170,56 +185,56 @@ export default function DraftsPage() {
           </div>
         </div>
 
-        {/* List Layout */}
-        <div className="space-y-4">
+        {/* Flat List UI */}
+        <div className="bg-surface rounded-xl border border-border-strong overflow-hidden shadow-sm">
           {records.length === 0 && !loading ? (
-            <div className="py-12 text-center border-2 border-dashed border-gray-200 rounded-xl">
-              <p className="text-gray-500 font-medium">No saved draft surveys.</p>
+            <div className="py-12 text-center bg-page">
+              <p className="text-muted mb-2">No drafts found.</p>
+              <Link href="/surveys" className="text-[#093C22] hover:underline text-sm font-medium">Start a new survey</Link>
             </div>
           ) : (
-            records.map(record => (
-              <div key={record.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col hover:border-emerald-200 transition-colors">
-                <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-                  <h3 className="font-bold text-gray-900 capitalize">{record.survey_type.toLowerCase()} Survey</h3>
-                  <span className="text-xs font-semibold px-2 py-1 bg-amber-100 text-amber-800 rounded">DRAFT</span>
-                </div>
-                
-                <div className="p-5 space-y-4">
-                  <div>
-                    <div className="text-sm text-gray-500 mb-1">{getEntityLabel(record.survey_type)}:</div>
-                    <div className="font-mono text-gray-900 font-medium bg-gray-50 inline-block px-2 py-1 rounded border border-gray-100">{record.entity_id}</div>
+            <div className="divide-y divide-border">
+              {records.map(record => (
+                <Link 
+                  key={record.id}
+                  href={`/surveys/${record.survey_type.toLowerCase()}/fill/${record.id}`}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 hover:bg-page transition-colors group cursor-pointer gap-4"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="font-bold text-primary capitalize text-base">{record.survey_type.toLowerCase()} Survey</h3>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-700 rounded uppercase tracking-wide border border-amber-100">Draft</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-4 text-sm text-muted">
+                      <div>
+                        <span className="font-medium text-primary">{getEntityLabel(record.survey_type)}: </span>
+                        <span className="font-mono text-secondary">{record.entity_id}</span>
+                      </div>
+                      <span className="hidden sm:inline text-gray-300">•</span>
+                      <div className="hidden sm:block">
+                        Updated: {new Date(record.updated_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                    
+                    <div className="mt-3 flex items-center gap-3">
+                      <div className="w-full sm:w-48 bg-page rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-[#093C22] h-1.5 rounded-full transition-all" style={{ width: `${record.progress}%` }}></div>
+                      </div>
+                      <span className="text-xs font-medium text-secondary">{record.progress}%</span>
+                    </div>
                   </div>
                   
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-500">Progress:</span>
-                      <span className="font-medium text-gray-900">{record.progress}%</span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                      <div className="bg-emerald-500 h-1.5 rounded-full transition-all" style={{ width: `${record.progress}%` }}></div>
+                  <div className="shrink-0 flex items-center sm:justify-end">
+                    <div className="text-sm font-medium text-[#093C22] flex items-center gap-1 group-hover:underline">
+                      Continue <ArrowRight size={16} />
                     </div>
                   </div>
-                  
-                  <div>
-                    <div className="text-sm text-gray-500 mb-1">Last Updated:</div>
-                    <div className="text-sm font-medium text-gray-900">
-                      {new Date(record.updated_at).toLocaleDateString()} at {new Date(record.updated_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="p-4 bg-gray-50">
-                  <Link 
-                    href={`/surveys/${record.survey_type.toLowerCase()}/fill/${record.id}`}
-                    className="w-full py-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center justify-center gap-2"
-                  >
-                    Continue Survey <ArrowRight size={16} />
-                  </Link>
-                </div>
-              </div>
-            ))
+                </Link>
+              ))}
+            </div>
           )}
-          
+        </div>
           {loading && (
             <div className="flex justify-center py-6">
               <Loader2 className="animate-spin text-emerald-600" size={24} />
@@ -230,13 +245,11 @@ export default function DraftsPage() {
             <button 
               onClick={() => loadDrafts(false)}
               disabled={loading}
-              className="w-full py-3 bg-white border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition-colors mt-4"
+              className="w-full py-3 bg-surface border border-border-strong rounded-lg font-medium text-secondary hover:bg-page transition-colors mt-4"
             >
               Load More
             </button>
           )}
-        </div>
-
       </div>
     </>
   );

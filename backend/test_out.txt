@@ -1,0 +1,99 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\ADMIN\Workspace\Projects\cfss-project\backend\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\ADMIN\Workspace\Projects\cfss-project\backend
+configfile: pyproject.toml
+plugins: anyio-4.14.1, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+tests/test_stabilization.py::TestPhoneNumberPipeline::test_phone_gender_pipeline FAILED [100%]
+
+================================== FAILURES ===================================
+_____________ TestPhoneNumberPipeline.test_phone_gender_pipeline ______________
+tests\test_stabilization.py:547: in test_phone_gender_pipeline
+    assert "PHONE002" in peers
+E   AssertionError: assert 'PHONE002' in {'OTHER001': {'id': 4, 'student_id': 'OTHER001', 'full_name': 'Other Group Student', 'faculty': 'Arts', ...}, 'PHONE001': {'id': 2, 'student_id': 'PHONE001', 'full_name': 'Phone Student', 'faculty': 'Science', ...}}
+---------------------------- Captured stdout call -----------------------------
+{"time": "2026-09-14 23:38:06,064", "level": "INFO", "message": "Incoming request: POST /admin/whitelist/upload", "trace_id": "5576cd56-fab7-4f6b-8ede-bcac0008d514"}
+{"time": "2026-09-14 23:38:06,141", "level": "INFO", "message": "Incoming request: PUT /api/admin/settings/registration", "trace_id": "5164d29a-d7f7-4f62-bfa5-5161cf31cc95"}
+{"time": "2026-09-14 23:38:06,242", "level": "INFO", "message": "Incoming request: POST /api/admin/communities", "trace_id": "9abaf80e-5df0-45a1-9292-f16a1f3996bd"}
+{"time": "2026-09-14 23:38:06,247", "level": "INFO", "message": "Incoming request: POST /api/admin/communities", "trace_id": "8a6a8a96-90b2-4a9a-bdbf-007188579bae"}
+{"time": "2026-09-14 23:38:06,265", "level": "INFO", "message": "Incoming request: POST /api/v2/students/register", "trace_id": "dde68550-740d-4104-accf-9e8d9da50fa7"}
+{"time": "2026-09-14 23:38:06,284", "level": "INFO", "message": "Register attempt: student_id=PHONE001, program=cs", "trace_id": "dde68550-740d-4104-accf-9e8d9da50fa7"}
+{"time": "2026-09-14 23:38:06,380", "level": "INFO", "message": "Registration success: PHONE001 -> Comm A", "trace_id": "dde68550-740d-4104-accf-9e8d9da50fa7"}
+{"time": "2026-09-14 23:38:06,380", "level": "INFO", "message": "Incoming request: POST /api/v2/students/register", "trace_id": "8efc95fe-37a8-4f49-aaf2-50a628b28407"}
+{"time": "2026-09-14 23:38:06,390", "level": "INFO", "message": "Register attempt: student_id=PHONE002, program=cs", "trace_id": "8efc95fe-37a8-4f49-aaf2-50a628b28407"}
+{"time": "2026-09-14 23:38:06,503", "level": "INFO", "message": "Registration success: PHONE002 -> Comm B", "trace_id": "8efc95fe-37a8-4f49-aaf2-50a628b28407"}
+{"time": "2026-09-14 23:38:06,506", "level": "INFO", "message": "Incoming request: POST /api/v2/students/register", "trace_id": "ec09d5dd-cf88-4696-95d1-d38e807b7df4"}
+{"time": "2026-09-14 23:38:06,514", "level": "INFO", "message": "Register attempt: student_id=OTHER001, program=english", "trace_id": "ec09d5dd-cf88-4696-95d1-d38e807b7df4"}
+{"time": "2026-09-14 23:38:06,617", "level": "INFO", "message": "Registration success: OTHER001 -> Comm A", "trace_id": "ec09d5dd-cf88-4696-95d1-d38e807b7df4"}
+{"time": "2026-09-14 23:38:06,620", "level": "INFO", "message": "Incoming request: POST /api/v2/students/login", "trace_id": "768f8869-a284-48c0-98cf-d364d08c3901"}
+{"time": "2026-09-14 23:38:06,622", "level": "INFO", "message": "Login attempt: student_id=PHONE001", "trace_id": "768f8869-a284-48c0-98cf-d364d08c3901"}
+{"time": "2026-09-14 23:38:06,698", "level": "INFO", "message": "Login success: PHONE001", "trace_id": "768f8869-a284-48c0-98cf-d364d08c3901"}
+{"time": "2026-09-14 23:38:06,702", "level": "INFO", "message": "Incoming request: GET /api/v2/students/me", "trace_id": "9d99e3f5-0456-4cb7-acf8-14dd59f106ac"}
+{"time": "2026-09-14 23:38:06,710", "level": "INFO", "message": "Incoming request: GET /api/student/community/members", "trace_id": "396fd1a7-4d5e-4a22-ba4b-daf8172a5541"}
+------------------------------ Captured log call ------------------------------
+INFO     cfss:middleware.py:14 Incoming request: POST /admin/whitelist/upload
+INFO     cfss:middleware.py:14 Incoming request: PUT /api/admin/settings/registration
+INFO     cfss:middleware.py:14 Incoming request: POST /api/admin/communities
+INFO     cfss:middleware.py:14 Incoming request: POST /api/admin/communities
+INFO     cfss:middleware.py:14 Incoming request: POST /api/v2/students/register
+INFO     cfss:student_auth_router.py:28 Register attempt: student_id=PHONE001, program=cs
+INFO     cfss:student_auth_router.py:110 Registration success: PHONE001 -> Comm A
+INFO     cfss:middleware.py:14 Incoming request: POST /api/v2/students/register
+INFO     cfss:student_auth_router.py:28 Register attempt: student_id=PHONE002, program=cs
+INFO     cfss:student_auth_router.py:110 Registration success: PHONE002 -> Comm B
+INFO     cfss:middleware.py:14 Incoming request: POST /api/v2/students/register
+INFO     cfss:student_auth_router.py:28 Register attempt: student_id=OTHER001, program=english
+INFO     cfss:student_auth_router.py:110 Registration success: OTHER001 -> Comm A
+INFO     cfss:middleware.py:14 Incoming request: POST /api/v2/students/login
+INFO     cfss:student_auth_router.py:125 Login attempt: student_id=PHONE001
+INFO     cfss:student_auth_router.py:141 Login success: PHONE001
+INFO     cfss:middleware.py:14 Incoming request: GET /api/v2/students/me
+INFO     cfss:middleware.py:14 Incoming request: GET /api/student/community/members
+============================== warnings summary ===============================
+app\schemas.py:9
+  C:\Users\ADMIN\Workspace\Projects\cfss-project\backend\app\schemas.py:9: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class UserResponse(BaseModel):
+
+app\schemas.py:30
+  C:\Users\ADMIN\Workspace\Projects\cfss-project\backend\app\schemas.py:30: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class GroupMemberResponse(BaseModel):
+
+app\schemas.py:63
+  C:\Users\ADMIN\Workspace\Projects\cfss-project\backend\app\schemas.py:63: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CommunityResponse(BaseModel):
+
+app\schemas.py:108
+  C:\Users\ADMIN\Workspace\Projects\cfss-project\backend\app\schemas.py:108: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SurveyResponse(BaseModel):
+
+app\routers\admin_whitelist.py:22
+  C:\Users\ADMIN\Workspace\Projects\cfss-project\backend\app\routers\admin_whitelist.py:22: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class WhitelistResponse(BaseModel):
+
+tests/test_stabilization.py::TestPhoneNumberPipeline::test_phone_gender_pipeline
+  C:\Users\ADMIN\Workspace\Projects\cfss-project\backend\.venv\Lib\site-packages\passlib\handlers\argon2.py:716: DeprecationWarning: Accessing argon2.__version__ is deprecated and will be removed in a future release. Use importlib.metadata directly to query for argon2-cffi's packaging metadata.
+    _argon2_cffi.__version__, max_version)
+
+tests/test_stabilization.py::TestPhoneNumberPipeline::test_phone_gender_pipeline
+tests/test_stabilization.py::TestPhoneNumberPipeline::test_phone_gender_pipeline
+  C:\Users\ADMIN\Workspace\Projects\cfss-project\backend\app\auth.py:30: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    expire = datetime.utcnow() + expires_delta
+
+tests/test_stabilization.py::TestPhoneNumberPipeline::test_phone_gender_pipeline
+tests/test_stabilization.py::TestPhoneNumberPipeline::test_phone_gender_pipeline
+  C:\Users\ADMIN\Workspace\Projects\cfss-project\backend\.venv\Lib\site-packages\jwt\api_jwt.py:147: InsecureKeyLengthWarning: The HMAC key is 31 bytes long, which is below the minimum recommended length of 32 bytes for SHA256. See RFC 7518 Section 3.2.
+    return self._jws.encode(
+
+tests/test_stabilization.py::TestPhoneNumberPipeline::test_phone_gender_pipeline
+tests/test_stabilization.py::TestPhoneNumberPipeline::test_phone_gender_pipeline
+tests/test_stabilization.py::TestPhoneNumberPipeline::test_phone_gender_pipeline
+  C:\Users\ADMIN\Workspace\Projects\cfss-project\backend\.venv\Lib\site-packages\jwt\api_jwt.py:368: InsecureKeyLengthWarning: The HMAC key is 31 bytes long, which is below the minimum recommended length of 32 bytes for SHA256. See RFC 7518 Section 3.2.
+    decoded = self.decode_complete(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_stabilization.py::TestPhoneNumberPipeline::test_phone_gender_pipeline
+======================= 1 failed, 13 warnings in 1.33s ========================

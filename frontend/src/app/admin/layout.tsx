@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuthStore } from '@/lib/store';
+import { useAdminAuthStore } from '@/lib/store';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
@@ -12,7 +12,7 @@ import {
 import Link from 'next/link';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, token, logout, theme } = useAuthStore();
+  const { user, token, logout, theme } = useAdminAuthStore();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);

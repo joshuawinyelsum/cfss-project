@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useAuthStore } from '@/lib/store';
+import { useAdminAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import Link from 'next/link';
@@ -26,7 +26,7 @@ interface SurveyList {
 }
 
 export default function AdminReportsPage() {
-  const { user, token } = useAuthStore();
+  const { user, token } = useAdminAuthStore();
   const router = useRouter();
 
   const [stats, setStats] = useState<SurveyStats | null>(null);

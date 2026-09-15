@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from 'react';
-import { useAuthStore } from '@/lib/store';
+import { useAdminAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 
@@ -25,7 +25,7 @@ interface Student {
 }
 
 export default function AdminStudentsPage() {
-  const { user, token } = useAuthStore();
+  const { user, token } = useAdminAuthStore();
   const router = useRouter();
 
   const [students, setStudents] = useState<Student[]>([]);

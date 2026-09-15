@@ -47,12 +47,32 @@ export default function SurveyWorkspace() {
   }, [user, token, router, typeStr]);
 
   const handleCreate = async () => {
-    if (creating) return;
+    if (creating || !user) return;
     setCreating(true);
     try {
-      const res = await api.post('/api/student/surveys/create', { survey_type: typeStr }, { headers: { Authorization: `Bearer ${token}` } });
-      const newRecord = res.data;
-      router.push(`/surveys/${typeStr}/fill/${newRecord.id}`);
+      if (navigator.onLine) {
+        const res = await api.post('/api/student/surveys/create', { survey_type: typeStr }, { headers: { Authorization: `Bearer ${token}` } });
+        const newRecord = res.data;
+        router.push(`/surveys/${typeStr}/fill/${newRecord.id}`);
+      } else {
+        // Offline fallback creation
+        const { db } = await import('@/lib/db');
+        const pseudoId = crypto.randomUUID();
+        const now = new Date().toISOString();
+        await db.surveys.put({
+          id: pseudoId,
+          student_id: user.id as number,
+          survey_type: typeStr.toUpperCase(),
+          community_id: user.community_id as number,
+          entity_id: null,
+          answers: [],
+          status: 'DRAFT',
+          sync_status: 'pending',
+          created_at: now,
+          updated_at: now
+        });
+        router.push(`/surveys/${typeStr}/fill/${pseudoId}`);
+      }
     } catch (e) {
       console.error("Failed to create survey", e);
       alert("Failed to create survey. Please try again.");

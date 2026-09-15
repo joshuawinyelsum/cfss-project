@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useAuthStore } from '@/lib/store';
+import { useAdminAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api, getErrorMessage } from '@/lib/api';
 
@@ -28,7 +28,7 @@ interface Student {
 }
 
 export default function CommunitiesPage() {
-  const { user, token } = useAuthStore();
+  const { user, token } = useAdminAuthStore();
   const router = useRouter();
 
   const [communities, setCommunities] = useState<Community[]>([]);

@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useAuthStore } from '@/lib/store';
+import { useAdminAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { downloadExport } from '@/lib/export';
 
 export default function AdminDashboard() {
-  const { user, token, logout } = useAuthStore();
+  const { user, token, logout } = useAdminAuthStore();
   const router = useRouter();
 
   const [communities, setCommunities] = useState<any[]>([]);

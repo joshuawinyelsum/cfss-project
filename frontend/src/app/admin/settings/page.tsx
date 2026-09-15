@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useAuthStore } from '@/lib/store';
+import { useAdminAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api, getErrorMessage } from '@/lib/api';
 
@@ -17,7 +17,7 @@ interface Settings {
 }
 
 export default function AdminSettingsPage() {
-  const { user, token, theme, setTheme } = useAuthStore();
+  const { user, token, theme, setTheme } = useAdminAuthStore();
   const router = useRouter();
 
   const [settings, setSettings] = useState<Settings>({

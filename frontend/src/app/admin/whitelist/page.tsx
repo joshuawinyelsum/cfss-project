@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { api } from '@/lib/api';
-import { useAuthStore } from '@/lib/store';
+import { useAdminAuthStore } from '@/lib/store';
 import { Loader2, Download, Trash2 } from 'lucide-react';
 import { downloadExport } from '@/lib/export';
 
@@ -23,7 +23,7 @@ interface Whitelist {
 }
 
 export default function WhitelistUploadPage() {
-  const { token } = useAuthStore();
+  const { token } = useAdminAuthStore();
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState<string>('');
   const [uploading, setUploading] = useState(false);

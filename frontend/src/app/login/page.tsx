@@ -12,13 +12,62 @@ export default function LoginPage() {
   const [registered, setRegistered] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setAuth = useAuthStore((state: any) => state.setAuth);
+  const token = useAuthStore((state: any) => state.token);
+  const user = useAuthStore((state: any) => state.user);
   
+  const [hydrated, setHydrated] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setRegistered(new URLSearchParams(window.location.search).get('registered') === 'true');
+    setHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+
+    const verify = async () => {
+      if (token && user) {
+        if (user.role === 'admin') {
+          // If the student store somehow contains an admin role (from before the storage separation),
+          // clear it out so it doesn't pollute the student portal.
+          useAuthStore.getState().logout();
+          setIsVerifying(false);
+          return;
+        }
+
+        setIsVerifying(true);
+        try {
+          // Verify token is still valid. If offline, it throws a network error (no response)
+          // and we still allow them to proceed offline.
+          await api.get('/api/v2/students/me', {
+            headers: { Authorization: 'Bearer ' + token }
+          });
+          router.push('/dashboard');
+        } catch (err: any) {
+          if (err.response?.status === 401) {
+            useAuthStore.getState().logout();
+            setIsVerifying(false);
+          } else {
+            // Network error (offline) or server error - assume token is valid enough for offline DB
+            router.push('/dashboard');
+          }
+        }
+      }
+    };
+    
+    verify();
+    
+    setRegistered(new URLSearchParams(window.location.search).get('registered') === 'true');
+  }, [hydrated, token, user, router]);
+
+  if (!hydrated || isVerifying) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,21 +87,15 @@ export default function LoginPage() {
       const token = res.data.access_token;
 
       const userRes = await api.get('/api/v2/students/me', {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: 'Bearer ' + token }
       });
 
-      // Admin accounts can authenticate through this endpoint too — route
-      // them to the admin portal instead of the student dashboard.
+      // Admin accounts should not log in through the student portal.
       const payload64 = token.split('.')[1];
       const role = JSON.parse(atob(payload64)).role;
       if (role === 'admin') {
-        setAuth(token, {
-          ...userRes.data,
-          role: 'admin',
-          full_name: 'Administrator',
-          program: 'System Admin'
-        });
-        router.push('/admin');
+        setIsLoading(false);
+        setError('Please use the Admin Portal (/admin/login) to log in as an administrator.');
         return;
       }
 
@@ -62,14 +105,8 @@ export default function LoginPage() {
       setAuth(token, userData);
       router.push('/dashboard');
     } catch (err: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const error = err as any;
       console.error("Login error object:", error);
-      if (error.response) {
-        console.error("Response data:", error.response.data);
-      } else {
-        console.error("Network or parsing error. Backend might not be reachable.");
-      }
       setError(getErrorMessage(error, 'Invalid student ID or password (or backend is unreachable)'));
       setIsLoading(false);
     }

@@ -15,8 +15,15 @@ export interface LocalSurvey {
   submitted_at?: string;
 }
 
+export interface LocalSurveyDefinition {
+  type: string;
+  questions: any[];
+  updated_at: string;
+}
+
 class CFSSDatabase extends Dexie {
   surveys!: EntityTable<LocalSurvey, 'id'>;
+  definitions!: EntityTable<LocalSurveyDefinition, 'type'>;
 
   constructor() {
     super('CFSSDatabase');
@@ -35,6 +42,12 @@ class CFSSDatabase extends Dexie {
           delete survey.house_number;
         }
       });
+    });
+
+    // Version 5 adds definitions for offline survey schema access
+    this.version(5).stores({
+      surveys: 'id, student_id, survey_type, status, sync_status, updated_at',
+      definitions: 'type'
     });
   }
 }

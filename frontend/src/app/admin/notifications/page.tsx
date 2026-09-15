@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useAuthStore } from '@/lib/store';
+import { useAdminAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Bell, CheckCircle, Clock } from 'lucide-react';
 
 export default function AdminNotifications() {
-  const { user, token } = useAuthStore();
+  const { user, token } = useAdminAuthStore();
   const router = useRouter();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

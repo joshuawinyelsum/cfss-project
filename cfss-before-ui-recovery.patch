@@ -1,0 +1,3476 @@
+diff --git a/backend/app/database.py b/backend/app/database.py
+index 5c839aa..82c8d42 100644
+--- a/backend/app/database.py
++++ b/backend/app/database.py
+@@ -8,6 +8,8 @@ from app.settings import DATABASE_URL
+ engine = create_async_engine(
+     DATABASE_URL,
+     echo=False,
++    pool_pre_ping=True,
++    pool_recycle=1800,
+     connect_args={
+         "statement_cache_size": 0,
+         "prepared_statement_cache_size": 0
+diff --git a/backend/app/routers/sync_router.py b/backend/app/routers/sync_router.py
+index 4e1c668..21a250f 100644
+--- a/backend/app/routers/sync_router.py
++++ b/backend/app/routers/sync_router.py
+@@ -51,12 +51,17 @@ async def sync_surveys(
+ ):
+     current_user, community = user_data
+     
++    comm_id = community.id
++    comm_name = community.name
++    curr_user_id = current_user.id
++    curr_user_name = current_user.name
++    
+     results = []
+     
+     for survey in payload.surveys:
+         try:
+             # Validate community
+-            if survey.community_id != community.id:
++            if survey.community_id != comm_id:
+                 raise ValueError("Survey community mismatch")
+                 
+             # Check if survey exists
+@@ -65,7 +70,7 @@ async def sync_surveys(
+             
+             if record:
+                 # Update existing
+-                if record.created_by_student_id != current_user.id:
++                if record.created_by_student_id != curr_user_id:
+                     raise ValueError("Not authorized to edit this survey")
+                     
+                 if record.status == "SUBMITTED" and survey.status != "SUBMITTED":
+@@ -87,13 +92,13 @@ async def sync_surveys(
+                 # If no entity_id (offline creation), generate one
+                 if not entity_id or entity_id.startswith("TEMP"):
+                     from app.routers.student_surveys import get_entity_prefix
+-                    clean_comm_name = re.sub(r'[^A-Za-z0-9]', '', community.name)
++                    clean_comm_name = re.sub(r'[^A-Za-z0-9]', '', comm_name)
+                     prefix = get_entity_prefix(survey.survey_type.upper())
+                     
+                     # Robust logic for unique entity_id
+                     count_res = await db.execute(
+                         select(func.count()).where(
+-                            models.SurveyRecord.community_id == community.id,
++                            models.SurveyRecord.community_id == comm_id,
+                             models.SurveyRecord.survey_type == survey.survey_type.upper()
+                         )
+                     )
+@@ -119,8 +124,8 @@ async def sync_surveys(
+ 
+                 record = models.SurveyRecord(
+                     id=survey.survey_id,
+-                    community_id=community.id,
+-                    created_by_student_id=current_user.id,
++                    community_id=comm_id,
++                    created_by_student_id=curr_user_id,
+                     survey_type=survey.survey_type.upper(),
+                     entity_id=entity_id,
+                     status=survey.status,
+@@ -143,6 +148,11 @@ async def sync_surveys(
+                     answer=ans.answer
+                 ))
+                 
++            # Extract attributes before commit to avoid lazy load MissingGreenlet
++            rec_id = record.id
++            rec_entity_id = record.entity_id
++            rec_survey_type = record.survey_type
++            
+             await db.commit()
+             
+             # Admin Notification on SUBMITTED
+@@ -150,25 +160,27 @@ async def sync_surveys(
+                 notif = models.AdminNotification(
+                     type="survey_submit",
+                     title="Survey Submitted",
+-                    message=f"{current_user.name} submitted {record.survey_type.capitalize()} Survey\nCommunity: {community.name}\nEntity ID: {record.entity_id}"
++                    message=f"{curr_user_name} submitted {rec_survey_type.capitalize()} Survey\nCommunity: {comm_name}\nEntity ID: {rec_entity_id}"
+                 )
+                 db.add(notif)
+                 await db.commit()
+                 
+             results.append({
+                 "client_id": survey.survey_id,
+-                "server_id": record.id,
+-                "house_number": record.entity_id, # keep house_number in payload to avoid breaking old apps, or Dexie payload compatibility
++                "server_id": rec_id,
++                "house_number": rec_entity_id,
+                 "success": True
+             })
+             
+         except Exception as e:
++            import traceback
++            tb = traceback.format_exc()
+             await db.rollback()
+             # Update sync error if record existed? Too complex to do in the same loop if rollback happens.
+             results.append({
+                 "client_id": survey.survey_id,
+                 "success": False,
+-                "error": str(e)
++                "error": f"{str(e)}\n{tb}"
+             })
+             
+     return {"success": True, "results": results}
+diff --git a/frontend/next.config.ts b/frontend/next.config.ts
+index e9ffa30..1499728 100644
+--- a/frontend/next.config.ts
++++ b/frontend/next.config.ts
+@@ -1,7 +1,21 @@
+ import type { NextConfig } from "next";
++import withSerwistInit from "@serwist/next";
++
++const withSerwist = withSerwistInit({
++  swSrc: "src/app/sw.ts",
++  swDest: "public/sw.js",
++  disable: process.env.NODE_ENV === "development",
++});
+ 
+ const nextConfig: NextConfig = {
+-  /* config options here */
++  async rewrites() {
++    return [
++      {
++        source: '/api/:path*',
++        destination: 'http://127.0.0.1:8000/api/:path*'
++      }
++    ]
++  }
+ };
+ 
+-export default nextConfig;
++export default withSerwist(nextConfig);
+diff --git a/frontend/package-lock.json b/frontend/package-lock.json
+index 88203c5..949bec7 100644
+--- a/frontend/package-lock.json
++++ b/frontend/package-lock.json
+@@ -8,6 +8,7 @@
+       "name": "frontend",
+       "version": "0.1.0",
+       "dependencies": {
++        "@serwist/next": "^9.5.12",
+         "axios": "^1.18.1",
+         "date-fns": "^4.4.0",
+         "dexie": "^4.4.4",
+@@ -17,6 +18,7 @@
+         "next": "16.2.10",
+         "react": "19.2.4",
+         "react-dom": "19.2.4",
++        "serwist": "^9.5.12",
+         "uuid": "^14.0.1",
+         "zustand": "^5.0.14"
+       },
+@@ -1330,6 +1332,138 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/@serwist/build": {
++      "version": "9.5.12",
++      "resolved": "https://registry.npmjs.org/@serwist/build/-/build-9.5.12.tgz",
++      "integrity": "sha512-U2UkA9BjdpniZkXDIG6NQRBEbXccRvqewzL3hfNEQERvM2bL6ezKvsVF9359akUWP8BxV950Kkq9LKGFmOR8Uw==",
++      "license": "MIT",
++      "dependencies": {
++        "@serwist/utils": "9.5.12",
++        "common-tags": "1.8.2",
++        "glob": "13.0.6",
++        "pretty-bytes": "6.1.1",
++        "source-map": "0.8.0",
++        "type-fest": "5.8.0",
++        "zod": "4.4.3"
++      },
++      "engines": {
++        "node": ">=18.0.0"
++      },
++      "peerDependencies": {
++        "typescript": ">=5.0.0"
++      },
++      "peerDependenciesMeta": {
++        "typescript": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@serwist/next": {
++      "version": "9.5.12",
++      "resolved": "https://registry.npmjs.org/@serwist/next/-/next-9.5.12.tgz",
++      "integrity": "sha512-aKSDZmxC2w6mvLC1aOcO4OnZqdKIl4zrW2VndlZT12+m+nIyOWih1xqqw4LsvUGfQCx0AswtKUUQ7woRYZ2thg==",
++      "license": "MIT",
++      "dependencies": {
++        "@serwist/build": "9.5.12",
++        "@serwist/utils": "9.5.12",
++        "@serwist/webpack-plugin": "9.5.12",
++        "@serwist/window": "9.5.12",
++        "browserslist": "4.28.6",
++        "glob": "13.0.6",
++        "kolorist": "1.8.0",
++        "semver": "7.8.5",
++        "serwist": "9.5.12",
++        "zod": "4.4.3"
++      },
++      "engines": {
++        "node": ">=18.0.0"
++      },
++      "peerDependencies": {
++        "@serwist/cli": "^9.5.12",
++        "next": ">=14.0.0",
++        "react": ">=18.0.0",
++        "typescript": ">=5.0.0"
++      },
++      "peerDependenciesMeta": {
++        "@serwist/cli": {
++          "optional": true
++        },
++        "typescript": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@serwist/next/node_modules/semver": {
++      "version": "7.8.5",
++      "resolved": "https://registry.npmjs.org/semver/-/semver-7.8.5.tgz",
++      "integrity": "sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==",
++      "license": "ISC",
++      "bin": {
++        "semver": "bin/semver.js"
++      },
++      "engines": {
++        "node": ">=10"
++      }
++    },
++    "node_modules/@serwist/utils": {
++      "version": "9.5.12",
++      "resolved": "https://registry.npmjs.org/@serwist/utils/-/utils-9.5.12.tgz",
++      "integrity": "sha512-BHDwiGL7H7JS7wFvVlAWTFHGt0ffHuPgKtdkaYP0lEWJFl6fKJRCnTDZhwhusFvBhicf37XP8Y6PouTZbcLmgg==",
++      "license": "MIT",
++      "peerDependencies": {
++        "browserslist": ">=4"
++      },
++      "peerDependenciesMeta": {
++        "browserslist": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@serwist/webpack-plugin": {
++      "version": "9.5.12",
++      "resolved": "https://registry.npmjs.org/@serwist/webpack-plugin/-/webpack-plugin-9.5.12.tgz",
++      "integrity": "sha512-+a5Fap7wVR4oN5jg1GxVNbWW+xUv3LO7UWYfg2D8PkJZiTCcX8PwkcmdzMGVr39dyOtIMTSAANw0af1zMjVbOA==",
++      "license": "MIT",
++      "dependencies": {
++        "@serwist/build": "9.5.12",
++        "@serwist/utils": "9.5.12",
++        "pretty-bytes": "6.1.1",
++        "zod": "4.4.3"
++      },
++      "engines": {
++        "node": ">=18.0.0"
++      },
++      "peerDependencies": {
++        "typescript": ">=5.0.0",
++        "webpack": "4.4.0 || ^5.9.0"
++      },
++      "peerDependenciesMeta": {
++        "typescript": {
++          "optional": true
++        },
++        "webpack": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@serwist/window": {
++      "version": "9.5.12",
++      "resolved": "https://registry.npmjs.org/@serwist/window/-/window-9.5.12.tgz",
++      "integrity": "sha512-+fjApJme34qfwdGE2kLT8sFx+xWO+a15477MN/B/b1v4HOWBmARuA9C2xGFBCT77XzCrzQ/2DxcDePZsqEYOlw==",
++      "license": "MIT",
++      "dependencies": {
++        "@types/trusted-types": "2.0.7",
++        "serwist": "9.5.12"
++      },
++      "peerDependencies": {
++        "typescript": ">=5.0.0"
++      },
++      "peerDependenciesMeta": {
++        "typescript": {
++          "optional": true
++        }
++      }
++    },
+     "node_modules/@swc/helpers": {
+       "version": "0.5.15",
+       "resolved": "https://registry.npmjs.org/@swc/helpers/-/helpers-0.5.15.tgz",
+@@ -1701,8 +1835,7 @@
+       "version": "2.0.7",
+       "resolved": "https://registry.npmjs.org/@types/trusted-types/-/trusted-types-2.0.7.tgz",
+       "integrity": "sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==",
+-      "license": "MIT",
+-      "optional": true
++      "license": "MIT"
+     },
+     "node_modules/@typescript-eslint/eslint-plugin": {
+       "version": "8.62.1",
+@@ -2723,10 +2856,9 @@
+       }
+     },
+     "node_modules/browserslist": {
+-      "version": "4.28.4",
+-      "resolved": "https://registry.npmjs.org/browserslist/-/browserslist-4.28.4.tgz",
+-      "integrity": "sha512-MTc8i/x9jBQd1iMw2CFGS+rwMa07eYjLR0CCTLDACl9xhxy+nIs3KeML/biicXtk9JrZ6dnnTatmc7ErPXIxqw==",
+-      "dev": true,
++      "version": "4.28.6",
++      "resolved": "https://registry.npmjs.org/browserslist/-/browserslist-4.28.6.tgz",
++      "integrity": "sha512-FQBYNK15VMslhLHpA7+n+n1GOlF1kId2xcCg7/j95f24AOF6VDYMNH4mFxF7KuaTdv627faazpOAjFzMrfJOUw==",
+       "funding": [
+         {
+           "type": "opencollective",
+@@ -2743,10 +2875,10 @@
+       ],
+       "license": "MIT",
+       "dependencies": {
+-        "baseline-browser-mapping": "^2.10.38",
+-        "caniuse-lite": "^1.0.30001799",
+-        "electron-to-chromium": "^1.5.376",
+-        "node-releases": "^2.0.48",
++        "baseline-browser-mapping": "^2.10.42",
++        "caniuse-lite": "^1.0.30001803",
++        "electron-to-chromium": "^1.5.389",
++        "node-releases": "^2.0.51",
+         "update-browserslist-db": "^1.2.3"
+       },
+       "bin": {
+@@ -2816,9 +2948,9 @@
+       }
+     },
+     "node_modules/caniuse-lite": {
+-      "version": "1.0.30001800",
+-      "resolved": "https://registry.npmjs.org/caniuse-lite/-/caniuse-lite-1.0.30001800.tgz",
+-      "integrity": "sha512-MMHtuAz9Ys840zAY5F4k6fV5GaivZ9sPk+nz0mY+GYVzRBnYkN0mpqkSR92oWRQ19yQWo4HvBV/FnC16AJX8MA==",
++      "version": "1.0.30001810",
++      "resolved": "https://registry.npmjs.org/caniuse-lite/-/caniuse-lite-1.0.30001810.tgz",
++      "integrity": "sha512-TITQPUkaz+aVk5GL6NhOdwk1aEaNTSDPsGFWrTuhKGtjTF70jL/Oht2W4c6rXUe5fu7Ie19VIahAXHIIiWWNeg==",
+       "funding": [
+         {
+           "type": "opencollective",
+@@ -2910,6 +3042,15 @@
+         "node": ">= 0.8"
+       }
+     },
++    "node_modules/common-tags": {
++      "version": "1.8.2",
++      "resolved": "https://registry.npmjs.org/common-tags/-/common-tags-1.8.2.tgz",
++      "integrity": "sha512-gk/Z852D2Wtb//0I+kRFNKKE9dIIVirjoqPoA1wJU+XePVXZfGeBpk45+A1rKO4Q43prqWBNY/MiIeRLbPWUaA==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=4.0.0"
++      }
++    },
+     "node_modules/concat-map": {
+       "version": "0.0.1",
+       "resolved": "https://registry.npmjs.org/concat-map/-/concat-map-0.0.1.tgz",
+@@ -3162,10 +3303,9 @@
+       }
+     },
+     "node_modules/electron-to-chromium": {
+-      "version": "1.5.387",
+-      "resolved": "https://registry.npmjs.org/electron-to-chromium/-/electron-to-chromium-1.5.387.tgz",
+-      "integrity": "sha512-TaxwufTFDufvPEoXdhwVrA3UdFWBeWGkYoJ1K8ldF1xe6gKfth6iRNS5lTQ5JPNOHdGQm8PT1QYKUqFLCiUefQ==",
+-      "dev": true,
++      "version": "1.5.428",
++      "resolved": "https://registry.npmjs.org/electron-to-chromium/-/electron-to-chromium-1.5.428.tgz",
++      "integrity": "sha512-1JxbaFJj1bRKurj1uY3l4xxpU9kOUAUjcIgApj0qu1Pao5GhoIWI8iL0BeMYJ2njig1hBx0A7eKD9VGjH9wlHw==",
+       "license": "ISC"
+     },
+     "node_modules/emoji-regex": {
+@@ -3388,7 +3528,6 @@
+       "version": "3.2.0",
+       "resolved": "https://registry.npmjs.org/escalade/-/escalade-3.2.0.tgz",
+       "integrity": "sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA==",
+-      "dev": true,
+       "license": "MIT",
+       "engines": {
+         "node": ">=6"
+@@ -4138,6 +4277,23 @@
+         "url": "https://github.com/privatenumber/get-tsconfig?sponsor=1"
+       }
+     },
++    "node_modules/glob": {
++      "version": "13.0.6",
++      "resolved": "https://registry.npmjs.org/glob/-/glob-13.0.6.tgz",
++      "integrity": "sha512-Wjlyrolmm8uDpm/ogGyXZXb1Z+Ca2B8NbJwqBVg0axK9GbBeoS7yGV6vjXnYdGm6X53iehEuxxbyiKp8QmN4Vw==",
++      "license": "BlueOak-1.0.0",
++      "dependencies": {
++        "minimatch": "^10.2.2",
++        "minipass": "^7.1.3",
++        "path-scurry": "^2.0.2"
++      },
++      "engines": {
++        "node": "18 || 20 || >=22"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/isaacs"
++      }
++    },
+     "node_modules/glob-parent": {
+       "version": "6.0.2",
+       "resolved": "https://registry.npmjs.org/glob-parent/-/glob-parent-6.0.2.tgz",
+@@ -4151,6 +4307,42 @@
+         "node": ">=10.13.0"
+       }
+     },
++    "node_modules/glob/node_modules/balanced-match": {
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/balanced-match/-/balanced-match-4.0.4.tgz",
++      "integrity": "sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==",
++      "license": "MIT",
++      "engines": {
++        "node": "18 || 20 || >=22"
++      }
++    },
++    "node_modules/glob/node_modules/brace-expansion": {
++      "version": "5.0.12",
++      "resolved": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-5.0.12.tgz",
++      "integrity": "sha512-YovQ3rzhaLMIrDjNDMkNS01tea93qhEhG5xy8f6+R0l+dw3Ki+5sCoIoI942iuLZTHWogWktgwVDhU09iNEimQ==",
++      "license": "MIT",
++      "dependencies": {
++        "balanced-match": "^4.0.2"
++      },
++      "engines": {
++        "node": "20 || >=22"
++      }
++    },
++    "node_modules/glob/node_modules/minimatch": {
++      "version": "10.2.6",
++      "resolved": "https://registry.npmjs.org/minimatch/-/minimatch-10.2.6.tgz",
++      "integrity": "sha512-vpLQEs+VLCr1nU0BXS07maYoFwlDAH0gngQuuttxIwutDFEMHq2blX+8vpgxDdK3J1PwjCJiep77OitTZ4Ll1A==",
++      "license": "BlueOak-1.0.0",
++      "dependencies": {
++        "brace-expansion": "^5.0.8"
++      },
++      "engines": {
++        "node": "18 || 20 || >=22"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/isaacs"
++      }
++    },
+     "node_modules/globals": {
+       "version": "14.0.0",
+       "resolved": "https://registry.npmjs.org/globals/-/globals-14.0.0.tgz",
+@@ -4335,6 +4527,12 @@
+         "node": ">= 6"
+       }
+     },
++    "node_modules/idb": {
++      "version": "8.0.3",
++      "resolved": "https://registry.npmjs.org/idb/-/idb-8.0.3.tgz",
++      "integrity": "sha512-LtwtVyVYO5BqRvcsKuB2iUMnHwPVByPCXFXOpuU96IZPPoPN6xjOGxZQ74pgSVVLQWtUOYgyeL4GE98BY5D3wg==",
++      "license": "ISC"
++    },
+     "node_modules/ignore": {
+       "version": "5.3.2",
+       "resolved": "https://registry.npmjs.org/ignore/-/ignore-5.3.2.tgz",
+@@ -4995,6 +5193,12 @@
+         "json-buffer": "3.0.1"
+       }
+     },
++    "node_modules/kolorist": {
++      "version": "1.8.0",
++      "resolved": "https://registry.npmjs.org/kolorist/-/kolorist-1.8.0.tgz",
++      "integrity": "sha512-Y+60/zizpJ3HRH8DCss+q95yr6145JXZo46OTpFvDZWLfRCE4qChOyk1b26nMaNpfHHgxagk9dXT5OP0Tfe+dQ==",
++      "license": "MIT"
++    },
+     "node_modules/language-subtag-registry": {
+       "version": "0.3.23",
+       "resolved": "https://registry.npmjs.org/language-subtag-registry/-/language-subtag-registry-0.3.23.tgz",
+@@ -5444,6 +5648,15 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/minipass": {
++      "version": "7.1.3",
++      "resolved": "https://registry.npmjs.org/minipass/-/minipass-7.1.3.tgz",
++      "integrity": "sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A==",
++      "license": "BlueOak-1.0.0",
++      "engines": {
++        "node": ">=16 || 14 >=14.17"
++      }
++    },
+     "node_modules/ms": {
+       "version": "2.1.3",
+       "resolved": "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz",
+@@ -5592,10 +5805,9 @@
+       }
+     },
+     "node_modules/node-releases": {
+-      "version": "2.0.50",
+-      "resolved": "https://registry.npmjs.org/node-releases/-/node-releases-2.0.50.tgz",
+-      "integrity": "sha512-J6l92tKHX6w8Jy5nO1Vuc01NoIiRGi/d6qBKVxh+IQ8Cr3b6HbVNfKiF8ZpFKufTwpwxMmce2W3iQZ861ZRyTg==",
+-      "dev": true,
++      "version": "2.0.55",
++      "resolved": "https://registry.npmjs.org/node-releases/-/node-releases-2.0.55.tgz",
++      "integrity": "sha512-mIrE/Cw9y+9Au6dS5vDKDhQza9YvG6w+ZrS6X+ZzA7yFW/soAeaups4Qzn1bL6g5FVy8WtP79+0j82oPIbqRjQ==",
+       "license": "MIT",
+       "engines": {
+         "node": ">=18"
+@@ -5848,6 +6060,31 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/path-scurry": {
++      "version": "2.0.2",
++      "resolved": "https://registry.npmjs.org/path-scurry/-/path-scurry-2.0.2.tgz",
++      "integrity": "sha512-3O/iVVsJAPsOnpwWIeD+d6z/7PmqApyQePUtCndjatj/9I5LylHvt5qluFaBT3I5h3r1ejfR056c+FCv+NnNXg==",
++      "license": "BlueOak-1.0.0",
++      "dependencies": {
++        "lru-cache": "^11.0.0",
++        "minipass": "^7.1.2"
++      },
++      "engines": {
++        "node": "18 || 20 || >=22"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/isaacs"
++      }
++    },
++    "node_modules/path-scurry/node_modules/lru-cache": {
++      "version": "11.5.2",
++      "resolved": "https://registry.npmjs.org/lru-cache/-/lru-cache-11.5.2.tgz",
++      "integrity": "sha512-4pfM1Ff0x50o0tQwb5ucw/RzNyD0/YJME6IVcStalZuMWxdt3sR3huStTtxz4PUmvZfRguvDejasvQ2kifR11g==",
++      "license": "BlueOak-1.0.0",
++      "engines": {
++        "node": "20 || >=22"
++      }
++    },
+     "node_modules/performance-now": {
+       "version": "2.1.0",
+       "resolved": "https://registry.npmjs.org/performance-now/-/performance-now-2.1.0.tgz",
+@@ -5923,6 +6160,18 @@
+         "node": ">= 0.8.0"
+       }
+     },
++    "node_modules/pretty-bytes": {
++      "version": "6.1.1",
++      "resolved": "https://registry.npmjs.org/pretty-bytes/-/pretty-bytes-6.1.1.tgz",
++      "integrity": "sha512-mQUvGU6aUFQ+rNvTIAcZuWGRT9a6f6Yrg9bHs4ImKF+HZCEK+plBvnAZYSIQztknZF2qnzNtr6F8s0+IuptdlQ==",
++      "license": "MIT",
++      "engines": {
++        "node": "^14.13.1 || >=16.0.0"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/prop-types": {
+       "version": "15.8.1",
+       "resolved": "https://registry.npmjs.org/prop-types/-/prop-types-15.8.1.tgz",
+@@ -6224,6 +6473,24 @@
+         "semver": "bin/semver.js"
+       }
+     },
++    "node_modules/serwist": {
++      "version": "9.5.12",
++      "resolved": "https://registry.npmjs.org/serwist/-/serwist-9.5.12.tgz",
++      "integrity": "sha512-PwREKJrSb3ja40XJyBntPOm7okcYZJCJPd++jUVz8tzxY1VYO9dyKSm0MimZ8LtUk0pIUTN0q2cfGe7R0wQsaQ==",
++      "license": "MIT",
++      "dependencies": {
++        "@serwist/utils": "9.5.12",
++        "idb": "8.0.3"
++      },
++      "peerDependencies": {
++        "typescript": ">=5.0.0"
++      },
++      "peerDependenciesMeta": {
++        "typescript": {
++          "optional": true
++        }
++      }
++    },
+     "node_modules/set-function-length": {
+       "version": "1.2.2",
+       "resolved": "https://registry.npmjs.org/set-function-length/-/set-function-length-1.2.2.tgz",
+@@ -6430,6 +6697,15 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/source-map": {
++      "version": "0.8.0",
++      "resolved": "https://registry.npmjs.org/source-map/-/source-map-0.8.0.tgz",
++      "integrity": "sha512-d8EqvL+k/SOXCreS/SUzg2ciyHqBBLcN/yuRjFsbvVhHTE2pgei7oAhmPM7kWFbkX6OSMQfUq4KbkF3au9lhYQ==",
++      "license": "BSD-3-Clause",
++      "engines": {
++        "node": ">= 12"
++      }
++    },
+     "node_modules/source-map-js": {
+       "version": "1.2.1",
+       "resolved": "https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.1.tgz",
+@@ -6666,6 +6942,18 @@
+         "node": ">=12.0.0"
+       }
+     },
++    "node_modules/tagged-tag": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/tagged-tag/-/tagged-tag-1.0.0.tgz",
++      "integrity": "sha512-yEFYrVhod+hdNyx7g5Bnkkb0G6si8HJurOoOEgC8B/O0uXLHlaey/65KRv6cuWBNhBgHKAROVpc7QyYqE5gFng==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=20"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/tailwindcss": {
+       "version": "4.3.2",
+       "resolved": "https://registry.npmjs.org/tailwindcss/-/tailwindcss-4.3.2.tgz",
+@@ -6816,6 +7104,21 @@
+         "node": ">= 0.8.0"
+       }
+     },
++    "node_modules/type-fest": {
++      "version": "5.8.0",
++      "resolved": "https://registry.npmjs.org/type-fest/-/type-fest-5.8.0.tgz",
++      "integrity": "sha512-YGYEVz3Fm5iy/AybuA0oyNFq7H4CgQNfRp/qfe8nurE1kuCeNm3/vfm9X4Mtl+qLyaKJUh5xrFZwogr41SMjYA==",
++      "license": "(MIT OR CC0-1.0)",
++      "dependencies": {
++        "tagged-tag": "^1.0.0"
++      },
++      "engines": {
++        "node": ">=20"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/typed-array-buffer": {
+       "version": "1.0.3",
+       "resolved": "https://registry.npmjs.org/typed-array-buffer/-/typed-array-buffer-1.0.3.tgz",
+@@ -6898,7 +7201,7 @@
+       "version": "5.9.3",
+       "resolved": "https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz",
+       "integrity": "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==",
+-      "dev": true,
++      "devOptional": true,
+       "license": "Apache-2.0",
+       "bin": {
+         "tsc": "bin/tsc",
+@@ -7000,7 +7303,6 @@
+       "version": "1.2.3",
+       "resolved": "https://registry.npmjs.org/update-browserslist-db/-/update-browserslist-db-1.2.3.tgz",
+       "integrity": "sha512-Js0m9cx+qOgDxo0eMiFGEueWztz+d4+M3rGlmKPT+T4IS/jP4ylw3Nwpu6cpTTP8R1MAC1kF4VbdLt3ARf209w==",
+-      "dev": true,
+       "funding": [
+         {
+           "type": "opencollective",
+@@ -7199,7 +7501,6 @@
+       "version": "4.4.3",
+       "resolved": "https://registry.npmjs.org/zod/-/zod-4.4.3.tgz",
+       "integrity": "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==",
+-      "dev": true,
+       "license": "MIT",
+       "funding": {
+         "url": "https://github.com/sponsors/colinhacks"
+diff --git a/frontend/package.json b/frontend/package.json
+index 6fceaef..bb68456 100644
+--- a/frontend/package.json
++++ b/frontend/package.json
+@@ -3,12 +3,13 @@
+   "version": "0.1.0",
+   "private": true,
+   "scripts": {
+-    "dev": "next dev",
+-    "build": "next build",
++    "dev": "next dev --webpack",
++    "build": "next build --webpack",
+     "start": "next start",
+     "lint": "eslint"
+   },
+   "dependencies": {
++    "@serwist/next": "^9.5.12",
+     "axios": "^1.18.1",
+     "date-fns": "^4.4.0",
+     "dexie": "^4.4.4",
+@@ -18,6 +19,7 @@
+     "next": "16.2.10",
+     "react": "19.2.4",
+     "react-dom": "19.2.4",
++    "serwist": "^9.5.12",
+     "uuid": "^14.0.1",
+     "zustand": "^5.0.14"
+   },
+diff --git a/frontend/src/app/admin/communities/page.tsx b/frontend/src/app/admin/communities/page.tsx
+index bab912b..24d63ca 100644
+--- a/frontend/src/app/admin/communities/page.tsx
++++ b/frontend/src/app/admin/communities/page.tsx
+@@ -1,7 +1,7 @@
+ "use client";
+ 
+ import { useEffect, useState } from 'react';
+-import { useAuthStore } from '@/lib/store';
++import { useAdminAuthStore } from '@/lib/store';
+ import { useRouter } from 'next/navigation';
+ import { api, getErrorMessage } from '@/lib/api';
+ 
+@@ -28,7 +28,7 @@ interface Student {
+ }
+ 
+ export default function CommunitiesPage() {
+-  const { user, token } = useAuthStore();
++  const { user, token } = useAdminAuthStore();
+   const router = useRouter();
+ 
+   const [communities, setCommunities] = useState<Community[]>([]);
+diff --git a/frontend/src/app/admin/exports/page.tsx b/frontend/src/app/admin/exports/page.tsx
+index b54d66c..dbc753c 100644
+--- a/frontend/src/app/admin/exports/page.tsx
++++ b/frontend/src/app/admin/exports/page.tsx
+@@ -4,10 +4,10 @@ import { useState } from 'react';
+ import { downloadExport } from '@/lib/export';
+ import { Download, Users, ClipboardList, Loader2 } from 'lucide-react';
+ 
+-import { useAuthStore } from '@/lib/store';
++import { useAdminAuthStore } from '@/lib/store';
+ 
+ export default function ExportsPage() {
+-  const { token } = useAuthStore();
++  const { token } = useAdminAuthStore();
+   const [exportingStudents, setExportingStudents] = useState(false);
+   const [exportingSurveys, setExportingSurveys] = useState(false);
+ 
+diff --git a/frontend/src/app/admin/layout.tsx b/frontend/src/app/admin/layout.tsx
+index a87b3d0..142fbfe 100644
+--- a/frontend/src/app/admin/layout.tsx
++++ b/frontend/src/app/admin/layout.tsx
+@@ -1,6 +1,6 @@
+ "use client";
+ 
+-import { useAuthStore } from '@/lib/store';
++import { useAdminAuthStore } from '@/lib/store';
+ import { useRouter, usePathname } from 'next/navigation';
+ import { useEffect, useState } from 'react';
+ import { api } from '@/lib/api';
+@@ -12,7 +12,7 @@ import {
+ import Link from 'next/link';
+ 
+ export default function AdminLayout({ children }: { children: React.ReactNode }) {
+-  const { user, token, logout, theme } = useAuthStore();
++  const { user, token, logout, theme } = useAdminAuthStore();
+   const router = useRouter();
+   const pathname = usePathname();
+   const [sidebarOpen, setSidebarOpen] = useState(true);
+diff --git a/frontend/src/app/admin/login/page.tsx b/frontend/src/app/admin/login/page.tsx
+index b945fa9..2c61307 100644
+--- a/frontend/src/app/admin/login/page.tsx
++++ b/frontend/src/app/admin/login/page.tsx
+@@ -2,7 +2,7 @@
+ 
+ import { useState } from 'react';
+ import { useRouter } from 'next/navigation';
+-import { useAuthStore } from '@/lib/store';
++import { useAdminAuthStore } from '@/lib/store';
+ import { api } from '@/lib/api';
+ 
+ export default function AdminLoginPage() {
+@@ -11,7 +11,7 @@ export default function AdminLoginPage() {
+   const [error, setError] = useState('');
+   const [isLoading, setIsLoading] = useState(false);
+   const router = useRouter();
+-  const setAuth = useAuthStore((state: any) => state.setAuth);
++  const setAuth = useAdminAuthStore((state: any) => state.setAuth);
+ 
+   const handleLogin = async (e: React.FormEvent) => {
+     e.preventDefault();
+diff --git a/frontend/src/app/admin/notifications/page.tsx b/frontend/src/app/admin/notifications/page.tsx
+index c24bcfd..01bc75c 100644
+--- a/frontend/src/app/admin/notifications/page.tsx
++++ b/frontend/src/app/admin/notifications/page.tsx
+@@ -1,13 +1,13 @@
+ "use client";
+ 
+ import { useEffect, useState } from 'react';
+-import { useAuthStore } from '@/lib/store';
++import { useAdminAuthStore } from '@/lib/store';
+ import { useRouter } from 'next/navigation';
+ import { api } from '@/lib/api';
+ import { Bell, CheckCircle, Clock } from 'lucide-react';
+ 
+ export default function AdminNotifications() {
+-  const { user, token } = useAuthStore();
++  const { user, token } = useAdminAuthStore();
+   const router = useRouter();
+   const [notifications, setNotifications] = useState<any[]>([]);
+   const [loading, setLoading] = useState(true);
+diff --git a/frontend/src/app/admin/page.tsx b/frontend/src/app/admin/page.tsx
+index 48e5c9f..8bdcb99 100644
+--- a/frontend/src/app/admin/page.tsx
++++ b/frontend/src/app/admin/page.tsx
+@@ -1,13 +1,13 @@
+ "use client";
+ 
+ import { useEffect, useState } from 'react';
+-import { useAuthStore } from '@/lib/store';
++import { useAdminAuthStore } from '@/lib/store';
+ import { useRouter } from 'next/navigation';
+ import { api } from '@/lib/api';
+ import { downloadExport } from '@/lib/export';
+ 
+ export default function AdminDashboard() {
+-  const { user, token, logout } = useAuthStore();
++  const { user, token, logout } = useAdminAuthStore();
+   const router = useRouter();
+ 
+   const [communities, setCommunities] = useState<any[]>([]);
+diff --git a/frontend/src/app/admin/registration/page.tsx b/frontend/src/app/admin/registration/page.tsx
+index 964fc5c..c85ed5e 100644
+--- a/frontend/src/app/admin/registration/page.tsx
++++ b/frontend/src/app/admin/registration/page.tsx
+@@ -3,10 +3,10 @@
+ import React, { useState, useEffect } from 'react';
+ import { api } from '@/lib/api';
+ import { ShieldCheck, ShieldAlert, Settings, Loader2, KeyRound } from 'lucide-react';
+-import { useAuthStore } from '@/lib/store';
++import { useAdminAuthStore } from '@/lib/store';
+ 
+ export default function RegistrationControlPage() {
+-  const { token } = useAuthStore();
++  const { token } = useAdminAuthStore();
+   
+   // Actual verified state from the backend
+   const [registrationEnabled, setRegistrationEnabled] = useState(false);
+diff --git a/frontend/src/app/admin/reports/page.tsx b/frontend/src/app/admin/reports/page.tsx
+index 41082ae..0fe1dee 100644
+--- a/frontend/src/app/admin/reports/page.tsx
++++ b/frontend/src/app/admin/reports/page.tsx
+@@ -1,7 +1,7 @@
+ "use client";
+ 
+ import { useEffect, useState } from 'react';
+-import { useAuthStore } from '@/lib/store';
++import { useAdminAuthStore } from '@/lib/store';
+ import { useRouter } from 'next/navigation';
+ import { api } from '@/lib/api';
+ import Link from 'next/link';
+@@ -26,7 +26,7 @@ interface SurveyList {
+ }
+ 
+ export default function AdminReportsPage() {
+-  const { user, token } = useAuthStore();
++  const { user, token } = useAdminAuthStore();
+   const router = useRouter();
+ 
+   const [stats, setStats] = useState<SurveyStats | null>(null);
+diff --git a/frontend/src/app/admin/settings/page.tsx b/frontend/src/app/admin/settings/page.tsx
+index 0bbac77..103fca0 100644
+--- a/frontend/src/app/admin/settings/page.tsx
++++ b/frontend/src/app/admin/settings/page.tsx
+@@ -1,7 +1,7 @@
+ "use client";
+ 
+ import { useEffect, useState } from 'react';
+-import { useAuthStore } from '@/lib/store';
++import { useAdminAuthStore } from '@/lib/store';
+ import { useRouter } from 'next/navigation';
+ import { api, getErrorMessage } from '@/lib/api';
+ 
+@@ -17,7 +17,7 @@ interface Settings {
+ }
+ 
+ export default function AdminSettingsPage() {
+-  const { user, token, theme, setTheme } = useAuthStore();
++  const { user, token, theme, setTheme } = useAdminAuthStore();
+   const router = useRouter();
+ 
+   const [settings, setSettings] = useState<Settings>({
+diff --git a/frontend/src/app/admin/students/page.tsx b/frontend/src/app/admin/students/page.tsx
+index 1bd0a09..52068fa 100644
+--- a/frontend/src/app/admin/students/page.tsx
++++ b/frontend/src/app/admin/students/page.tsx
+@@ -1,7 +1,7 @@
+ "use client";
+ 
+ import { useEffect, useState, useMemo } from 'react';
+-import { useAuthStore } from '@/lib/store';
++import { useAdminAuthStore } from '@/lib/store';
+ import { useRouter } from 'next/navigation';
+ import { api } from '@/lib/api';
+ 
+@@ -25,7 +25,7 @@ interface Student {
+ }
+ 
+ export default function AdminStudentsPage() {
+-  const { user, token } = useAuthStore();
++  const { user, token } = useAdminAuthStore();
+   const router = useRouter();
+ 
+   const [students, setStudents] = useState<Student[]>([]);
+diff --git a/frontend/src/app/admin/surveys/page.tsx b/frontend/src/app/admin/surveys/page.tsx
+index 1581b77..19fe73a 100644
+--- a/frontend/src/app/admin/surveys/page.tsx
++++ b/frontend/src/app/admin/surveys/page.tsx
+@@ -1,7 +1,7 @@
+ "use client";
+ 
+ import { useEffect, useState, useMemo } from 'react';
+-import { useAuthStore } from '@/lib/store';
++import { useAdminAuthStore } from '@/lib/store';
+ import { useRouter } from 'next/navigation';
+ import { api } from '@/lib/api';
+ 
+@@ -28,7 +28,7 @@ interface SurveyDetail extends SurveyList {
+ }
+ 
+ export default function AdminSurveysPage() {
+-  const { user, token } = useAuthStore();
++  const { user, token } = useAdminAuthStore();
+   const router = useRouter();
+ 
+   const [surveys, setSurveys] = useState<SurveyList[]>([]);
+diff --git a/frontend/src/app/admin/whitelist/page.tsx b/frontend/src/app/admin/whitelist/page.tsx
+index 95b028b..9653d2d 100644
+--- a/frontend/src/app/admin/whitelist/page.tsx
++++ b/frontend/src/app/admin/whitelist/page.tsx
+@@ -2,7 +2,7 @@
+ 
+ import React, { useState, useRef, useEffect } from 'react';
+ import { api } from '@/lib/api';
+-import { useAuthStore } from '@/lib/store';
++import { useAdminAuthStore } from '@/lib/store';
+ import { Loader2, Download, Trash2 } from 'lucide-react';
+ import { downloadExport } from '@/lib/export';
+ 
+@@ -23,7 +23,7 @@ interface Whitelist {
+ }
+ 
+ export default function WhitelistUploadPage() {
+-  const { token } = useAuthStore();
++  const { token } = useAdminAuthStore();
+   const [file, setFile] = useState<File | null>(null);
+   const [name, setName] = useState<string>('');
+   const [uploading, setUploading] = useState(false);
+diff --git a/frontend/src/app/dashboard/layout.tsx b/frontend/src/app/dashboard/layout.tsx
+index 6cdd5c0..24b33f8 100644
+--- a/frontend/src/app/dashboard/layout.tsx
++++ b/frontend/src/app/dashboard/layout.tsx
+@@ -6,303 +6,258 @@ import { useRouter, usePathname } from 'next/navigation';
+ import Link from 'next/link';
+ import { 
+   Home, 
+-  ClipboardList, 
+   FileEdit, 
+   CheckSquare, 
+-  BarChart2, 
+   User as UserIcon, 
+   Settings, 
+   Bell, 
+   LogOut,
+   Menu,
+   X,
+-  Users
++  Users,
++  HelpCircle,
++  Plus,
++  RefreshCw
+ } from 'lucide-react';
+ import { syncEngine } from '@/lib/sync';
+ 
+-import { formatDistanceToNow } from 'date-fns';
+-
+-export default function DashboardLayout({
+-  children,
+-}: {
+-  children: React.ReactNode;
+-}) {
++export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+   const { user, token, logout } = useAuthStore();
+   const router = useRouter();
+   const pathname = usePathname();
+   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+   const [syncStatus, setSyncStatus] = useState('Online');
+-  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+-  const [lastSyncText, setLastSyncText] = useState('Never');
+   const [isSyncing, setIsSyncing] = useState(false);
++  const [draftCount, setDraftCount] = useState(0);
++  const [hydrated, setHydrated] = useState(false);
++  const [authVerified, setAuthVerified] = useState(false);
+ 
+   useEffect(() => {
+-    if (!token || !user || user.role !== 'student') return;
+-
+-    // Load initial sync time
+-    const stored = localStorage.getItem('cfss_last_sync');
+-    if (stored) setLastSyncTime(stored);
++    setHydrated(true);
++  }, []);
+ 
+-    const handleOnline = () => {
+-      setSyncStatus('Online');
+-      if (token) {
+-        setIsSyncing(true);
+-        syncEngine.processQueue(token).finally(() => setIsSyncing(false));
+-      }
+-    };
+-    const handleOffline = () => setSyncStatus('Offline');
+-
+-    const handleSyncCompleted = () => {
+-      setIsSyncing(false);
+-      const now = new Date().toISOString();
+-      localStorage.setItem('cfss_last_sync', now);
+-      setLastSyncTime(now);
+-    };
+-
+-    window.addEventListener('online', handleOnline);
+-    window.addEventListener('offline', handleOffline);
+-    window.addEventListener('sync-completed', handleSyncCompleted);
++  useEffect(() => {
++    if (!hydrated) return;
+ 
+-    if (navigator.onLine && token) {
+-      setIsSyncing(true);
+-      syncEngine.processQueue(token).finally(() => setIsSyncing(false));
+-    } else if (!navigator.onLine) {
+-      setSyncStatus('Offline');
++    if (!token || !user || user.role !== 'student') {
++      router.push('/login');
++      return;
+     }
+ 
+-    return () => {
+-      window.removeEventListener('online', handleOnline);
+-      window.removeEventListener('offline', handleOffline);
+-      window.removeEventListener('sync-completed', handleSyncCompleted);
+-    };
+-  }, [user, token]);
+-
+-  useEffect(() => {
+-    if (!lastSyncTime) return;
+-    const updateText = () => {
++    const verifyAndFetch = async () => {
+       try {
+-        setLastSyncText(formatDistanceToNow(new Date(lastSyncTime), { addSuffix: true }));
+-      } catch (e) {
+-        // Ignored
++        await import('@/lib/api').then(m => m.api.get('/api/v2/students/me', {
++          headers: { Authorization: `Bearer ${token}` }
++        }));
++      } catch (err: any) {
++        if (err.response?.status === 401) {
++          logout();
++          router.push('/login');
++          return;
++        }
+       }
++
++      setAuthVerified(true);
++
++      try {
++        const { db } = await import('@/lib/db');
++        const localSurveys = await db.surveys.where('student_id').equals(user.id as number).toArray();
++        const localDrafts = localSurveys.filter(s => s.status === 'DRAFT').length;
++        setDraftCount(localDrafts);
++      } catch (err) {}
+     };
+-    updateText();
+-    const interval = setInterval(updateText, 60000);
+-    return () => clearInterval(interval);
+-  }, [lastSyncTime]);
++    
++    verifyAndFetch();
++  }, [hydrated, user, token, pathname, router, logout]);
+ 
+   const handleLogout = () => {
+     logout();
+     router.push('/login');
+   };
+ 
+-  useEffect(() => {
+-    if (!token || !user || user.role === 'admin') return;
+-
+-    // Sessions created before the admin routing fix can hold a stale
+-    // 'student' role. Decode the token and kick admins to the admin portal.
+-    try {
+-      const role = JSON.parse(atob(token.split('.')[1])).role;
+-      if (role === 'admin') {
+-        useAuthStore.getState().setAuth(token, { ...user, role: 'admin' });
+-        router.replace('/admin');
+-      }
+-    } catch (e) {
+-      // malformed token — let the page's own auth checks handle it
+-    }
+-  }, [token, user, router]);
+-
+-  const [draftCount, setDraftCount] = useState(0);
+-  
+-  useEffect(() => {
+-    if (!user || !token) return;
+-    const fetchCount = async () => {
+-      try {
+-        let count = 0;
+-        // First try to get real count from server if online
+-        if (navigator.onLine) {
+-           const { api } = await import('@/lib/api');
+-           const res = await api.get('/api/student/surveys/dashboard/stats', {
+-              headers: { Authorization: `Bearer ${token}` }
+-           }).catch(() => null);
+-           if (res?.data) {
+-              count = res.data.draft_surveys || 0;
+-           }
+-        }
+-        
+-        // If offline, fallback to Dexie local count
+-        if (!navigator.onLine) {
+-           const { db } = await import('@/lib/db');
+-           const drafts = await db.surveys.where('status').equals('DRAFT').toArray();
+-           count = drafts.filter(d => d.student_id === user.id).length;
+-        }
+-
+-        setDraftCount(count);
+-      } catch (e) {
+-        // Ignored
+-      }
+-    };
+-    fetchCount();
+-    
+-    const interval = setInterval(fetchCount, 30000); // refresh every 30s
+-    window.addEventListener('sync-queued', fetchCount);
+-    window.addEventListener('sync-completed', fetchCount);
+-    return () => {
+-      clearInterval(interval);
+-      window.removeEventListener('sync-queued', fetchCount);
+-      window.removeEventListener('sync-completed', fetchCount);
+-    };
+-  }, [user, token]);
+-
+   const navItems = [
+-    { name: 'Dashboard', href: '/dashboard', icon: Home },
+-    { name: 'My Group', href: '/dashboard/group', icon: Users },
+-    { name: 'Surveys', href: '/surveys', icon: ClipboardList },
+-    { name: 'Drafts', href: '/dashboard/surveys/drafts', icon: FileEdit, badge: draftCount > 0 ? draftCount : undefined },
++    { name: 'Home', href: '/dashboard', icon: Home },
++    { name: 'Work', href: '/dashboard/work', icon: FileEdit, badge: draftCount > 0 ? draftCount : undefined },
++    { name: 'Collect', href: '/surveys', icon: Plus },
+     { name: 'Submitted', href: '/dashboard/surveys/submitted', icon: CheckSquare },
+-    { name: 'Reports', href: '/reports', icon: BarChart2 },
++  ];
++
++  const moreItems = [
++    { name: 'My Group', href: '/dashboard/group', icon: Users },
++    { name: 'Sync & Activity', href: '/dashboard/sync', icon: RefreshCw },
+     { name: 'Profile', href: '/profile', icon: UserIcon },
+     { name: 'Settings', href: '/settings', icon: Settings },
++    { name: 'Help', href: '#', icon: HelpCircle },
+   ];
+ 
+-
+-  if (!user) return null;
++  if (!hydrated || !authVerified || !user) {
++    return (
++      <div className="flex h-screen bg-page items-center justify-center font-sans">
++        <div className="w-8 h-8 border-4 border-cfss-green border-t-transparent rounded-full animate-spin"></div>
++      </div>
++    );
++  }
+ 
+   return (
+-    <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
++    <div className="flex h-screen bg-page overflow-hidden font-sans text-primary">
+       
+-      {/* Mobile Sidebar Overlay */}
+       {isMobileMenuOpen && (
+         <div 
+-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
++          className="lg:hidden fixed inset-0 bg-primary/10 backdrop-blur-sm z-50 transition-opacity"
+           onClick={() => setIsMobileMenuOpen(false)}
+         />
+       )}
+ 
+-      {/* Sidebar */}
+-      <aside 
+-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-[#0a4628] to-[#052b18] text-white flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:shrink-0 ${
+-          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+-        }`}
+-      >
+-        <div className="p-6 flex items-center gap-3">
+-          <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shrink-0">
+-            <span className="text-[#0a4628] font-bold text-xl">C</span>
+-          </div>
+-          <div>
+-            <h1 className="font-bold text-lg leading-tight">CFSS</h1>
+-            <p className="text-[10px] text-emerald-100/80 leading-tight">Community Field<br/>Survey System</p>
++      {/* DESKTOP SIDEBAR & MOBILE DRAWER */}
++      <aside className={`fixed lg:static inset-y-0 right-0 z-50 w-72 bg-surface border-l lg:border-l-0 lg:border-r border-border transform transition-transform duration-200 ease-in-out flex flex-col ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}`}>
++        <div className="h-16 flex items-center justify-between px-6 border-b border-border shrink-0">
++          <div className="flex items-center gap-2">
++            <span className="font-semibold tracking-tight text-primary">CFSS</span>
+           </div>
+           <button 
+-            className="ml-auto lg:hidden text-white/80 hover:text-white"
++            className="lg:hidden text-muted hover:text-primary p-2 -mr-2"
+             onClick={() => setIsMobileMenuOpen(false)}
+           >
+             <X size={20} />
+           </button>
+         </div>
+ 
+-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1 scrollbar-hide">
+-          {navItems.map((item) => {
+-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+-            return (
+-              <Link
+-                key={item.name}
++        <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-8">
++          
++          {/* PRIMARY NAV (DESKTOP) */}
++          <div className="hidden lg:block space-y-1">
++            {navItems.map(item => {
++              const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
++              return (
++                <Link 
++                  key={item.href} 
++                  href={item.href}
++                  className={`flex items-center justify-between px-3 py-2.5 rounded-lg transition-colors ${isActive ? 'bg-cfss-green-soft text-cfss-green font-medium' : 'text-secondary hover:bg-page hover:text-primary'}`}
++                >
++                  <div className="flex items-center gap-3">
++                    <item.icon size={18} className={isActive ? 'text-cfss-green' : 'text-muted'} />
++                    <span className="text-sm">{item.name}</span>
++                  </div>
++                  {item.badge && (
++                    <span className="text-cfss-green text-[10px] font-bold px-2 py-0.5 rounded-full bg-cfss-green/10">
++                      {item.badge}
++                    </span>
++                  )}
++                </Link>
++              );
++            })}
++          </div>
++
++          {/* SECONDARY NAV (DESKTOP + MOBILE DRAWER) */}
++          <div className="space-y-1">
++            <h4 className="text-[10px] font-bold text-muted uppercase tracking-wider mb-3 px-3">More</h4>
++            {moreItems.map(item => (
++              <Link 
++                key={item.href} 
+                 href={item.href}
+-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+-                  isActive 
+-                    ? 'bg-[#105f38] text-white' 
+-                    : 'text-emerald-100/70 hover:bg-[#105f38]/50 hover:text-white'
+-                }`}
+                 onClick={() => setIsMobileMenuOpen(false)}
++                className="flex items-center justify-between px-3 py-2.5 rounded-lg text-secondary hover:bg-page hover:text-primary transition-colors"
+               >
+-                <item.icon size={20} className={isActive ? 'text-white' : 'text-emerald-100/70'} />
+-                {item.name}
+-                {item.badge && (
+-                  <span className="ml-auto bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+-                    {item.badge}
+-                  </span>
++                <div className="flex items-center gap-3">
++                  <item.icon size={18} className={item.name === 'Sync & Activity' && isSyncing ? 'text-cfss-green animate-spin' : 'text-muted'} />
++                  <span className="text-sm">{item.name}</span>
++                </div>
++                {item.name === 'Sync & Activity' && (
++                  <div className="flex items-center gap-2">
++                     <span className={`w-2 h-2 rounded-full ${syncStatus === 'Online' && !isSyncing ? 'bg-status-success' : isSyncing ? 'bg-status-warning animate-pulse' : 'bg-status-error'}`}></span>
++                  </div>
+                 )}
+               </Link>
+-            );
+-          })}
+-        </nav>
+-
+-        <div className="p-4 mt-auto">
+-          <div className="bg-[#105f38]/40 border border-[#105f38] rounded-xl p-4 mb-4">
+-            <h3 className="text-sm font-medium text-white mb-2">Sync Status</h3>
+-            <div className="flex items-center gap-2 text-xs text-emerald-100 mb-3">
+-              <span className={`w-2 h-2 rounded-full ${syncStatus === 'Online' && !isSyncing ? 'bg-green-400' : isSyncing ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'}`}></span>
+-              {isSyncing ? 'Syncing...' : syncStatus}
+-            </div>
+-            <p className="text-[10px] text-emerald-200/60 mb-3">Last sync: {lastSyncText}</p>
+-            <button 
+-              className={`w-full py-2 bg-[#0a4628] hover:bg-[#07361e] border border-[#1e7c4c] rounded-lg text-xs font-medium text-white transition-colors flex items-center justify-center gap-2 ${isSyncing || syncStatus === 'Offline' ? 'opacity-50 cursor-not-allowed' : ''}`}
+-              onClick={() => {
+-                if (!isSyncing && token && syncStatus === 'Online') {
+-                  setIsSyncing(true);
+-                  syncEngine.processQueue(token).finally(() => setIsSyncing(false));
+-                }
+-              }}
+-              disabled={isSyncing || syncStatus === 'Offline'}
+-            >
+-              <svg className={isSyncing ? 'animate-spin' : ''} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+-              {isSyncing ? 'Syncing...' : 'Sync Now'}
+-            </button>
++            ))}
+           </div>
+ 
++        </nav>
++
++        <div className="p-4 mt-auto border-t border-border">
+           <button 
+             onClick={handleLogout}
+-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-950/30 hover:text-red-300 transition-colors w-full"
++            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-secondary hover:bg-page transition-colors w-full"
+           >
+-            <LogOut size={20} />
++            <LogOut size={18} className="text-muted" />
+             Logout
+           </button>
+         </div>
+       </aside>
+ 
+-      {/* Main Content Area */}
+-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
++      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+         
+-        {/* Header */}
+-        <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-4 lg:px-8 shrink-0">
+-          <div className="flex items-center">
+-            <button 
+-              className="lg:hidden p-2 -ml-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100"
+-              onClick={() => setIsMobileMenuOpen(true)}
+-            >
+-              <Menu size={24} />
+-            </button>
+-            <span className="lg:hidden font-bold text-gray-900 ml-2">CFSS</span>
++        {/* MOBILE TOP HEADER */}
++        <header className="lg:hidden bg-surface border-b border-border h-14 flex items-center justify-between px-4 shrink-0">
++          <div className="flex items-center gap-2">
++            <span className="font-semibold text-primary text-base tracking-tight">CFSS Home</span>
+           </div>
++          <div className="w-7 h-7 rounded-full bg-page text-secondary flex items-center justify-center font-bold text-xs shrink-0 border border-border">
++            {user.full_name.charAt(0)}
++          </div>
++        </header>
+ 
+-          <div className="flex items-center gap-4 lg:gap-6 ml-auto">
+-            <button className="relative text-gray-500 hover:text-gray-700">
+-              <Bell size={20} />
+-              {/* Notification badge removed because no backend notification system exists yet */}
++        {/* DESKTOP TOP HEADER */}
++        <header className="hidden lg:flex bg-surface border-b border-border h-16 items-center justify-between px-8 shrink-0">
++          <div className="flex items-center gap-4 text-sm text-secondary">
++             {/* No giant banners or solid blocks, just context */}
++          </div>
++
++          <div className="flex items-center gap-4">
++            <button className="text-muted hover:text-primary">
++              <Bell size={18} />
+             </button>
+-            
+-            <div className="flex items-center gap-3">
+-              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm shrink-0">
+-                {user.full_name.charAt(0)}
++            <div className="flex items-center gap-3 pl-4 border-l border-border">
++              <div className="text-right">
++                <p className="text-sm font-medium text-primary leading-none">{user.full_name}</p>
++                <p className="text-[10px] text-muted mt-1">{user.community} · Group {user.group_number}</p>
+               </div>
+-              <div className="hidden sm:block">
+-                <p className="text-sm font-semibold text-gray-900 leading-none">{user.full_name}</p>
+-                <p className="text-xs text-gray-500 mt-1">
+-                  Level 100 • Group {user.group_number || 'Pending'} {user.community ? `• ${user.community}` : ''}
+-                </p>
++              <div className="w-8 h-8 rounded-full bg-page text-secondary flex items-center justify-center font-bold text-sm shrink-0 border border-border">
++                {user.full_name.charAt(0)}
+               </div>
+             </div>
+           </div>
+         </header>
+ 
+-        {/* Scrollable Main Content */}
+-        <main className="flex-1 overflow-y-auto bg-gray-50 p-4 lg:p-8">
+-          <div className="max-w-6xl mx-auto h-full">
++        {/* MAIN CONTENT AREA */}
++        <main className="flex-1 overflow-y-auto bg-page p-4 pb-24 lg:p-8 lg:pb-8">
++          <div className="max-w-4xl mx-auto h-full">
+             {children}
+           </div>
+         </main>
+-      </div>
+ 
++        {/* MOBILE BOTTOM NAV */}
++        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-border flex justify-between items-center px-2 pb-safe pt-2 h-16 z-40">
++          {[
++            { name: 'Home', href: '/dashboard', icon: Home, exact: true },
++            { name: 'Work', href: '/dashboard/work', icon: FileEdit, badge: draftCount },
++            { name: 'Collect', href: '/surveys', icon: Plus },
++            { name: 'Submitted', href: '/dashboard/surveys/submitted', icon: CheckSquare }
++          ].map(item => {
++            const isActive = item.exact ? pathname === item.href : pathname.includes(item.href);
++            return (
++              <Link key={item.name} href={item.href} className="flex flex-col items-center justify-center w-1/5 h-full relative group">
++                <item.icon size={22} className={isActive ? 'text-cfss-green stroke-[2.5]' : 'text-muted stroke-[1.5] group-hover:text-secondary'} />
++                <span className={`text-[10px] mt-1 font-medium ${isActive ? 'text-cfss-green' : 'text-muted group-hover:text-secondary'}`}>{item.name}</span>
++                {item.badge && item.badge > 0 && (
++                  <span className="absolute top-1 right-3 w-1.5 h-1.5 bg-status-warning rounded-full"></span>
++                )}
++                {isActive && (
++                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 bg-cfss-green rounded-full"></div>
++                )}
++              </Link>
++            );
++          })}
++          
++          <button onClick={() => setIsMobileMenuOpen(true)} className="flex flex-col items-center justify-center w-1/5 h-full relative group">
++            <Menu size={22} className={isMobileMenuOpen ? 'text-cfss-green stroke-[2.5]' : 'text-muted stroke-[1.5] group-hover:text-secondary'} />
++            <span className={`text-[10px] mt-1 font-medium ${isMobileMenuOpen ? 'text-cfss-green' : 'text-muted group-hover:text-secondary'}`}>More</span>
++            {isMobileMenuOpen && (
++              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 bg-cfss-green rounded-full"></div>
++            )}
++          </button>
++        </div>
++
++      </div>
+     </div>
+   );
+ }
+diff --git a/frontend/src/app/dashboard/page.tsx b/frontend/src/app/dashboard/page.tsx
+index b7f43e8..9a590c0 100644
+--- a/frontend/src/app/dashboard/page.tsx
++++ b/frontend/src/app/dashboard/page.tsx
+@@ -6,22 +6,11 @@ import { useRouter } from 'next/navigation';
+ import { api } from '@/lib/api';
+ import Link from 'next/link';
+ import { 
+-  Users, 
+-  FileText, 
+-  FileEdit, 
+-  Clock,
+   ArrowRight,
+-  ClipboardList,
+-  ChevronRight,
+-  Heart,
+-  Home,
+-  Book,
+-  Droplet,
+-  PlusSquare,
+   CheckCircle,
+-  Cloud,
++  AlertCircle,
+   RefreshCw,
+-  AlertCircle
++  Clock
+ } from 'lucide-react';
+ import { formatDistanceToNow } from 'date-fns';
+ 
+@@ -29,303 +18,228 @@ export default function StudentDashboard() {
+   const { user, token, logout } = useAuthStore();
+   const router = useRouter();
+   
+-  const [dashboardStats, setDashboardStats] = useState<any>(null);
+-  const [communityStats, setCommunityStats] = useState<any>(null);
++  const [dashboardStats, setDashboardStats] = useState({
++    total_surveys: 0,
++    draft_surveys: 0,
++    submitted_surveys: 0,
++    pending_sync: 0
++  });
++  const [activity, setActivity] = useState<any[]>([]);
++  const [drafts, setDrafts] = useState<any[]>([]);
+   const [loading, setLoading] = useState(true);
+-  const [error, setError] = useState(false);
++  const [hasPending, setHasPending] = useState(false);
+ 
+   const loadData = useCallback(async () => {
+-    if (!token) return;
++    if (!token || !user) return;
+     try {
+-      setLoading(true);
+-      setError(false);
+-      const opts = { headers: { Authorization: `Bearer ${token}` } };
++      let dashData = {
++        total_surveys: 0,
++        draft_surveys: 0,
++        submitted_surveys: 0,
++        pending_sync: 0,
++      };
++      let recent: any[] = [];
++      let localDrafts: any[] = [];
+       
+-      const [dashRes, commRes] = await Promise.all([
+-        api.get('/api/student/surveys/dashboard/stats', opts).catch(() => null),
+-        api.get('/api/student/community/stats', opts).catch(() => null)
+-      ]);
++      if (navigator.onLine) {
++        const opts = { headers: { Authorization: `Bearer ${token}` } };
++        const res = await api.get('/api/student/surveys/dashboard/stats', opts).catch(() => null);
++        if (res?.data) dashData = res.data;
++      }
+       
+-      if (dashRes?.data) setDashboardStats(dashRes.data);
+-      if (commRes?.data) setCommunityStats(commRes.data);
++      try {
++        const { db } = await import('@/lib/db');
++        const localSurveys = await db.surveys.where('student_id').equals(user.id as number).toArray();
++        
++        if (localSurveys && localSurveys.length > 0) {
++          const lDrafts = localSurveys.filter(s => s.status === 'DRAFT');
++          localDrafts = lDrafts;
++          
++          const localDraftsCount = lDrafts.length;
++          const localSubmittedCount = localSurveys.filter(s => s.status === 'SUBMITTED').length;
++          const localPendingSubmits = localSurveys.filter(s => s.status === 'SUBMITTED' && s.sync_status !== 'synced').length;
++          const pendingSync = localSurveys.filter(s => s.sync_status === 'pending' || s.sync_status === 'failed').length;
++          
++          const adjustedServerDrafts = Math.max(0, (dashData.draft_surveys || 0) - localPendingSubmits);
++          dashData.draft_surveys = Math.max(adjustedServerDrafts, localDraftsCount);
++          dashData.submitted_surveys = Math.max(dashData.submitted_surveys || 0, localSubmittedCount);
++          dashData.total_surveys = dashData.draft_surveys + dashData.submitted_surveys;
++          dashData.pending_sync = pendingSync;
++          
++          setHasPending(pendingSync > 0);
++        }
++        
++        const pendingIds = new Set(localSurveys.filter(s => s.sync_status === 'pending' || s.sync_status === 'failed').map(s => s.id));
++        
++        recent = localSurveys
++          .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
++          .slice(0, 5)
++          .map(s => ({
++            id: s.id,
++            survey_type: s.survey_type,
++            status: s.status,
++            sync_status: pendingIds.has(s.id) ? 'pending' : 'synced',
++            updated_at: s.updated_at,
++            entity_id: s.entity_id
++          }));
++          
++      } catch (e) {
++        console.warn("Could not load local stats", e);
++      }
+       
+-      if (!dashRes?.data) throw new Error("Failed to load dashboard stats");
++      setDashboardStats(dashData);
++      setActivity(recent);
++      setDrafts(localDrafts);
+     } catch (e) {
+       console.error("Failed to fetch dashboard data", e);
+-      setError(true);
+     } finally {
+       setLoading(false);
+     }
+-  }, [token]);
++  }, [token, user]);
+ 
+   useEffect(() => {
+     if (!token) {
+       router.push('/login');
+       return;
+     }
+-    
+     if (!user) {
+       api.get('/api/v2/students/me', { headers: { Authorization: `Bearer ${token}` } })
+         .then(res => useAuthStore.getState().setAuth(token, { ...res.data, role: 'student' }))
+         .catch(() => { logout(); router.push('/login'); });
+       return;
+     }
+-    
+-    if (user.role !== 'student') {
+-      router.push('/login');
+-      return;
+-    }
+-
+     loadData();
+-    
+-    const interval = setInterval(loadData, 30000);
+-    
+-    const handleVisibilityChange = () => {
+-      if (!document.hidden) {
+-        loadData();
+-      }
+-    };
+-    
+-    document.addEventListener("visibilitychange", handleVisibilityChange);
+-    
+-    return () => {
+-      clearInterval(interval);
+-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+-    };
+-  }, [user, token, router, logout, loadData]);
++    const handleSync = () => loadData();
++    window.addEventListener('sync-completed', handleSync);
++    return () => window.removeEventListener('sync-completed', handleSync);
++  }, [user, token, loadData, router, logout]);
+ 
+-  if (!user) return null;
++  if (loading || !user) return null;
+ 
+   return (
+-    <div className="space-y-6">
++    <div className="space-y-10 pb-8">
+       
+-      <div className="flex justify-between items-center">
+-        <h1 className="text-2xl font-bold text-gray-900">Welcome, {user.full_name}</h1>
+-        {loading && <RefreshCw className="w-5 h-5 text-gray-400 animate-spin" />}
+-      </div>
+-
+-      {error ? (
+-        <div className="bg-red-50 p-6 rounded-xl border border-red-100 flex flex-col items-center justify-center text-center">
+-          <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
+-          <h3 className="text-red-800 font-medium">Unable to load dashboard data</h3>
+-          <button 
+-            onClick={loadData}
+-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+-          >
+-            Retry
+-          </button>
++      {/* 1. ASSIGNMENT CONTEXT (Level 3 - Flat) */}
++      <section>
++        <div className="flex flex-col lg:hidden mb-6">
++          <h1 className="text-2xl font-light tracking-tight text-primary">{user.community || 'No Community'}</h1>
++          <p className="text-sm text-secondary mt-1">
++            Group {user.group_number || 'Pending'} { (user as any).supervisor_name ? `· Supervisor: ${(user as any).supervisor_name}` : '' }
++          </p>
+         </div>
+-      ) : (
+-        <>
+-          {/* Stats Cards */}
+-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
+-            
+-            {/* Total Surveys */}
+-            <Link href="/surveys" className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-emerald-300 hover:shadow-md transition-all group">
+-              <div className="flex flex-col sm:flex-row items-start gap-2 sm:gap-3 mb-3">
+-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0 group-hover:bg-emerald-100 transition-colors">
+-                  <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+-                </div>
+-                <div>
+-                  <p className="text-xs sm:text-sm font-medium text-gray-500 group-hover:text-gray-700 transition-colors">Total Surveys</p>
+-                  <h3 className="text-sm sm:text-base font-bold text-gray-900 mt-0.5">{dashboardStats?.total_surveys || 0}</h3>
+-                </div>
+-              </div>
+-            </Link>
+-
+-            {/* Drafts */}
+-            <Link href="/dashboard/surveys/drafts" className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-emerald-300 hover:shadow-md transition-all group">
+-              <div className="flex flex-col sm:flex-row items-start gap-2 sm:gap-3 mb-3">
+-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-600 shrink-0 group-hover:bg-gray-100 transition-colors">
+-                  <FileEdit className="w-4 h-4 sm:w-5 sm:h-5" />
+-                </div>
+-                <div>
+-                  <p className="text-xs sm:text-sm font-medium text-gray-500 group-hover:text-gray-700 transition-colors">Drafts</p>
+-                  <h3 className="text-sm sm:text-base font-bold text-gray-900 mt-0.5">{dashboardStats?.draft_surveys || 0}</h3>
+-                </div>
+-              </div>
+-            </Link>
+-
+-            {/* Submitted */}
+-            <Link href="/dashboard/surveys/submitted" className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-emerald-300 hover:shadow-md transition-all group">
+-              <div className="flex flex-col sm:flex-row items-start gap-2 sm:gap-3 mb-3">
+-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0 group-hover:bg-emerald-100 transition-colors">
+-                  <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+-                </div>
+-                <div>
+-                  <p className="text-xs sm:text-sm font-medium text-gray-500 group-hover:text-gray-700 transition-colors">Submitted</p>
+-                  <h3 className="text-sm sm:text-base font-bold text-gray-900 mt-0.5">{dashboardStats?.submitted_surveys || 0}</h3>
+-                </div>
+-              </div>
+-            </Link>
+-
+-            {/* Pending Sync */}
+-            <Link href="/dashboard/sync" className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-amber-300 hover:shadow-md transition-all group">
+-              <div className="flex flex-col sm:flex-row items-start gap-2 sm:gap-3 mb-3">
+-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 shrink-0 group-hover:bg-amber-100 transition-colors">
+-                  <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
+-                </div>
+-                <div>
+-                  <p className="text-xs sm:text-sm font-medium text-gray-500 group-hover:text-gray-700 transition-colors">Pending Sync</p>
+-                  <h3 className="text-sm sm:text-base font-bold text-gray-900 mt-0.5">{dashboardStats?.pending_sync || 0}</h3>
+-                </div>
+-              </div>
+-            </Link>
+-
+-            {/* Synced */}
+-            <Link href="/dashboard/sync" className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-blue-300 hover:shadow-md transition-all group">
+-              <div className="flex flex-col sm:flex-row items-start gap-2 sm:gap-3 mb-3">
+-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 shrink-0 group-hover:bg-blue-100 transition-colors">
+-                  <Cloud className="w-4 h-4 sm:w-5 sm:h-5" />
+-                </div>
+-                <div>
+-                  <p className="text-xs sm:text-sm font-medium text-gray-500 group-hover:text-gray-700 transition-colors">Synced</p>
+-                  <h3 className="text-sm sm:text-base font-bold text-gray-900 mt-0.5">{dashboardStats?.synced_surveys || 0}</h3>
+-                </div>
++      </section>
++
++      {/* 2. CONTINUE FIELDWORK (Level 2 - Important Surface) */}
++      <section>
++        <h2 className="text-xs font-semibold text-secondary uppercase tracking-wider mb-4">Current Task</h2>
++        {drafts.length > 0 ? (
++          <div className="bg-surface border border-border rounded-lg p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
++            <div>
++              <div className="flex items-center gap-2 mb-1">
++                <span className="text-[10px] font-bold uppercase tracking-wider text-status-warning bg-status-warning/10 px-2 py-0.5 rounded">Unfinished</span>
++                <span className="text-xs text-muted">{drafts.length} {drafts.length === 1 ? 'record' : 'records'}</span>
+               </div>
++              <h3 className="text-base font-medium text-primary mt-2">Resume Data Collection</h3>
++              <p className="text-sm text-secondary mt-1">You have unfinished drafts saved locally.</p>
++            </div>
++            <Link 
++              href="/dashboard/work" 
++              className="inline-flex items-center justify-center gap-2 bg-cfss-green hover:bg-cfss-green-hover text-white px-5 py-2.5 rounded text-sm font-medium transition-colors whitespace-nowrap"
++            >
++              Continue Work
++              <ArrowRight size={16} />
+             </Link>
+-
+           </div>
+-
+-          {/* Quick Actions */}
+-          <section>
+-            <h2 className="text-lg font-bold text-gray-900 mb-4">Quick Actions</h2>
+-            <div className="grid grid-cols-2 gap-3 md:gap-6">
+-              
+-              <Link href="/surveys/household" className="bg-white p-4 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center hover:border-emerald-200 transition-colors group">
+-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-3 sm:mb-0 sm:mr-4 group-hover:bg-emerald-100 transition-colors shrink-0">
+-                  <ClipboardList className="w-5 h-5 sm:w-6 sm:h-6" />
+-                </div>
+-                <div className="flex-1">
+-                  <h3 className="text-sm sm:text-base font-bold text-gray-900 leading-tight">Household Survey</h3>
+-                  <p className="text-[10px] sm:text-sm text-gray-500 mt-1">Collect household info</p>
+-                </div>
+-                <ChevronRight className="hidden sm:block text-gray-400 group-hover:text-emerald-500 transition-colors ml-2" />
+-              </Link>
+-
+-              <Link href="/surveys/health" className="bg-white p-4 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center hover:border-emerald-200 transition-colors group">
+-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-3 sm:mb-0 sm:mr-4 group-hover:bg-emerald-100 transition-colors shrink-0">
+-                  <Heart className="w-5 h-5 sm:w-6 sm:h-6" />
+-                </div>
+-                <div className="flex-1">
+-                  <h3 className="text-sm sm:text-base font-bold text-gray-900 leading-tight">Health Survey</h3>
+-                  <p className="text-[10px] sm:text-sm text-gray-500 mt-1">Collect health data</p>
+-                </div>
+-                <ChevronRight className="hidden sm:block text-gray-400 group-hover:text-emerald-500 transition-colors ml-2" />
+-              </Link>
+-
++        ) : (
++          <div className="border border-dashed border-border rounded-lg p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
++            <div>
++              <h3 className="text-sm font-medium text-primary">All caught up</h3>
++              <p className="text-sm text-secondary mt-1">You have no unfinished drafts.</p>
+             </div>
+-          </section>
+-
+-          {/* Main Grid */}
+-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+-            
+-            {/* Recent Activity */}
+-            <section className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col">
+-              <div className="p-5 border-b border-gray-50 flex items-center justify-between">
+-                <h2 className="text-lg font-bold text-gray-900">Recent Activity</h2>
+-                <Link href="/surveys" className="text-sm font-medium text-emerald-600 hover:text-emerald-700">
+-                  View All
+-                </Link>
+-              </div>
+-              <div className="p-2 sm:p-5">
+-                <div className="space-y-1">
+-                  {dashboardStats?.recent_surveys?.length > 0 ? (
+-                    dashboardStats.recent_surveys.map((survey: any) => (
+-                      <Link 
+-                        href={`/surveys/${survey.survey_type.toLowerCase()}/${survey.status === 'SUBMITTED' ? 'view' : 'fill'}/${survey.id}`}
+-                        key={survey.id} 
+-                        className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-lg transition-colors group cursor-pointer"
+-                      >
+-                        <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-600 shrink-0 group-hover:bg-white group-hover:shadow-sm transition-all">
+-                          {survey.survey_type === 'HOUSEHOLD' ? <Home size={20} /> : 
+-                           survey.survey_type === 'HEALTH' ? <Heart size={20} /> :
+-                           survey.survey_type === 'EDUCATION' ? <Book size={20} /> :
+-                           <ClipboardList size={20} />}
+-                        </div>
+-                        <div className="flex-1 min-w-0">
+-                          <h4 className="font-semibold text-gray-900 truncate group-hover:text-emerald-700 transition-colors">
+-                            {survey.survey_type} Survey #{survey.entity_id || survey.id.slice(0, 8)}
+-                          </h4>
+-                          <p className="text-sm text-gray-500 truncate mt-0.5">
+-                            Status: {survey.status} {survey.sync_status === 'pending' ? '(Pending Sync)' : ''}
+-                          </p>
+-                        </div>
+-                        <div className="text-right flex-shrink-0">
+-                          <p className="text-xs text-gray-500 mb-1 group-hover:text-gray-700 transition-colors">
+-                            {survey.updated_at ? formatDistanceToNow(new Date(survey.updated_at), { addSuffix: true }) : 'Unknown'}
+-                          </p>
+-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+-                            survey.status === 'SUBMITTED' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+-                          }`}>
+-                            {survey.status}
+-                          </span>
+-                        </div>
+-                      </Link>
+-                    ))
+-                  ) : (
+-                    <div className="py-8 text-center flex flex-col items-center">
+-                      <p className="text-gray-500 mb-4">No surveys yet. Start your first survey.</p>
+-                      <Link href="/surveys/household" className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium shadow-sm">
+-                        Start Survey
+-                      </Link>
+-                    </div>
+-                  )}
+-                </div>
+-              </div>
+-            </section>
+-
+-            {/* Community Overview */}
+-            <section className="bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col">
+-              <div className="p-5 border-b border-gray-50">
+-                <h2 className="text-lg font-bold text-gray-900">Community Overview</h2>
+-              </div>
+-              <div className="p-5 space-y-6">
+-                <div className="flex items-center gap-4">
+-                  <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+-                    <Users size={20} />
+-                  </div>
+-                  <div>
+-                    <p className="text-sm font-medium text-gray-500">Total Households</p>
+-                    <h3 className="font-bold text-gray-900 text-lg mt-0.5">{communityStats?.summary?.household?.total || 0}</h3>
+-                  </div>
+-                </div>
+-
+-                <div className="flex items-center gap-4">
+-                  <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-600 shrink-0">
+-                    <PlusSquare size={20} />
+-                  </div>
+-                  <div>
+-                    <p className="text-sm font-medium text-gray-500">Health Facilities</p>
+-                    <h3 className="font-bold text-gray-900 text-lg mt-0.5">{communityStats?.summary?.health?.hospitals || 0}</h3>
+-                  </div>
+-                </div>
+-
+-                <div className="flex items-center gap-4">
+-                  <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-600 shrink-0">
+-                    <Book size={20} />
+-                  </div>
+-                  <div>
+-                    <p className="text-sm font-medium text-gray-500">Schools</p>
+-                    <h3 className="font-bold text-gray-900 text-lg mt-0.5">{communityStats?.summary?.education?.schools || 0}</h3>
+-                  </div>
+-                </div>
+-
+-                <div className="flex items-center gap-4">
+-                  <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-600 shrink-0">
+-                    <Droplet size={20} />
+-                  </div>
+-                  <div>
+-                    <p className="text-sm font-medium text-gray-500">Water Sources</p>
+-                    <h3 className="font-bold text-gray-900 text-lg mt-0.5">{communityStats?.summary?.governance?.water_access || 0}</h3>
+-                  </div>
+-                </div>
+-              </div>
+-            </section>
+-
++            <Link 
++              href="/surveys" 
++              className="inline-flex items-center justify-center gap-2 bg-page border border-border hover:bg-surface text-primary px-5 py-2 rounded text-sm font-medium transition-colors whitespace-nowrap"
++            >
++              Start New Collection
++            </Link>
++          </div>
++        )}
++      </section>
++
++      {/* 3. FIELDWORK STATISTICS (Level 3 - Flat typographic grid) */}
++      <section>
++        <h2 className="text-xs font-semibold text-secondary uppercase tracking-wider mb-4">Progress Overview</h2>
++        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-8">
++          <div className="flex flex-col border-l-2 border-border pl-4">
++             <span className="text-3xl font-light text-primary tracking-tight leading-none">{dashboardStats?.total_surveys || 0}</span>
++             <span className="text-xs text-secondary mt-2">Total Records</span>
++          </div>
++          <div className="flex flex-col border-l-2 border-border pl-4">
++             <span className="text-3xl font-light text-primary tracking-tight leading-none">{dashboardStats?.draft_surveys || 0}</span>
++             <span className="text-xs text-secondary mt-2">Local Drafts</span>
+           </div>
+-        </>
+-      )}
++          <div className="flex flex-col border-l-2 border-border pl-4">
++             <span className="text-3xl font-light text-primary tracking-tight leading-none">{dashboardStats?.pending_sync || 0}</span>
++             <span className="text-xs text-secondary mt-2">Pending Sync</span>
++          </div>
++          <div className="flex flex-col border-l-2 border-border pl-4">
++             <span className="text-3xl font-light text-primary tracking-tight leading-none">{dashboardStats?.submitted_surveys || 0}</span>
++             <span className="text-xs text-secondary mt-2">Submitted</span>
++          </div>
++        </div>
++      </section>
++
++      {/* 4. RECENT ACTIVITY (Level 3 - Flat) */}
++      <section>
++        <h2 className="text-xs font-semibold text-secondary uppercase tracking-wider mb-4">Recent Activity</h2>
++        {activity.length > 0 ? (
++          <div className="flex flex-col">
++             {activity.slice(0, 4).map((item, idx) => {
++               const timeStr = item.updated_at ? formatDistanceToNow(new Date(item.updated_at), { addSuffix: true }) : '';
++               const isSynced = item.status === 'SUBMITTED' && item.sync_status === 'synced';
++               const isPending = item.sync_status === 'pending';
++               
++               let statusText = 'Draft saved';
++               if (isSynced) statusText = 'Synced to server';
++               else if (isPending) statusText = 'Pending sync';
++               else if (item.status === 'SUBMITTED') statusText = 'Submitted locally';
++
++               return (
++                 <div key={`${item.id}-${idx}`} className="flex items-start justify-between py-3 border-b border-border last:border-0">
++                   <div className="flex flex-col">
++                     <span className="text-sm text-primary font-medium">
++                       {item.survey_type} {item.entity_id ? `· ${item.entity_id}` : ''}
++                     </span>
++                     <span className="text-xs text-secondary mt-0.5">{statusText}</span>
++                   </div>
++                   <div className="text-right flex items-center gap-2 pt-0.5">
++                     <span className="text-[10px] text-muted uppercase tracking-wider">{timeStr}</span>
++                   </div>
++                 </div>
++               );
++             })}
++          </div>
++        ) : (
++          <p className="text-sm text-secondary">No recent activity.</p>
++        )}
++      </section>
++
++      {/* 5. SYNC STATUS (Level 3 - Flat Footer) */}
++      <section className="pt-4 mt-8 flex items-center justify-between border-t border-border">
++        <div className="flex items-center gap-3">
++          {hasPending ? (
++             <>
++               <span className="w-1.5 h-1.5 rounded-full bg-status-warning"></span>
++               <span className="text-xs text-secondary">{dashboardStats.pending_sync} {dashboardStats.pending_sync === 1 ? 'record' : 'records'} waiting to sync</span>
++             </>
++          ) : (
++             <>
++               <span className="w-1.5 h-1.5 rounded-full bg-status-success"></span>
++               <span className="text-xs text-secondary">All changes synced</span>
++             </>
++          )}
++        </div>
++      </section>
+ 
+     </div>
+   );
+diff --git a/frontend/src/app/dashboard/surveys/drafts/page.tsx b/frontend/src/app/dashboard/surveys/drafts/page.tsx
+index 556416c..0eb0ae2 100644
+--- a/frontend/src/app/dashboard/surveys/drafts/page.tsx
++++ b/frontend/src/app/dashboard/surveys/drafts/page.tsx
+@@ -30,9 +30,10 @@ export default function DraftsPage() {
+       
+       // Load local drafts
+       const { db } = await import('@/lib/db');
+-      const allLocal = await db.surveys.where('status').equals('DRAFT').toArray();
++      const userSurveys = await db.surveys.where('student_id').equals(user?.id as number).toArray();
++      const allLocal = userSurveys.filter(s => s.status === 'DRAFT');
+       // Simple local filtering
+-      let localDrafts = allLocal.filter(d => d.student_id === user?.id);
++      let localDrafts = allLocal;
+       if (search) localDrafts = localDrafts.filter(d => d.entity_id?.toLowerCase().includes(search.toLowerCase()));
+       if (typeFilter) localDrafts = localDrafts.filter(d => d.survey_type.toLowerCase() === typeFilter.toLowerCase());
+ 
+@@ -81,8 +82,7 @@ export default function DraftsPage() {
+       // Critical: remove any server draft that is already SUBMITTED locally.
+       // This handles the race condition where the server still has status=DRAFT
+       // but the student already submitted it locally (sync pending).
+-      const localSubmitted = await db.surveys.where('status').equals('SUBMITTED').toArray();
+-      const localSubmittedIds = new Set(localSubmitted.map(s => s.id));
++      const localSubmittedIds = new Set(userSurveys.filter(s => s.status === 'SUBMITTED').map(s => s.id));
+       for (const id of localSubmittedIds) {
+         if (mergedMap.has(id)) {
+           mergedMap.delete(id);
+diff --git a/frontend/src/app/dashboard/surveys/submitted/page.tsx b/frontend/src/app/dashboard/surveys/submitted/page.tsx
+index caa7bbc..9c19ad0 100644
+--- a/frontend/src/app/dashboard/surveys/submitted/page.tsx
++++ b/frontend/src/app/dashboard/surveys/submitted/page.tsx
+@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react';
+ import { useAuthStore } from '@/lib/store';
+ import { useRouter } from 'next/navigation';
+ import { api } from '@/lib/api';
+-import { db } from '@/lib/db';
+-import { getEntityLabel } from '@/lib/entityLabel';
+ import Link from 'next/link';
+ import { Search, Filter, Loader2, ArrowRight } from 'lucide-react';
+ 
+@@ -28,11 +26,11 @@ export default function SubmittedSurveysPage() {
+     try {
+       const currentSkip = reset ? 0 : skip;
+       
+-      // Load local submitted
+       const { db } = await import('@/lib/db');
+-      const allLocal = await db.surveys.where('status').equals('SUBMITTED').toArray();
+-      // Simple local filtering
+-      let localSubmitted = allLocal.filter(d => d.student_id === user?.id);
++      const userSurveys = await db.surveys.where('student_id').equals(user?.id as number).toArray();
++      const allLocal = userSurveys.filter(s => s.status === 'SUBMITTED');
++      
++      let localSubmitted = allLocal;
+       if (search) localSubmitted = localSubmitted.filter(d => d.entity_id?.toLowerCase().includes(search.toLowerCase()));
+       if (typeFilter) localSubmitted = localSubmitted.filter(d => d.survey_type.toLowerCase() === typeFilter.toLowerCase());
+ 
+@@ -52,17 +50,14 @@ export default function SubmittedSurveysPage() {
+           });
+           serverItems = res.data.items;
+           serverTotal = res.data.total;
+-        } catch (e) {
+-          console.warn("Could not fetch server submitted, showing local only");
+-        }
++        } catch (e) {}
+       }
+       
+-      // Merge local and server items, prioritizing local if ID matches
+       const mergedMap = new Map();
+       serverItems.forEach((item: any) => mergedMap.set(item.id, item));
+       localSubmitted.forEach((item: any) => mergedMap.set(item.id, {
+          ...item,
+-         isLocal: true // flag for UI to know it's local
++         isLocal: true
+       }));
+       
+       const mergedArray = Array.from(mergedMap.values()).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+@@ -107,101 +102,95 @@ export default function SubmittedSurveysPage() {
+   if (!user) return null;
+ 
+   return (
+-    <>
+-      <div className="space-y-6 max-w-3xl mx-auto pb-12">
++    <div className="space-y-6 pb-12">
++      
++      <div>
++        <h1 className="text-2xl font-light text-primary tracking-tight">Submitted Surveys</h1>
++        <p className="text-sm text-secondary mt-1">Finalized records for {user.community || 'your community'} (read-only).</p>
++      </div>
++
++      <div className="flex flex-col sm:flex-row gap-3">
++        <form onSubmit={handleSearch} className="flex-1 relative">
++          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
++          <input 
++            type="text"
++            placeholder="Search record ID..."
++            value={search}
++            onChange={e => setSearch(e.target.value)}
++            className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-1 focus:ring-cfss-green focus:border-cfss-green text-sm text-primary placeholder:text-muted bg-surface"
++          />
++        </form>
+         
+-        <div>
+-          <h1 className="text-2xl font-bold text-gray-900">Submitted Surveys</h1>
+-          <p className="text-gray-500 mt-1">These surveys have been finalized for <strong className="text-gray-700">{user.community}</strong> and cannot be edited.</p>
++        <div className="relative shrink-0 w-full sm:w-48">
++          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
++          <select
++            value={typeFilter}
++            onChange={handleTypeChange}
++            className="w-full pl-10 pr-8 py-2 border border-border rounded-lg focus:ring-1 focus:ring-cfss-green focus:border-cfss-green text-sm appearance-none bg-surface text-primary"
++          >
++            <option value="">All Types</option>
++            <option value="HOUSEHOLD">Household</option>
++            <option value="EDUCATION">Education</option>
++            <option value="HEALTH">Health</option>
++            <option value="GOVERNANCE">Governance</option>
++          </select>
+         </div>
++      </div>
+ 
+-        {/* Filters */}
+-        <div className="flex flex-col sm:flex-row gap-4">
+-          <form onSubmit={handleSearch} className="flex-1 relative">
+-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+-            <input 
+-              type="text"
+-              placeholder="Search house number..."
+-              value={search}
+-              onChange={e => setSearch(e.target.value)}
+-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm text-gray-900"
+-            />
+-          </form>
+-          
+-          <div className="relative shrink-0 w-full sm:w-48">
+-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+-            <select
+-              value={typeFilter}
+-              onChange={handleTypeChange}
+-              className="w-full pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm appearance-none bg-white text-gray-900"
+-            >
+-              <option value="">All Types</option>
+-              <option value="HOUSEHOLD">Household</option>
+-              <option value="EDUCATION">Education</option>
+-              <option value="HEALTH">Health</option>
+-              <option value="GOVERNANCE">Governance</option>
+-            </select>
++      <div className="flex flex-col">
++        {records.length === 0 && !loading ? (
++          <div className="py-12 text-center flex flex-col items-center border border-dashed border-border rounded-lg bg-surface mt-2">
++            <p className="text-primary font-medium text-sm">No submitted surveys.</p>
+           </div>
+-        </div>
+-
+-        {/* List Layout */}
+-        <div className="space-y-4">
+-          {records.length === 0 && !loading ? (
+-            <div className="py-12 text-center border-2 border-dashed border-gray-200 rounded-xl">
+-              <p className="text-gray-500 font-medium">No submitted surveys.</p>
+-            </div>
+-          ) : (
+-            records.map(record => (
+-              <div key={record.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col hover:border-emerald-200 transition-colors">
+-                <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+-                  <h3 className="font-bold text-gray-900 capitalize">{record.survey_type.toLowerCase()} Survey</h3>
+-                  <span className="text-xs font-semibold px-2 py-1 bg-emerald-100 text-emerald-800 rounded">SUBMITTED</span>
+-                </div>
+-                
+-                <div className="p-5 space-y-4">
+-                  <div>
+-                    <div className="text-sm text-gray-500 mb-1">{getEntityLabel(record.survey_type)}:</div>
+-                    <div className="font-mono text-gray-900 font-medium bg-gray-50 inline-block px-2 py-1 rounded border border-gray-100">{record.entity_id}</div>
+-                  </div>
+-                  
+-                  <div>
+-                    <div className="text-sm text-gray-500 mb-1">Submitted:</div>
+-                    <div className="text-sm font-medium text-gray-900">
+-                      {new Date(record.submitted_at || record.updated_at).toLocaleDateString()}
++        ) : (
++          <div className="flex flex-col mt-2">
++            {records.map(record => {
++              const timeStr = new Date(record.submitted_at || record.updated_at).toLocaleDateString();
++              return (
++                <Link 
++                  href={`/surveys/${record.survey_type.toLowerCase()}/view/${record.id}`}
++                  key={record.id}
++                  className="block py-4 border-b border-border hover:bg-surface transition-colors"
++                >
++                  <div className="flex justify-between items-start px-2">
++                    <div className="flex flex-col">
++                      <p className="text-xs font-semibold text-secondary uppercase tracking-wider">{record.survey_type.toLowerCase()}</p>
++                      {record.entity_id ? (
++                        <p className="text-base font-medium text-primary mt-1">{record.entity_id}</p>
++                      ) : (
++                        <p className="text-base font-medium text-muted mt-1 italic">Unassigned ID</p>
++                      )}
++                      <p className="text-xs text-secondary mt-1">Submitted {timeStr}</p>
++                    </div>
++                    <div className="text-right">
++                      <span className="text-[10px] font-bold tracking-wider uppercase text-status-success bg-status-success/10 px-2 py-0.5 rounded">
++                        Submitted
++                      </span>
+                     </div>
+                   </div>
+-                </div>
+-                
+-                <div className="p-4 bg-gray-50">
+-                  <Link 
+-                    href={`/surveys/${record.survey_type.toLowerCase()}/view/${record.id}`}
+-                    className="w-full py-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center justify-center gap-2"
+-                  >
+-                    View Survey <ArrowRight size={16} />
+-                  </Link>
+-                </div>
+-              </div>
+-            ))
+-          )}
+-          
+-          {loading && (
+-            <div className="flex justify-center py-6">
+-              <Loader2 className="animate-spin text-emerald-600" size={24} />
+-            </div>
+-          )}
+-          
+-          {records.length > 0 && records.length < total && (
+-            <button 
+-              onClick={() => loadSubmitted(false)}
+-              disabled={loading}
+-              className="w-full py-3 bg-white border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition-colors mt-4"
+-            >
+-              Load More
+-            </button>
+-          )}
+-        </div>
+-
++                </Link>
++              );
++            })}
++          </div>
++        )}
++        
++        {loading && (
++          <div className="flex justify-center py-6">
++            <Loader2 className="animate-spin text-cfss-green" size={20} />
++          </div>
++        )}
+       </div>
+-    </>
++
++      {records.length > 0 && records.length < total && (
++        <button 
++          onClick={() => loadSubmitted(false)}
++          disabled={loading}
++          className="w-full py-3 bg-surface border border-border rounded-lg font-medium text-sm text-secondary hover:text-primary transition-colors mt-4"
++        >
++          Load More
++        </button>
++      )}
++
++    </div>
+   );
+ }
+diff --git a/frontend/src/app/dashboard/sync/page.tsx b/frontend/src/app/dashboard/sync/page.tsx
+index 9714005..98070aa 100644
+--- a/frontend/src/app/dashboard/sync/page.tsx
++++ b/frontend/src/app/dashboard/sync/page.tsx
+@@ -1,12 +1,13 @@
+ "use client";
+ 
+-import { useEffect, useState } from 'react';
++import { useEffect, useState, useCallback } from 'react';
+ import { useAuthStore } from '@/lib/store';
+ import { useRouter } from 'next/navigation';
+ import { db, LocalSurvey } from '@/lib/db';
+ import { syncEngine } from '@/lib/sync';
+ import Link from 'next/link';
+ import { RefreshCw, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
++import { formatDistanceToNow } from 'date-fns';
+ 
+ export default function SyncPage() {
+   const { user, token } = useAuthStore();
+@@ -17,30 +18,35 @@ export default function SyncPage() {
+   const [historyItems, setHistoryItems] = useState<LocalSurvey[]>([]);
+   const [isSyncing, setIsSyncing] = useState(false);
+   const [isOnline, setIsOnline] = useState(true);
++  const [lastSyncText, setLastSyncText] = useState('Never');
+ 
+-  const loadSyncData = async () => {
++  const loadSyncData = useCallback(async () => {
+     try {
+-      const all = await db.surveys.toArray();
++      const mySurveys = await db.surveys.where('student_id').equals(user?.id as number).toArray();
+       
+-      const pending = all.filter(s => s.sync_status === 'pending' || s.sync_status === 'syncing');
+-      const failed = all.filter(s => s.sync_status === 'failed');
+-      const synced = all.filter(s => s.sync_status === 'synced');
++      const pending = mySurveys.filter(s => s.sync_status === 'pending' || s.sync_status === 'syncing');
++      const failed = mySurveys.filter(s => s.sync_status === 'failed');
++      const synced = mySurveys.filter(s => s.sync_status === 'synced');
+       
+       setStats({
+-        total: all.length,
++        total: mySurveys.length,
+         pending: pending.length,
+         failed: failed.length,
+         synced: synced.length
+       });
+       
+-      // Sort newest first
+       setPendingItems([...pending, ...failed].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()));
+-      setHistoryItems(synced.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 50));
++      setHistoryItems(synced.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 20));
+       setIsOnline(navigator.onLine);
++      
++      const stored = localStorage.getItem('cfss_last_sync');
++      if (stored) {
++        setLastSyncText(formatDistanceToNow(new Date(stored), { addSuffix: true }));
++      }
+     } catch (e) {
+       console.error(e);
+     }
+-  };
++  }, [user]);
+ 
+   useEffect(() => {
+     if (!token || user?.role !== 'student') {
+@@ -50,22 +56,22 @@ export default function SyncPage() {
+     
+     loadSyncData();
+     
+-    window.addEventListener('sync-completed', loadSyncData);
+-    window.addEventListener('sync-queued', loadSyncData);
+-    window.addEventListener('online', loadSyncData);
+-    window.addEventListener('offline', loadSyncData);
++    const handleSync = () => loadSyncData();
++    window.addEventListener('sync-completed', handleSync);
++    window.addEventListener('sync-queued', handleSync);
++    window.addEventListener('online', handleSync);
++    window.addEventListener('offline', handleSync);
+     
+-    // Periodically update to catch background changes just in case
+-    const interval = setInterval(loadSyncData, 5000);
++    const interval = setInterval(loadSyncData, 30000);
+     
+     return () => {
+-      window.removeEventListener('sync-completed', loadSyncData);
+-      window.removeEventListener('sync-queued', loadSyncData);
+-      window.removeEventListener('online', loadSyncData);
+-      window.removeEventListener('offline', loadSyncData);
++      window.removeEventListener('sync-completed', handleSync);
++      window.removeEventListener('sync-queued', handleSync);
++      window.removeEventListener('online', handleSync);
++      window.removeEventListener('offline', handleSync);
+       clearInterval(interval);
+     };
+-  }, [user, token, router]);
++  }, [user, token, router, loadSyncData]);
+ 
+   const handleManualSync = async () => {
+     if (!token || !navigator.onLine) return;
+@@ -78,128 +84,99 @@ export default function SyncPage() {
+   if (!user) return null;
+ 
+   return (
+-    <div className="space-y-6 max-w-4xl mx-auto pb-12">
++    <div className="space-y-6 max-w-4xl mx-auto pb-24">
++      
+       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+         <div>
+-          <h1 className="text-2xl font-bold text-gray-900">Sync Status</h1>
+-          <p className="text-gray-500 mt-1">
++          <h1 className="text-2xl font-light text-primary tracking-tight">Sync & Activity</h1>
++          <p className="text-muted mt-1">
+             {!isOnline 
+-              ? "You are currently offline. Surveys will be saved locally." 
+-              : "You are online. Pending surveys will upload automatically."}
++              ? "You are currently offline. Work is saved securely on this device." 
++              : "You are online. Pending records will sync automatically."}
+           </p>
+         </div>
+         <button 
+           onClick={handleManualSync}
+           disabled={!isOnline || isSyncing || (stats.pending === 0 && stats.failed === 0)}
+-          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#0a4628] text-white rounded-lg hover:bg-[#0d5a34] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm"
++          className="inline-flex items-center justify-center gap-2 px-6 py-3 sm:px-4 sm:py-2 bg-cfss-green text-white rounded-lg hover:bg-cfss-green-hover transition-colors disabled:opacity-50 font-bold text-sm "
+         >
+           <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+           {isSyncing ? 'Syncing...' : 'Sync Now'}
+         </button>
+       </div>
+ 
+-      {/* Stats Summary */}
+       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+-        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col">
+-          <p className="text-sm font-medium text-gray-500 mb-1">Total Locally</p>
+-          <h3 className="text-2xl font-bold text-gray-900">{stats.total}</h3>
++        <div className="flex flex-col border-l-2 border-border pl-4">
++           <span className="text-xs font-bold text-muted uppercase tracking-wider mb-1">Last Synced</span>
++           <span className="text-sm font-light tracking-tight text-primary">{lastSyncText}</span>
+         </div>
+-        <div className="bg-white p-4 rounded-xl border border-blue-100 bg-blue-50/30 shadow-sm flex flex-col">
+-          <p className="text-sm font-medium text-blue-600 mb-1">Pending Sync</p>
+-          <h3 className="text-2xl font-bold text-blue-700">{stats.pending}</h3>
++        <div className="flex flex-col border-l-2 border-border pl-4">
++           <span className="text-xs font-bold text-muted uppercase tracking-wider mb-1">Needs Syncing</span>
++           <span className={`text-lg font-bold ${stats.pending > 0 ? 'text-status-warning' : 'text-primary'}`}>{stats.pending}</span>
+         </div>
+-        <div className="bg-white p-4 rounded-xl border border-emerald-100 bg-emerald-50/30 shadow-sm flex flex-col">
+-          <p className="text-sm font-medium text-emerald-600 mb-1">Synced</p>
+-          <h3 className="text-2xl font-bold text-emerald-700">{stats.synced}</h3>
++        <div className="flex flex-col border-l-2 border-border pl-4">
++           <span className="text-xs font-bold text-muted uppercase tracking-wider mb-1">Failed</span>
++           <span className={`text-lg font-bold ${stats.failed > 0 ? 'text-status-error' : 'text-primary'}`}>{stats.failed}</span>
+         </div>
+-        <div className="bg-white p-4 rounded-xl border border-red-100 bg-red-50/30 shadow-sm flex flex-col">
+-          <p className="text-sm font-medium text-red-600 mb-1">Failed</p>
+-          <h3 className="text-2xl font-bold text-red-700">{stats.failed}</h3>
++        <div className="flex flex-col border-l-2 border-border pl-4">
++           <span className="text-xs font-bold text-muted uppercase tracking-wider mb-1">Synced</span>
++           <span className="text-lg font-bold text-cfss-green">{stats.synced}</span>
+         </div>
+       </div>
+ 
+-      {/* Pending Sync List */}
+-      <section className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+-        <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+-          <h2 className="font-bold text-gray-900 flex items-center gap-2">
+-            <Clock className="w-5 h-5 text-blue-500" />
+-            Pending Sync Queue
+-          </h2>
+-          <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">{pendingItems.length}</span>
+-        </div>
+-        
+-        <div className="divide-y divide-gray-100">
+-          {pendingItems.length === 0 ? (
+-            <div className="p-8 text-center text-gray-500 text-sm">
+-              No surveys waiting to sync.
+-            </div>
+-          ) : (
+-            pendingItems.map(item => (
+-              <div key={item.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+-                <div>
+-                  <div className="flex items-center gap-2 mb-1">
+-                    <span className="font-bold text-gray-900">{item.survey_type.toUpperCase()} Survey</span>
+-                    {item.sync_status === 'failed' && (
+-                      <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full">Failed</span>
+-                    )}
+-                    {item.sync_status === 'syncing' && (
+-                      <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">Syncing</span>
+-                    )}
+-                  </div>
+-                  <p className="text-sm text-gray-500">
+-                    ID: <span className="font-medium text-gray-700">{item.entity_id || 'Pending Assignment'}</span>
+-                  </p>
+-                  <p className="text-xs text-gray-400 mt-1">
+-                    Saved: {new Date(item.updated_at).toLocaleString()}
+-                  </p>
+-                  {item.sync_error && (
+-                    <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
+-                      <AlertCircle className="w-3 h-3" />
+-                      {item.sync_error}
+-                    </p>
+-                  )}
+-                </div>
+-              </div>
+-            ))
+-          )}
+-        </div>
+-      </section>
++      <div className="space-y-6">
++        {pendingItems.length > 0 && (
++          <section>
++             <h2 className="text-sm font-bold text-muted uppercase tracking-wider mb-3">Waiting to sync</h2>
++             <div className="flex flex-col border-t border-border mt-2">
++               {pendingItems.map((item) => (
++                 <div key={item.id} className="py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-page transition-colors">
++                   <div>
++                     <h3 className="text-sm font-medium text-primary capitalize">{item.survey_type.toLowerCase()}</h3>
++                     <p className="text-xs font-medium text-muted">{item.entity_id ? `${user.community}/${item.entity_id}` : `Draft Record`}</p>
++                   </div>
++                   <div className="flex items-center gap-3">
++                     {item.sync_status === 'failed' ? (
++                        <span className="text-[10px] font-bold px-2 py-1 bg-status-error/10 text-status-error rounded-md border border-status-error/20 flex items-center gap-1"><XCircle size={12}/> Sync Failed</span>
++                     ) : (
++                        <span className="text-[10px] font-bold px-2 py-1 bg-status-warning/10 text-status-warning rounded-md border border-status-warning/20 flex items-center gap-1"><Clock size={12}/> Waiting to sync</span>
++                     )}
++                     <span className="text-[10px] font-bold text-muted px-2 py-1 bg-surface border border-border rounded-md">{item.status}</span>
++                   </div>
++                 </div>
++               ))}
++             </div>
++          </section>
++        )}
+ 
+-      {/* Sync History */}
+-      <section className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+-        <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
+-          <h2 className="font-bold text-gray-900 flex items-center gap-2">
+-            <CheckCircle className="w-5 h-5 text-emerald-500" />
+-            Recent Sync History
+-          </h2>
+-        </div>
+-        
+-        <div className="divide-y divide-gray-100">
+-          {historyItems.length === 0 ? (
+-            <div className="p-8 text-center text-gray-500 text-sm">
+-              No recent sync history.
+-            </div>
+-          ) : (
+-            historyItems.map(item => (
+-              <div key={item.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-gray-50">
+-                <div>
+-                  <p className="font-medium text-gray-900 text-sm">{item.survey_type.toUpperCase()} Survey</p>
+-                  <p className="text-xs text-gray-500">ID: {item.entity_id}</p>
+-                </div>
+-                <div className="text-right">
+-                  <p className="text-xs text-emerald-600 font-medium flex items-center justify-end gap-1">
+-                    <CheckCircle className="w-3 h-3" /> Synced successfully
+-                  </p>
+-                  <p className="text-[10px] text-gray-400 mt-0.5">
+-                    {new Date(item.updated_at).toLocaleString()}
+-                  </p>
+-                </div>
+-              </div>
+-            ))
+-          )}
+-        </div>
+-      </section>
++        {historyItems.length > 0 && (
++          <section>
++             <h2 className="text-sm font-bold text-muted uppercase tracking-wider mb-3">Recently Synced</h2>
++             <div className="flex flex-col border-t border-border mt-2">
++               {historyItems.map((item) => (
++                 <div key={item.id} className="py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-page transition-colors">
++                   <div>
++                     <h3 className="text-sm font-medium text-primary capitalize">{item.survey_type.toLowerCase()}</h3>
++                     <p className="text-xs font-medium text-muted">{item.entity_id ? `${user.community}/${item.entity_id}` : `Draft Record`}</p>
++                   </div>
++                   <div className="flex items-center gap-3">
++                     <span className="text-[10px] font-bold px-2 py-1 bg-cfss-green-soft text-cfss-green rounded-md border border-cfss-green/20 flex items-center gap-1"><CheckCircle size={12}/> Synced</span>
++                     <span className="text-[10px] font-bold text-muted px-2 py-1 bg-surface border border-border rounded-md">{item.status}</span>
++                   </div>
++                 </div>
++               ))}
++             </div>
++          </section>
++        )}
+ 
++        {pendingItems.length === 0 && historyItems.length === 0 && (
++          <div className="bg-page rounded-xl border border-border border-dashed p-12 text-center flex flex-col items-center">
++            <RefreshCw size={32} className="text-muted mb-3 opacity-30" />
++            <p className="text-muted font-medium text-sm">No activity recorded yet.</p>
++          </div>
++        )}
++      </div>
++      
+     </div>
+   );
+ }
+diff --git a/frontend/src/app/globals.css b/frontend/src/app/globals.css
+index e1cf760..21e94a7 100644
+--- a/frontend/src/app/globals.css
++++ b/frontend/src/app/globals.css
+@@ -3,42 +3,70 @@
+ @custom-variant dark (&:is(.dark *));
+ 
+ :root {
+-  --background: #ffffff;
+-  --foreground: #171717;
++  /* Core Backgrounds */
++  --color-page: #f9fafb;
++  --color-surface: #ffffff;
++  --color-surface-elevated: #ffffff;
++
++  /* Core Borders */
++  --color-border-subtle: #f3f4f6;
++  --color-border-strong: #e5e7eb;
++
++  /* Typography */
++  --color-text-primary: #111827;
++  --color-text-secondary: #4b5563;
++  --color-text-muted: #9ca3af;
++
++  /* Brand Colors */
++  --color-cfss-green: #093C22;
++  --color-cfss-green-hover: #0c512e;
++  --color-cfss-green-soft: #f0fdf4;
++  
++  /* Semantic Status Colors */
++  --color-status-success: #15803d;
++  --color-status-warning: #b45309;
++  --color-status-error: #b91c1c;
++  --color-status-info: #1d4ed8;
+ }
+ 
+ @theme inline {
+-  --color-background: var(--background);
+-  --color-foreground: var(--foreground);
+-  --font-sans: var(--font-geist-sans);
+-  --font-mono: var(--font-geist-mono);
+-}
++  --color-page: var(--color-page);
++  --color-surface: var(--color-surface);
++  --color-surface-elevated: var(--color-surface-elevated);
++  --color-border: var(--color-border-subtle);
++  --color-border-strong: var(--color-border-strong);
++  
++  --color-primary: var(--color-text-primary);
++  --color-secondary: var(--color-text-secondary);
++  --color-muted: var(--color-text-muted);
++  
++  --color-cfss-green: var(--color-cfss-green);
++  --color-cfss-green-hover: var(--color-cfss-green-hover);
++  --color-cfss-green-soft: var(--color-cfss-green-soft);
++  
++  --color-status-success: var(--color-status-success);
++  --color-status-warning: var(--color-status-warning);
++  --color-status-error: var(--color-status-error);
++  --color-status-info: var(--color-status-info);
+ 
+-@media (prefers-color-scheme: dark) {
+-  :root {
+-    --background: #0a0a0a;
+-    --foreground: #ededed;
+-  }
++  --font-sans: Arial, Helvetica, sans-serif;
+ }
+ 
+ body {
+-  background: var(--background);
+-  color: var(--foreground);
++  background-color: var(--color-page);
++  color: var(--color-text-primary);
+   font-family: Arial, Helvetica, sans-serif;
++  -webkit-font-smoothing: antialiased;
+ }
+ 
+-/* Force readable text in form inputs regardless of OS dark mode.
+-   The app uses white backgrounds on all form containers, so inputs
+-   must always render dark text on white. Without this, OS dark mode
+-   sets --foreground to #ededed which becomes invisible on bg-white. */
+ input,
+ select,
+ textarea {
+-  color: #111827;
+-  background-color: #ffffff;
++  color: var(--color-text-primary);
++  background-color: var(--color-surface);
+ }
+ 
+ input::placeholder,
+ textarea::placeholder {
+-  color: #9ca3af;
++  color: var(--color-text-muted);
+ }
+diff --git a/frontend/src/app/layout.tsx b/frontend/src/app/layout.tsx
+index c5e8f66..4ce74f3 100644
+--- a/frontend/src/app/layout.tsx
++++ b/frontend/src/app/layout.tsx
+@@ -1,10 +1,20 @@
+-import type { Metadata } from "next";
++import type { Metadata, Viewport } from "next";
+ import "./globals.css";
+ import ThemeProvider from "@/components/ThemeProvider";
+ 
+ export const metadata: Metadata = {
+-  title: "Create Next App",
+-  description: "Generated by create next app",
++  title: "CFSS Fieldwork",
++  description: "Community Field Survey System",
++  manifest: "/manifest.json",
++  appleWebApp: {
++    capable: true,
++    statusBarStyle: "default",
++    title: "CFSS Fieldwork",
++  },
++};
++
++export const viewport: Viewport = {
++  themeColor: "#0a4628",
+ };
+ 
+ export default function RootLayout({
+diff --git a/frontend/src/app/login/page.tsx b/frontend/src/app/login/page.tsx
+index 9c15380..c6fd839 100644
+--- a/frontend/src/app/login/page.tsx
++++ b/frontend/src/app/login/page.tsx
+@@ -12,13 +12,63 @@ export default function LoginPage() {
+   const [registered, setRegistered] = useState(false);
+   const [isLoading, setIsLoading] = useState(false);
+   const router = useRouter();
+-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   const setAuth = useAuthStore((state: any) => state.setAuth);
++  const token = useAuthStore((state: any) => state.token);
++  const user = useAuthStore((state: any) => state.user);
+   
++  const [hydrated, setHydrated] = useState(false);
++  const [isVerifying, setIsVerifying] = useState(false);
++
++  useEffect(() => {
++    setHydrated(true);
++  }, []);
++
+   useEffect(() => {
++    if (!hydrated) return;
++
++    const verify = async () => {
++      if (token && user) {
++        if (user.role === 'admin') {
++          // If the student store somehow contains an admin role (from before the storage separation),
++          // clear it out so it doesn't pollute the student portal.
++          useAuthStore.getState().logout();
++          setIsVerifying(false);
++          return;
++        }
++
++        setIsVerifying(true);
++        try {
++          // Verify token is still valid. If offline, it throws a network error (no response)
++          // and we still allow them to proceed offline.
++          await api.get('/api/v2/students/me', {
++            headers: { Authorization: `Bearer ${token}` }
++          });
++          router.push('/dashboard');
++        } catch (err: any) {
++          if (err.response?.status === 401) {
++            useAuthStore.getState().logout();
++            setIsVerifying(false);
++          } else {
++            // Network error (offline) or server error - assume token is valid enough for offline DB
++            router.push('/dashboard');
++          }
++        }
++      }
++    };
++    
++    verify();
++    
+     // eslint-disable-next-line react-hooks/set-state-in-effect
+     setRegistered(new URLSearchParams(window.location.search).get('registered') === 'true');
+-  }, []);
++  }, [hydrated, token, user, router]);
++
++  if (!hydrated || isVerifying) {
++    return (
++      <div className="min-h-screen flex items-center justify-center bg-page">
++        <div className="w-8 h-8 border-4 border-cfss-green border-t-transparent rounded-full animate-spin"></div>
++      </div>
++    );
++  }
+ 
+   const handleLogin = async (e: React.FormEvent) => {
+     e.preventDefault();
+@@ -41,18 +91,12 @@ export default function LoginPage() {
+         headers: { Authorization: `Bearer ${token}` }
+       });
+ 
+-      // Admin accounts can authenticate through this endpoint too — route
+-      // them to the admin portal instead of the student dashboard.
++      // Admin accounts should not log in through the student portal.
+       const payload64 = token.split('.')[1];
+       const role = JSON.parse(atob(payload64)).role;
+       if (role === 'admin') {
+-        setAuth(token, {
+-          ...userRes.data,
+-          role: 'admin',
+-          full_name: 'Administrator',
+-          program: 'System Admin'
+-        });
+-        router.push('/admin');
++        setIsLoading(false);
++        setError('Please use the Admin Portal (/admin/login) to log in as an administrator.');
+         return;
+       }
+ 
+@@ -76,49 +120,49 @@ export default function LoginPage() {
+   };
+ 
+   return (
+-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+-      <div className="max-w-md w-full bg-white p-8 border border-gray-200 rounded shadow-sm">
++    <div className="min-h-screen flex items-center justify-center bg-page">
++      <div className="max-w-md w-full bg-surface p-8 border border-border rounded shadow-sm">
+       <div className="text-center mb-8">
+-        <h1 className="text-2xl font-semibold text-gray-900">CFSS Portal</h1>
+-        <p className="text-sm text-gray-500 mt-2">Community Field Survey System</p>
++        <h1 className="text-2xl font-light tracking-tight text-primary">CFSS Portal</h1>
++        <p className="text-sm text-muted mt-2">Community Field Survey System</p>
+       </div>
+       
+       {registered && (
+-        <div className="mb-4 p-3 bg-green-50 text-green-700 text-sm border border-green-200 rounded">
++        <div className="mb-4 p-3 bg-status-success/10 text-status-success text-sm border border-status-success/20 rounded">
+           Registration successful! Please log in.
+         </div>
+       )}
+       
+-      {error && <div className="mb-4 p-3 bg-red-50 text-red-700 text-sm border border-red-200 rounded">{error}</div>}
++      {error && <div className="mb-4 p-3 bg-status-error/10 text-status-error text-sm border border-status-error/20 rounded">{error}</div>}
+       
+       <form onSubmit={handleLogin} className="space-y-4">
+         <div>
+-          <label className="block text-sm font-medium text-gray-700">Student ID</label>
++          <label className="block text-sm font-medium text-secondary">Student ID</label>
+           <input 
+             type="text" 
+             required 
+             value={studentId}
+             onChange={(e) => setStudentId(e.target.value.toUpperCase())}
+             disabled={isLoading}
+-            className="mt-1 block w-full border border-gray-300 rounded-md p-2 text-sm text-gray-900 bg-white placeholder-gray-400 disabled:opacity-60 disabled:cursor-not-allowed"
++            className="mt-1 block w-full border border-border-strong rounded-md p-2 text-sm text-primary bg-surface placeholder-gray-400 disabled:opacity-60 disabled:cursor-not-allowed"
+             placeholder="e.g. ABC/1234/5678"
+           />
+         </div>
+         <div>
+-          <label className="block text-sm font-medium text-gray-700">Password</label>
++          <label className="block text-sm font-medium text-secondary">Password</label>
+           <input 
+             type="password" 
+             required 
+             value={password}
+             onChange={(e) => setPassword(e.target.value)}
+             disabled={isLoading}
+-            className="mt-1 block w-full border border-gray-300 rounded-md p-2 text-sm text-gray-900 bg-white placeholder-gray-400 disabled:opacity-60 disabled:cursor-not-allowed"
++            className="mt-1 block w-full border border-border-strong rounded-md p-2 text-sm text-primary bg-surface placeholder-gray-400 disabled:opacity-60 disabled:cursor-not-allowed"
+           />
+         </div>
+         <button 
+           type="submit"
+           disabled={isLoading}
+-          className="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 text-sm font-medium disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
++          className="w-full bg-cfss-green text-white p-2 rounded-md hover:bg-cfss-green-hover text-sm font-medium disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+         >
+           {isLoading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+           {isLoading ? 'Signing In...' : 'Sign In'}
+@@ -126,8 +170,8 @@ export default function LoginPage() {
+       </form>
+       
+       <div className="mt-6 text-center">
+-        <p className="text-sm text-gray-600">
+-          Don&apos;t have an account? <a href="/register" className="text-blue-600 hover:underline">Register here</a>
++        <p className="text-sm text-secondary">
++          Don&apos;t have an account? <a href="/register" className="text-cfss-green hover:underline">Register here</a>
+         </p>
+       </div>
+       </div>
+diff --git a/frontend/src/app/page.tsx b/frontend/src/app/page.tsx
+index 1413e02..e16aa29 100644
+--- a/frontend/src/app/page.tsx
++++ b/frontend/src/app/page.tsx
+@@ -1,5 +1,31 @@
+-import { redirect } from 'next/navigation';
++"use client";
++
++import { useEffect, useState } from 'react';
++import { useRouter } from 'next/navigation';
++import { useAuthStore } from '@/lib/store';
+ 
+ export default function Home() {
+-  redirect('/login');
++  const router = useRouter();
++  const { token, user } = useAuthStore();
++  const [hydrated, setHydrated] = useState(false);
++
++  useEffect(() => {
++    setHydrated(true);
++  }, []);
++
++  useEffect(() => {
++    if (!hydrated) return;
++
++    if (token && user) {
++      router.push('/dashboard');
++    } else {
++      router.push('/login');
++    }
++  }, [hydrated, token, user, router]);
++
++  return (
++    <div className="min-h-screen flex items-center justify-center bg-gray-50">
++      <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
++    </div>
++  );
+ }
+diff --git a/frontend/src/app/surveys/[type]/fill/[id]/page.tsx b/frontend/src/app/surveys/[type]/fill/[id]/page.tsx
+index 0fe1d85..e304313 100644
+--- a/frontend/src/app/surveys/[type]/fill/[id]/page.tsx
++++ b/frontend/src/app/surveys/[type]/fill/[id]/page.tsx
+@@ -2,7 +2,6 @@
+ 
+ import { useEffect, useState, useMemo } from 'react';
+ import { useAuthStore } from '@/lib/store';
+-import { getEntityLabel } from '@/lib/entityLabel';
+ import { useRouter, useParams } from 'next/navigation';
+ import { api } from '@/lib/api';
+ import DashboardLayout from '@/app/dashboard/layout';
+@@ -40,8 +39,22 @@ export default function QuestionnairePage() {
+ 
+         if (recordId === 'new') {
+           // Start a new survey draft locally
+-          const qRes = await api.get('/api/student/surveys/questions', { params: { type: typeStr }, headers: { Authorization: `Bearer ${token}` } });
+-          questionsData = qRes.data;
++          try {
++            const qRes = await api.get('/api/student/surveys/questions', { params: { type: typeStr }, headers: { Authorization: `Bearer ${token}` } });
++            questionsData = qRes.data;
++            // Cache definition offline
++            const { db } = await import('@/lib/db');
++            await db.definitions.put({ type: typeStr, questions: questionsData, updated_at: new Date().toISOString() });
++          } catch (e) {
++            // Offline fallback
++            const { db } = await import('@/lib/db');
++            const cachedDef = await db.definitions.get(typeStr);
++            if (cachedDef) {
++              questionsData = cachedDef.questions;
++            } else {
++              throw new Error("No internet and survey definition not cached.");
++            }
++          }
+           
+           recordData = {
+             id: crypto.randomUUID(), // New UUID for offline sync mapping
+@@ -58,9 +71,22 @@ export default function QuestionnairePage() {
+           const { db } = await import('@/lib/db');
+           const localRecord = await db.surveys.get(recordId);
+           if (localRecord) {
++            if (localRecord.student_id !== user.id) {
++              throw new Error("You do not have permission to view this survey.");
++            }
+             recordData = localRecord;
+-            const qRes = await api.get('/api/student/surveys/questions', { params: { type: typeStr }, headers: { Authorization: `Bearer ${token}` } });
+-            questionsData = qRes.data;
++            try {
++              const qRes = await api.get('/api/student/surveys/questions', { params: { type: typeStr }, headers: { Authorization: `Bearer ${token}` } });
++              questionsData = qRes.data;
++              await db.definitions.put({ type: typeStr, questions: questionsData, updated_at: new Date().toISOString() });
++            } catch (e) {
++              const cachedDef = await db.definitions.get(typeStr);
++              if (cachedDef) {
++                questionsData = cachedDef.questions;
++              } else {
++                throw new Error("No internet and survey definition not cached.");
++              }
++            }
+             answersData = localRecord.answers || [];
+           } else {
+             // Fallback to server if not found locally
+@@ -68,6 +94,10 @@ export default function QuestionnairePage() {
+             recordData = res.data.record;
+             questionsData = res.data.questions;
+             answersData = res.data.answers || [];
++            
++            // Cache definitions
++            const { db } = await import('@/lib/db');
++            await db.definitions.put({ type: typeStr, questions: questionsData, updated_at: new Date().toISOString() });
+           }
+         }
+ 
+@@ -171,7 +201,7 @@ export default function QuestionnairePage() {
+   if (loading) {
+     return (
+       <DashboardLayout>
+-        <div className="flex justify-center p-12 text-gray-500">Loading questionnaire...</div>
++        <div className="flex justify-center p-12 text-muted">Loading questionnaire...</div>
+       </DashboardLayout>
+     );
+   }
+@@ -179,7 +209,7 @@ export default function QuestionnairePage() {
+   if (error && !record) {
+     return (
+       <DashboardLayout>
+-        <div className="bg-red-50 text-red-600 p-6 rounded-xl border border-red-100 max-w-3xl mx-auto flex items-center gap-3">
++        <div className="bg-status-error/10 text-status-error p-6 rounded-lg border-status-error/20 max-w-3xl mx-auto flex items-center gap-3">
+           <AlertCircle />
+           <div className="font-medium">{error}</div>
+         </div>
+@@ -194,37 +224,49 @@ export default function QuestionnairePage() {
+       <div className="space-y-6 max-w-4xl mx-auto pb-24">
+         
+         {/* Header */}
+-        <div className="flex items-center gap-4">
+-          <Link href={`/surveys/${typeStr}`} className="p-2 rounded-lg bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors shrink-0">
+-            <ArrowLeft size={20} />
+-          </Link>
+-          <div>
+-            <h1 className="text-2xl font-bold text-gray-900 capitalize">{typeStr.toLowerCase()} Survey</h1>
+-            <p className="text-gray-500 mt-0.5">{getEntityLabel(typeStr)}: <strong className="text-gray-900 bg-gray-100 px-2 py-0.5 rounded font-mono text-sm border border-gray-200">{record?.entity_id}</strong></p>
++        <div className="flex flex-col sm:flex-row sm:items-center gap-4 bg-surface p-4 rounded-xl border border-border shadow-sm">
++          <div className="flex items-center gap-4">
++            <Link href={`/surveys/${typeStr}`} className="p-2 rounded-lg bg-page text-muted hover:bg-gray-100 hover:text-primary transition-colors shrink-0">
++              <ArrowLeft size={20} />
++            </Link>
++            <div className="flex-1">
++              <div className="flex items-center gap-2 mb-1">
++                <h1 className="text-xl font-bold text-primary capitalize">{typeStr.toLowerCase()} {record?.entity_id ? record.entity_id : 'Draft'}</h1>
++                {record?.sync_status === 'pending' && (
++                  <span className="text-[10px] font-bold bg-status-warning/10 text-status-warning px-2 py-0.5 rounded border border-status-warning/20">Pending Sync</span>
++                )}
++                {record?.status === 'DRAFT' && record?.sync_status === 'synced' && (
++                  <span className="text-[10px] font-bold bg-cfss-green-soft text-cfss-green px-2 py-0.5 rounded border border-cfss-green/20">Saved ✓</span>
++                )}
++              </div>
++              <p className="text-sm font-medium text-muted">
++                Section {currentSectionIndex + 1} of {sections.length}: <strong className="text-secondary">{sections[currentSectionIndex]}</strong>
++              </p>
++            </div>
+           </div>
+           
+           {isReadonly && (
+-            <div className="ml-auto bg-emerald-50 text-emerald-700 px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-2 border border-emerald-100">
++            <div className="sm:ml-auto bg-cfss-green-soft text-cfss-green px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-2 border border-cfss-green/20 self-start sm:self-auto">
+               <CheckCircle size={16} /> Read Only
+             </div>
+           )}
+         </div>
+         
+         {error && (
+-          <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 text-sm font-medium flex items-center gap-2">
++          <div className="bg-status-error/10 text-status-error p-4 rounded-lg border-status-error/20 text-sm font-medium flex items-center gap-2">
+             <AlertCircle size={18} />
+             {error}
+           </div>
+         )}
+ 
+         {/* Progress Bar */}
+-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
++        <div className="bg-surface border-y sm:border sm:rounded-lg border-border p-5">
+           <div className="flex justify-between text-sm font-medium mb-2">
+-            <span className="text-gray-500">Overall Progress</span>
+-            <span className={progress === 100 ? 'text-emerald-600' : 'text-gray-900'}>{progress}%</span>
++            <span className="text-muted">Overall Progress</span>
++            <span className={progress === 100 ? 'text-cfss-green' : 'text-primary'}>{progress}%</span>
+           </div>
+           <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+-            <div className="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
++            <div className="bg-cfss-green h-2.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+           </div>
+         </div>
+ 
+@@ -236,8 +278,8 @@ export default function QuestionnairePage() {
+               onClick={() => setCurrentSectionIndex(idx)}
+               className={`px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors border ${
+                 idx === currentSectionIndex 
+-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+-                  : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
++                  ? 'bg-cfss-green-soft text-cfss-green border-cfss-green/20' 
++                  : 'bg-surface text-secondary border-border hover:bg-page'
+               }`}
+             >
+               {sec}
+@@ -246,15 +288,15 @@ export default function QuestionnairePage() {
+         </div>
+ 
+         {/* Questions Area */}
+-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+-          <div className="bg-gray-50 border-b border-gray-100 p-5">
+-            <h2 className="text-lg font-bold text-gray-900">Section {currentSectionIndex + 1}: {currentSection}</h2>
++        <div className="bg-surface border-y sm:border sm:rounded-lg border-border overflow-hidden">
++          <div className="bg-page border-b border-border p-5">
++            <h2 className="text-lg font-bold text-primary">Section {currentSectionIndex + 1}: {currentSection}</h2>
+           </div>
+           
+           <div className="p-6 space-y-8">
+             {sectionQuestions.map((q, index) => (
+               <div key={q.id} className="space-y-3">
+-                <label className="block text-gray-900 font-medium">
++                <label className="block text-primary font-medium">
+                   {index + 1}. {q.question_text}
+                   {q.required && <span className="text-red-500 ml-1">*</span>}
+                 </label>
+@@ -265,7 +307,7 @@ export default function QuestionnairePage() {
+                     disabled={isReadonly}
+                     value={answers[q.id] || ''}
+                     onChange={(e) => handleAnswerChange(q.id, e.target.value)}
+-                    className="w-full border border-gray-300 rounded-lg p-3 text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-gray-50 disabled:text-gray-500"
++                    className="w-full border border-border-strong rounded-lg p-3 text-primary focus:ring-2 focus:ring-cfss-green focus:border-cfss-green disabled:bg-page disabled:text-muted"
+                     placeholder="Enter answer..."
+                   />
+                 )}
+@@ -276,7 +318,7 @@ export default function QuestionnairePage() {
+                     disabled={isReadonly}
+                     value={answers[q.id] || ''}
+                     onChange={(e) => handleAnswerChange(q.id, e.target.value)}
+-                    className="w-full border border-gray-300 rounded-lg p-3 text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-gray-50 disabled:text-gray-500 max-w-xs"
++                    className="w-full border border-border-strong rounded-lg p-3 text-primary focus:ring-2 focus:ring-cfss-green focus:border-cfss-green disabled:bg-page disabled:text-muted max-w-xs"
+                     placeholder="0"
+                   />
+                 )}
+@@ -284,7 +326,7 @@ export default function QuestionnairePage() {
+                 {q.question_type === 'radio' && q.options && (
+                   <div className="space-y-2">
+                     {(q.options as string[]).map(opt => (
+-                      <label key={opt} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
++                      <label key={opt} className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-page cursor-pointer">
+                         <input 
+                           type="radio" 
+                           disabled={isReadonly}
+@@ -292,9 +334,9 @@ export default function QuestionnairePage() {
+                           value={opt}
+                           checked={answers[q.id] === opt}
+                           onChange={() => handleAnswerChange(q.id, opt)}
+-                          className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300"
++                          className="w-4 h-4 text-cfss-green focus:ring-cfss-green border-border-strong"
+                         />
+-                        <span className="text-gray-700">{opt}</span>
++                        <span className="text-secondary">{opt}</span>
+                       </label>
+                     ))}
+                   </div>
+@@ -305,7 +347,7 @@ export default function QuestionnairePage() {
+                     disabled={isReadonly}
+                     value={answers[q.id] || ''}
+                     onChange={(e) => handleAnswerChange(q.id, e.target.value)}
+-                    className="w-full border border-gray-300 rounded-lg p-3 text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-gray-50 disabled:text-gray-500"
++                    className="w-full border border-border-strong rounded-lg p-3 text-primary focus:ring-2 focus:ring-cfss-green focus:border-cfss-green disabled:bg-page disabled:text-muted"
+                   >
+                     <option value="" disabled>Select an option...</option>
+                     {(q.options as string[]).map(opt => (
+@@ -320,11 +362,11 @@ export default function QuestionnairePage() {
+           </div>
+           
+           {/* Bottom Navigation */}
+-          <div className="border-t border-gray-100 p-5 bg-gray-50 flex items-center justify-between">
++          <div className="border-t border-border p-5 bg-page flex items-center justify-between">
+             <button 
+               onClick={() => setCurrentSectionIndex(prev => Math.max(0, prev - 1))}
+               disabled={currentSectionIndex === 0}
+-              className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
++              className="px-4 py-2 bg-surface border border-border-strong text-secondary rounded-lg font-medium hover:bg-page disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+             >
+               <ChevronLeft size={18} /> Previous
+             </button>
+@@ -332,7 +374,7 @@ export default function QuestionnairePage() {
+             <button 
+               onClick={() => setCurrentSectionIndex(prev => Math.min(sections.length - 1, prev + 1))}
+               disabled={currentSectionIndex === sections.length - 1}
+-              className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
++              className="px-4 py-2 bg-surface border border-border-strong text-secondary rounded-lg font-medium hover:bg-page disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+             >
+               Next <ChevronRight size={18} />
+             </button>
+@@ -343,12 +385,12 @@ export default function QuestionnairePage() {
+ 
+       {/* Action Bar (Fixed to bottom) */}
+       {!isReadonly && (
+-        <div className="fixed bottom-0 left-0 lg:left-64 right-0 bg-white border-t border-gray-200 p-4 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
++        <div className="fixed bottom-0 left-0 lg:left-64 right-0 bg-surface border-t border-border p-4 z-10">
+           <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+             <button 
+               onClick={() => saveAnswers(false)}
+               disabled={saving || submitting}
+-              className="px-6 py-3 bg-white border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-70 flex-1 sm:flex-none"
++              className="px-6 py-3 bg-surface border border-border-strong text-secondary font-medium rounded-lg hover:bg-page transition-colors flex items-center justify-center gap-2 disabled:opacity-70 flex-1 sm:flex-none"
+             >
+               {saving ? <div className="w-5 h-5 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div> : <Save size={18} />}
+               <span className="hidden sm:inline">Save Draft</span>
+@@ -358,7 +400,7 @@ export default function QuestionnairePage() {
+             <button 
+               onClick={() => saveAnswers(true)}
+               disabled={saving || submitting}
+-              className="px-6 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-70 flex-1 sm:flex-none"
++              className="px-6 py-3 bg-cfss-green text-white font-medium rounded-lg hover:bg-cfss-green-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-70 flex-1 sm:flex-none"
+             >
+               {submitting ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <CheckCircle size={18} />}
+               Submit Survey
+diff --git a/frontend/src/app/surveys/[type]/page.tsx b/frontend/src/app/surveys/[type]/page.tsx
+index f1319c6..cbde6b2 100644
+--- a/frontend/src/app/surveys/[type]/page.tsx
++++ b/frontend/src/app/surveys/[type]/page.tsx
+@@ -47,12 +47,32 @@ export default function SurveyWorkspace() {
+   }, [user, token, router, typeStr]);
+ 
+   const handleCreate = async () => {
+-    if (creating) return;
++    if (creating || !user) return;
+     setCreating(true);
+     try {
+-      const res = await api.post('/api/student/surveys/create', { survey_type: typeStr }, { headers: { Authorization: `Bearer ${token}` } });
+-      const newRecord = res.data;
+-      router.push(`/surveys/${typeStr}/fill/${newRecord.id}`);
++      if (navigator.onLine) {
++        const res = await api.post('/api/student/surveys/create', { survey_type: typeStr }, { headers: { Authorization: `Bearer ${token}` } });
++        const newRecord = res.data;
++        router.push(`/surveys/${typeStr}/fill/${newRecord.id}`);
++      } else {
++        // Offline fallback creation
++        const { db } = await import('@/lib/db');
++        const pseudoId = crypto.randomUUID();
++        const now = new Date().toISOString();
++        await db.surveys.put({
++          id: pseudoId,
++          student_id: user.id as number,
++          survey_type: typeStr.toUpperCase(),
++          community_id: user.community_id as number,
++          entity_id: null,
++          answers: [],
++          status: 'DRAFT',
++          sync_status: 'pending',
++          created_at: now,
++          updated_at: now
++        });
++        router.push(`/surveys/${typeStr}/fill/${pseudoId}`);
++      }
+     } catch (e) {
+       console.error("Failed to create survey", e);
+       alert("Failed to create survey. Please try again.");
+diff --git a/frontend/src/app/surveys/page.tsx b/frontend/src/app/surveys/page.tsx
+index 97ff1b7..779ffe6 100644
+--- a/frontend/src/app/surveys/page.tsx
++++ b/frontend/src/app/surveys/page.tsx
+@@ -1,110 +1,53 @@
+ "use client";
+ 
+-import { useEffect, useState } from 'react';
++import { useEffect } from 'react';
+ import { useAuthStore } from '@/lib/store';
+ import { useRouter } from 'next/navigation';
+-import { api } from '@/lib/api';
+ import DashboardLayout from '@/app/dashboard/layout';
+ import Link from 'next/link';
+-import { Home, Book, Heart, Building, ArrowRight, ClipboardList, FileEdit } from 'lucide-react';
++import { ArrowRight } from 'lucide-react';
+ 
+ const SURVEY_TYPES = [
+-  { id: 'HOUSEHOLD', name: 'Household Survey', icon: Home, desc: 'Collect household information within your assigned community.', classes: 'bg-emerald-50 text-emerald-600' },
+-  { id: 'EDUCATION', name: 'Education Survey', icon: Book, desc: 'Assess educational facilities and accessibility.', classes: 'bg-blue-50 text-blue-600' },
+-  { id: 'HEALTH', name: 'Health Survey', icon: Heart, desc: 'Collect data on health facilities and common health issues.', classes: 'bg-red-50 text-red-600' },
+-  { id: 'GOVERNANCE', name: 'Governance & Infrastructure Survey', icon: Building, desc: 'Evaluate local governance and infrastructure projects.', classes: 'bg-purple-50 text-purple-600' }
++  { id: 'HOUSEHOLD', name: 'Household' },
++  { id: 'EDUCATION', name: 'Education' },
++  { id: 'HEALTH', name: 'Health' },
++  { id: 'GOVERNANCE', name: 'Governance' }
+ ];
+ 
+ export default function SurveysPage() {
+-  const { user, token, logout } = useAuthStore();
++  const { user, token } = useAuthStore();
+   const router = useRouter();
+-  const [stats, setStats] = useState<any>(null);
+-  const [loading, setLoading] = useState(true);
+-
++  
+   useEffect(() => {
+     if (!token) {
+       router.push('/login');
+-      return;
+-    }
+-    
+-    if (user?.role !== 'student') {
+-      router.push('/login');
+-      return;
+     }
+-    
+-    const loadStats = async () => {
+-      try {
+-        const res = await api.get('/api/student/surveys/stats', { headers: { Authorization: `Bearer ${token}` } });
+-        setStats(res.data);
+-      } catch (e) {
+-        console.error("Failed to load survey stats", e);
+-      } finally {
+-        setLoading(false);
+-      }
+-    };
+-    
+-    loadStats();
+-  }, [user, token, router]);
++  }, [token, router]);
+ 
+   if (!user) return null;
+ 
+   return (
+     <DashboardLayout>
+-      <div className="space-y-6 max-w-5xl mx-auto">
++      <div className="max-w-xl mx-auto pt-4 pb-12">
+         
+-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+-          <div>
+-            <h1 className="text-2xl font-bold text-gray-900">Surveys</h1>
+-            <p className="text-gray-500 mt-1">Manage data collection for your assigned community: <strong className="text-gray-700">{user.community}</strong></p>
+-          </div>
++        <div className="mb-8">
++          <h1 className="text-2xl font-light text-primary tracking-tight">Collect Data</h1>
++          <p className="text-sm text-secondary mt-1">What are you collecting for {user.community || 'your community'}?</p>
+         </div>
+ 
+-        {loading ? (
+-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+-            {[1, 2, 3, 4].map(i => (
+-              <div key={i} className="bg-white p-6 rounded-xl border border-gray-200 animate-pulse h-48"></div>
+-            ))}
+-          </div>
+-        ) : (
+-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+-            {SURVEY_TYPES.map(type => {
+-              const typeStats = stats?.[type.id] || { submitted: 0, drafts: 0 };
+-              const Icon = type.icon;
+-              
+-              return (
+-                <div key={type.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col hover:border-emerald-200 transition-colors">
+-                  <div className="flex items-start gap-4 mb-4">
+-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${type.classes}`}>
+-                      <Icon size={24} />
+-                    </div>
+-                    <div>
+-                      <h2 className="text-lg font-bold text-gray-900">{type.name}</h2>
+-                      <p className="text-sm text-gray-500 mt-1">{type.desc}</p>
+-                    </div>
+-                  </div>
+-                  
+-                  <div className="flex items-center gap-6 mt-2 mb-6">
+-                    <div className="flex items-center gap-2">
+-                      <ClipboardList className="text-gray-400" size={16} />
+-                      <span className="text-sm font-medium text-gray-600">Completed: <strong className="text-gray-900">{typeStats.submitted}</strong></span>
+-                    </div>
+-                    <div className="flex items-center gap-2">
+-                      <FileEdit className="text-gray-400" size={16} />
+-                      <span className="text-sm font-medium text-gray-600">Drafts: <strong className="text-gray-900">{typeStats.drafts}</strong></span>
+-                    </div>
+-                  </div>
+-                  
+-                  <Link 
+-                    href={`/surveys/${type.id.toLowerCase()}`}
+-                    className="mt-auto w-full py-2.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold rounded-lg flex items-center justify-center gap-2 transition-colors border border-emerald-100"
+-                  >
+-                    Continue Survey <ArrowRight size={18} />
+-                  </Link>
+-                </div>
+-              );
+-            })}
+-          </div>
+-        )}
++        <div className="flex flex-col border-t border-border mt-2">
++          {SURVEY_TYPES.map(type => (
++            <Link 
++              key={type.id}
++              href={`/surveys/${type.id.toLowerCase()}`}
++              className="flex items-center justify-between py-5 border-b border-border hover:bg-surface transition-colors group px-2"
++            >
++              <span className="text-base font-medium text-primary">{type.name}</span>
++              <ArrowRight className="text-muted group-hover:text-cfss-green transition-colors" size={20} />
++            </Link>
++          ))}
++        </div>
++        
+       </div>
+     </DashboardLayout>
+   );
+diff --git a/frontend/src/lib/api.ts b/frontend/src/lib/api.ts
+index 6e5a3fb..c4989b2 100644
+--- a/frontend/src/lib/api.ts
++++ b/frontend/src/lib/api.ts
+@@ -10,8 +10,7 @@ const isBrowser = typeof window !== "undefined";
+  * localhost fallback only exists so `next dev` keeps working with no setup.
+  */
+ export const API_BASE_URL =
+-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") ||
+-  `http://${isBrowser ? window.location.hostname : "127.0.0.1"}:8000`;
++  process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") || "";
+ 
+ export const api = axios.create({
+   baseURL: API_BASE_URL,
+diff --git a/frontend/src/lib/db.ts b/frontend/src/lib/db.ts
+index 9f43815..98536bc 100644
+--- a/frontend/src/lib/db.ts
++++ b/frontend/src/lib/db.ts
+@@ -15,8 +15,15 @@ export interface LocalSurvey {
+   submitted_at?: string;
+ }
+ 
++export interface LocalSurveyDefinition {
++  type: string;
++  questions: any[];
++  updated_at: string;
++}
++
+ class CFSSDatabase extends Dexie {
+   surveys!: EntityTable<LocalSurvey, 'id'>;
++  definitions!: EntityTable<LocalSurveyDefinition, 'type'>;
+ 
+   constructor() {
+     super('CFSSDatabase');
+@@ -36,6 +43,12 @@ class CFSSDatabase extends Dexie {
+         }
+       });
+     });
++
++    // Version 5 adds definitions for offline survey schema access
++    this.version(5).stores({
++      surveys: 'id, student_id, survey_type, status, sync_status, updated_at',
++      definitions: 'type'
++    });
+   }
+ }
+ 
+diff --git a/frontend/src/lib/store.ts b/frontend/src/lib/store.ts
+index a36760b..de6f832 100644
+--- a/frontend/src/lib/store.ts
++++ b/frontend/src/lib/store.ts
+@@ -31,11 +31,34 @@ export const useAuthStore = create<AuthState>()(
+       user: null,
+       theme: 'light',
+       setAuth: (token: string, user: any) => set({ token, user }),
+-      logout: () => set({ token: null, user: null }),
++      logout: () => {
++        set({ token: null, user: null });
++        // NOTE: We do NOT clear db.surveys here. 
++        // Data isolation is enforced at query time via student_id.
++        // This ensures unsynchronized offline fieldwork is not destroyed on logout.
++      },
+       setTheme: (theme: string) => set({ theme }),
+     }),
+     {
+-      name: 'cfss-auth-storage',
++      name: 'cfss-auth-storage', // STUDENT ONLY
++    }
++  )
++);
++
++export const useAdminAuthStore = create<AuthState>()(
++  persist(
++    (set: any): AuthState => ({
++      token: null,
++      user: null,
++      theme: 'light',
++      setAuth: (token: string, user: any) => set({ token, user }),
++      logout: () => {
++        set({ token: null, user: null });
++      },
++      setTheme: (theme: string) => set({ theme }),
++    }),
++    {
++      name: 'cfss-admin-auth-storage', // ADMIN ONLY
+     }
+   )
+ );
+diff --git a/frontend/src/lib/sync.ts b/frontend/src/lib/sync.ts
+index 4bc6fe2..9f62d82 100644
+--- a/frontend/src/lib/sync.ts
++++ b/frontend/src/lib/sync.ts
+@@ -1,5 +1,6 @@
+ import { api } from './api';
+ import { db, LocalSurvey } from './db';
++import { useAuthStore } from './store';
+ 
+ export const syncEngine = {
+   isSyncing: false,
+@@ -7,15 +8,22 @@ export const syncEngine = {
+   async processQueue(token: string) {
+     if (!navigator.onLine || this.isSyncing) return;
+     this.isSyncing = true;
++    const userId = useAuthStore.getState().user?.id;
++
++    if (!userId) {
++      this.isSyncing = false;
++      return;
++    }
+ 
+     try {
+-      // Get all pending or failed surveys
+-      const queueItems = await db.surveys
+-        .where('sync_status')
+-        .anyOf(['pending', 'failed'])
+-        .toArray();
++      // Get all pending or failed surveys for the current user
++      const userSurveys = await db.surveys.where('student_id').equals(userId).toArray();
++      const queueItems = userSurveys.filter(s => s.sync_status === 'pending' || s.sync_status === 'failed');
+ 
+-      if (queueItems.length === 0) return;
++      if (queueItems.length === 0) {
++        this.isSyncing = false;
++        return;
++      }
+ 
+       // Mark as syncing locally so UI updates
+       for (const item of queueItems) {
+@@ -72,12 +80,19 @@ export const syncEngine = {
+       }
+     } catch (error: any) {
+       console.error("Sync Engine Error:", error);
++      
++      // If unauthorized, do not delete data, just fail the sync to force re-auth
++      if (error.response?.status === 401) {
++        useAuthStore.getState().logout();
++      }
++
+       // Revert syncing items back to failed
+-      const syncingItems = await db.surveys.where('sync_status').equals('syncing').toArray();
++      const userSurveys = await db.surveys.where('student_id').equals(userId).toArray();
++      const syncingItems = userSurveys.filter(s => s.sync_status === 'syncing');
+       for (const item of syncingItems) {
+         await db.surveys.update(item.id, {
+           sync_status: 'failed',
+-          sync_error: error.message || "Network error during sync"
++          sync_error: error.response?.status === 401 ? "Session expired. Please log in again." : (error.message || "Network error during sync")
+         });
+       }
+     } finally {
+@@ -86,19 +101,28 @@ export const syncEngine = {
+       window.dispatchEvent(new Event('sync-completed'));
+ 
+       // Check if any items were queued while this sync was running
+-      const hasPending = await db.surveys.where('sync_status').equals('pending').count();
+-      if (hasPending > 0 && navigator.onLine) {
+-        this.processQueue(token);
++      if (userId) {
++        const userSurveysAfter = await db.surveys.where('student_id').equals(userId).toArray();
++        const hasPending = userSurveysAfter.some(s => s.sync_status === 'pending');
++        if (hasPending && navigator.onLine) {
++          this.processQueue(token);
++        }
+       }
+     }
+   },
+ 
+   async queueSurvey(survey: LocalSurvey, token: string) {
++    const userId = useAuthStore.getState().user?.id;
++    if (userId && survey.student_id !== userId) {
++      console.error("Attempted to queue survey belonging to a different user.");
++      return;
++    }
++
+     // Save or update in IndexedDB
+     survey.sync_status = 'pending';
+     survey.updated_at = new Date().toISOString();
+     
+-    // put() inserts or fully replaces — .update() rejects a whole LocalSurvey
++    // put() inserts or fully replaces - .update() rejects a whole LocalSurvey
+     // because Dexie expects a partial update spec, not the complete record.
+     await db.surveys.put(survey);
+ 

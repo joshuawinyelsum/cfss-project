@@ -1,26 +1,30 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useAuthStore } from '@/lib/store';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuthStore } from '@/lib/store';
+import { formatDistanceToNow } from 'date-fns';
+
+
 import { 
   Home, 
-  ClipboardList, 
   FileEdit, 
   CheckSquare, 
-  BarChart2, 
   User as UserIcon, 
   Settings, 
+  LogOut, 
+  Menu, 
+  X, 
   Bell, 
-  LogOut,
-  Menu,
-  X,
-  Users
+  Users, 
+  BarChart2,
+  ClipboardList,
+  MoreHorizontal,
+  RefreshCw
 } from 'lucide-react';
 import { syncEngine } from '@/lib/sync';
 
-import { formatDistanceToNow } from 'date-fns';
 
 export default function DashboardLayout({
   children,
@@ -30,11 +34,13 @@ export default function DashboardLayout({
   const { user, token, logout } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
   const [syncStatus, setSyncStatus] = useState('Online');
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [lastSyncText, setLastSyncText] = useState('Never');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const [authVerified, setAuthVerified] = useState(false);
 
   useEffect(() => {
     if (!token || !user || user.role !== 'student') return;
@@ -97,20 +103,35 @@ export default function DashboardLayout({
   };
 
   useEffect(() => {
-    if (!token || !user || user.role === 'admin') return;
+    setHydrated(true);
+  }, []);
 
-    // Sessions created before the admin routing fix can hold a stale
-    // 'student' role. Decode the token and kick admins to the admin portal.
-    try {
-      const role = JSON.parse(atob(token.split('.')[1])).role;
-      if (role === 'admin') {
-        useAuthStore.getState().setAuth(token, { ...user, role: 'admin' });
-        router.replace('/admin');
-      }
-    } catch (e) {
-      // malformed token — let the page's own auth checks handle it
+  useEffect(() => {
+    if (!hydrated) return;
+
+    if (!token || !user || user.role !== 'student') {
+      logout();
+      router.push('/login');
+      return;
     }
-  }, [token, user, router]);
+
+    const verifyToken = async () => {
+      try {
+        const { api } = await import('@/lib/api');
+        await api.get('/api/v2/students/me', {
+          headers: { Authorization: 'Bearer ' + token }
+        });
+      } catch (err: any) {
+        if (err.response?.status === 401) {
+          logout();
+          router.push('/login');
+          return;
+        }
+      }
+      setAuthVerified(true);
+    };
+    verifyToken();
+  }, [hydrated, token, user, logout, router]);
 
   const [draftCount, setDraftCount] = useState(0);
   
@@ -154,89 +175,108 @@ export default function DashboardLayout({
     };
   }, [user, token]);
 
-  const navItems = [
-    { name: 'Dashboard', href: '/dashboard', icon: Home },
-    { name: 'My Group', href: '/dashboard/group', icon: Users },
-    { name: 'Surveys', href: '/surveys', icon: ClipboardList },
-    { name: 'Drafts', href: '/dashboard/surveys/drafts', icon: FileEdit, badge: draftCount > 0 ? draftCount : undefined },
+  const primaryNavItems = [
+    { name: 'Home', href: '/dashboard', icon: Home },
+    { name: 'Work', href: '/dashboard/work', icon: FileEdit, badge: draftCount > 0 ? draftCount : undefined },
+    { name: 'Collect', href: '/surveys', icon: ClipboardList, prominent: true },
     { name: 'Submitted', href: '/dashboard/surveys/submitted', icon: CheckSquare },
-    { name: 'Reports', href: '/reports', icon: BarChart2 },
+  ];
+
+  const secondaryNavItems = [
+    { name: 'My Group', href: '/dashboard/group', icon: Users },
+    { name: 'Sync & Activity', href: '/dashboard/sync', icon: RefreshCw },
     { name: 'Profile', href: '/profile', icon: UserIcon },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
 
+  const mobileNavItems = [
+    { name: 'Home', href: '/dashboard', icon: Home },
+    { name: 'Work', href: '/dashboard/work', icon: FileEdit, badge: draftCount > 0 ? draftCount : undefined },
+    { name: 'Collect', href: '/surveys', icon: ClipboardList, prominent: true },
+    { name: 'Submitted', href: '/dashboard/surveys/submitted', icon: CheckSquare },
+    { name: 'More', href: '/dashboard/more', icon: MoreHorizontal },
+  ];
 
   if (!user) return null;
 
-  return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
-      
-      {/* Mobile Sidebar Overlay */}
-      {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
+  if (!hydrated || !authVerified) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-page">
+        <div className="w-8 h-8 border-4 border-[#093C22] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
-      {/* Sidebar */}
-      <aside 
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-[#0a4628] to-[#052b18] text-white flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:shrink-0 ${
-          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <div className="p-6 flex items-center gap-3">
-          <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shrink-0">
-            <span className="text-[#0a4628] font-bold text-xl">C</span>
+  return (
+    <div className="flex h-screen bg-page overflow-hidden font-sans">
+      
+      {/* Desktop Sidebar */}
+      <aside className="hidden lg:flex flex-col w-64 bg-[#093C22] shrink-0 z-10">
+        <div className="p-6 flex items-center gap-3 border-b border-[#0c512e]">
+          <div className="w-10 h-10 bg-surface rounded-lg flex items-center justify-center shrink-0">
+            <span className="text-[#093C22] font-bold text-xl">C</span>
           </div>
           <div>
-            <h1 className="font-bold text-lg leading-tight">CFSS</h1>
-            <p className="text-[10px] text-emerald-100/80 leading-tight">Community Field<br/>Survey System</p>
+            <h1 className="font-bold text-lg leading-tight text-white">CFSS</h1>
+            <p className="text-[10px] text-emerald-100/70 leading-tight">Fieldwork Workspace</p>
           </div>
-          <button 
-            className="ml-auto lg:hidden text-white/80 hover:text-white"
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            <X size={20} />
-          </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1 scrollbar-hide">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+          <div className="text-xs font-semibold text-emerald-100/50 mb-2 px-3 uppercase tracking-wider">Fieldwork</div>
+          {primaryNavItems.map((item) => {
+            const isActive = pathname === item.href || (pathname.startsWith(item.href + '/') && item.href !== '/dashboard');
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive 
-                    ? 'bg-[#105f38] text-white' 
-                    : 'text-emerald-100/70 hover:bg-[#105f38]/50 hover:text-white'
+                    ? 'bg-surface/10 text-white' 
+                    : 'text-emerald-100/70 hover:bg-surface/5 hover:text-white'
                 }`}
-                onClick={() => setIsMobileMenuOpen(false)}
               >
                 <item.icon size={20} className={isActive ? 'text-white' : 'text-emerald-100/70'} />
                 {item.name}
                 {item.badge && (
-                  <span className="ml-auto bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  <span className="ml-auto bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                     {item.badge}
                   </span>
                 )}
               </Link>
             );
           })}
+
+          <div className="text-xs font-semibold text-emerald-100/50 mt-8 mb-2 px-3 uppercase tracking-wider">Account & System</div>
+          {secondaryNavItems.map((item) => {
+            const isActive = pathname === item.href || (pathname.startsWith(item.href + '/') && item.href !== '/dashboard');
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive 
+                    ? 'bg-surface/10 text-white' 
+                    : 'text-emerald-100/70 hover:bg-surface/5 hover:text-white'
+                }`}
+              >
+                <item.icon size={20} className={isActive ? 'text-white' : 'text-emerald-100/70'} />
+                {item.name}
+              </Link>
+            );
+          })}
         </nav>
 
-        <div className="p-4 mt-auto">
-          <div className="bg-[#105f38]/40 border border-[#105f38] rounded-xl p-4 mb-4">
+        <div className="p-4 mt-auto border-t border-[#0c512e]">
+          <div className="bg-surface/5 border border-white/10 rounded-xl p-4 mb-4">
             <h3 className="text-sm font-medium text-white mb-2">Sync Status</h3>
-            <div className="flex items-center gap-2 text-xs text-emerald-100 mb-3">
-              <span className={`w-2 h-2 rounded-full ${syncStatus === 'Online' && !isSyncing ? 'bg-green-400' : isSyncing ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'}`}></span>
+            <div className="flex items-center gap-2 text-xs text-emerald-100/80 mb-3">
+              <span className={`w-2 h-2 rounded-full ${syncStatus === 'Online' && !isSyncing ? 'bg-green-500' : isSyncing ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'}`}></span>
               {isSyncing ? 'Syncing...' : syncStatus}
             </div>
-            <p className="text-[10px] text-emerald-200/60 mb-3">Last sync: {lastSyncText}</p>
+            <p className="text-[10px] text-emerald-100/50 mb-3">Last sync: {lastSyncText}</p>
             <button 
-              className={`w-full py-2 bg-[#0a4628] hover:bg-[#07361e] border border-[#1e7c4c] rounded-lg text-xs font-medium text-white transition-colors flex items-center justify-center gap-2 ${isSyncing || syncStatus === 'Offline' ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`w-full py-2 bg-surface/10 hover:bg-surface/20 border border-white/10 rounded-lg text-xs font-medium text-white transition-colors flex items-center justify-center gap-2 ${isSyncing || syncStatus === 'Offline' ? 'opacity-50 cursor-not-allowed' : ''}`}
               onClick={() => {
                 if (!isSyncing && token && syncStatus === 'Online') {
                   setIsSyncing(true);
@@ -245,14 +285,14 @@ export default function DashboardLayout({
               }}
               disabled={isSyncing || syncStatus === 'Offline'}
             >
-              <svg className={isSyncing ? 'animate-spin' : ''} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+              <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
               {isSyncing ? 'Syncing...' : 'Sync Now'}
             </button>
           </div>
 
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-950/30 hover:text-red-300 transition-colors w-full"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-300 hover:bg-red-500/20 hover:text-red-200 transition-colors w-full"
           >
             <LogOut size={20} />
             Logout
@@ -261,46 +301,76 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         
-        {/* Header */}
-        <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-4 lg:px-8 shrink-0">
-          <div className="flex items-center">
-            <button 
-              className="lg:hidden p-2 -ml-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100"
-              onClick={() => setIsMobileMenuOpen(true)}
-            >
-              <Menu size={24} />
-            </button>
-            <span className="lg:hidden font-bold text-gray-900 ml-2">CFSS</span>
+        {/* Mobile Header */}
+        <header className="lg:hidden bg-surface border-b border-border-strong h-14 flex items-center justify-between px-4 shrink-0 z-10">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-[#093C22] rounded flex items-center justify-center shrink-0">
+              <span className="text-white font-bold text-sm">C</span>
+            </div>
+            <span className="font-bold text-primary text-sm">CFSS Workspace</span>
           </div>
 
-          <div className="flex items-center gap-4 lg:gap-6 ml-auto">
-            <button className="relative text-gray-500 hover:text-gray-700">
-              <Bell size={20} />
-              {/* Notification badge removed because no backend notification system exists yet */}
-            </button>
-            
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm shrink-0">
+          <div className="flex items-center gap-3">
+             <div className="flex items-center gap-1">
+               <span className={`w-2 h-2 rounded-full ${syncStatus === 'Online' && !isSyncing ? 'bg-green-500' : isSyncing ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'}`}></span>
+             </div>
+             <div className="w-8 h-8 rounded-full bg-[#093C22]/10 text-[#093C22] flex items-center justify-center font-bold text-sm shrink-0">
                 {user.full_name.charAt(0)}
-              </div>
-              <div className="hidden sm:block">
-                <p className="text-sm font-semibold text-gray-900 leading-none">{user.full_name}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Level 100 • Group {user.group_number || 'Pending'} {user.community ? `• ${user.community}` : ''}
-                </p>
-              </div>
-            </div>
+             </div>
           </div>
         </header>
 
         {/* Scrollable Main Content */}
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-4 lg:p-8">
+        <main className="flex-1 overflow-y-auto bg-page p-4 pb-24 lg:pb-4 lg:p-8">
           <div className="max-w-6xl mx-auto h-full">
             {children}
           </div>
         </main>
+
+        {/* Mobile Bottom Navigation */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-border-strong flex items-center justify-around h-16 z-50 pb-safe">
+          {mobileNavItems.map((item) => {
+            const isActive = pathname === item.href || (pathname.startsWith(item.href + '/') && item.href !== '/dashboard');
+            
+            if (item.prominent) {
+               return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className="flex flex-col items-center justify-center -mt-5 relative z-10"
+                  >
+                    <div className="w-12 h-12 bg-[#093C22] rounded-full flex items-center justify-center shadow-lg border-4 border-gray-50 text-white">
+                      <item.icon size={22} />
+                    </div>
+                    <span className="text-[10px] font-medium text-secondary mt-1">{item.name}</span>
+                  </Link>
+               );
+            }
+
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className="flex flex-col items-center justify-center w-16 h-full relative"
+              >
+                <item.icon 
+                  size={22} 
+                  className={`mb-1 ${isActive ? 'text-[#093C22]' : 'text-muted'}`} 
+                />
+                <span className={`text-[10px] font-medium ${isActive ? 'text-[#093C22]' : 'text-muted'}`}>
+                  {item.name}
+                </span>
+                {item.badge && (
+                  <span className="absolute top-1 right-2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white">
+                    {item.badge}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
       </div>
 
     </div>

@@ -1,5 +1,6 @@
 import { api } from './api';
 import { db, LocalSurvey } from './db';
+import { useAuthStore } from './store';
 
 export const syncEngine = {
   isSyncing: false,
@@ -7,15 +8,22 @@ export const syncEngine = {
   async processQueue(token: string) {
     if (!navigator.onLine || this.isSyncing) return;
     this.isSyncing = true;
+    const userId = useAuthStore.getState().user?.id;
+
+    if (!userId) {
+      this.isSyncing = false;
+      return;
+    }
 
     try {
-      // Get all pending or failed surveys
-      const queueItems = await db.surveys
-        .where('sync_status')
-        .anyOf(['pending', 'failed'])
-        .toArray();
+      // Get all pending or failed surveys for the current user
+      const userSurveys = await db.surveys.where('student_id').equals(userId).toArray();
+      const queueItems = userSurveys.filter(s => s.sync_status === 'pending' || s.sync_status === 'failed');
 
-      if (queueItems.length === 0) return;
+      if (queueItems.length === 0) {
+        this.isSyncing = false;
+        return;
+      }
 
       // Mark as syncing locally so UI updates
       for (const item of queueItems) {
@@ -72,12 +80,19 @@ export const syncEngine = {
       }
     } catch (error: any) {
       console.error("Sync Engine Error:", error);
+      
+      // If unauthorized, do not delete data, just fail the sync to force re-auth
+      if (error.response?.status === 401) {
+        useAuthStore.getState().logout();
+      }
+
       // Revert syncing items back to failed
-      const syncingItems = await db.surveys.where('sync_status').equals('syncing').toArray();
+      const userSurveys = await db.surveys.where('student_id').equals(userId).toArray();
+      const syncingItems = userSurveys.filter(s => s.sync_status === 'syncing');
       for (const item of syncingItems) {
         await db.surveys.update(item.id, {
           sync_status: 'failed',
-          sync_error: error.message || "Network error during sync"
+          sync_error: error.response?.status === 401 ? "Session expired. Please log in again." : (error.message || "Network error during sync")
         });
       }
     } finally {
@@ -86,19 +101,28 @@ export const syncEngine = {
       window.dispatchEvent(new Event('sync-completed'));
 
       // Check if any items were queued while this sync was running
-      const hasPending = await db.surveys.where('sync_status').equals('pending').count();
-      if (hasPending > 0 && navigator.onLine) {
-        this.processQueue(token);
+      if (userId) {
+        const userSurveysAfter = await db.surveys.where('student_id').equals(userId).toArray();
+        const hasPending = userSurveysAfter.some(s => s.sync_status === 'pending');
+        if (hasPending && navigator.onLine) {
+          this.processQueue(token);
+        }
       }
     }
   },
 
   async queueSurvey(survey: LocalSurvey, token: string) {
+    const userId = useAuthStore.getState().user?.id;
+    if (userId && survey.student_id !== userId) {
+      console.error("Attempted to queue survey belonging to a different user.");
+      return;
+    }
+
     // Save or update in IndexedDB
     survey.sync_status = 'pending';
     survey.updated_at = new Date().toISOString();
     
-    // put() inserts or fully replaces — .update() rejects a whole LocalSurvey
+    // put() inserts or fully replaces - .update() rejects a whole LocalSurvey
     // because Dexie expects a partial update spec, not the complete record.
     await db.surveys.put(survey);
 

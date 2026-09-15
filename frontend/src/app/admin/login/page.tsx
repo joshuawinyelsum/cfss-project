@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/lib/store';
+import { useAdminAuthStore } from '@/lib/store';
 import { api } from '@/lib/api';
 
 export default function AdminLoginPage() {
@@ -11,7 +11,7 @@ export default function AdminLoginPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const setAuth = useAuthStore((state: any) => state.setAuth);
+  const setAuth = useAdminAuthStore((state: any) => state.setAuth);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

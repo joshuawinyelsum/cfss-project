@@ -51,12 +51,17 @@ async def sync_surveys(
 ):
     current_user, community = user_data
     
+    comm_id = community.id
+    comm_name = community.name
+    curr_user_id = current_user.id
+    curr_user_name = current_user.name
+    
     results = []
     
     for survey in payload.surveys:
         try:
             # Validate community
-            if survey.community_id != community.id:
+            if survey.community_id != comm_id:
                 raise ValueError("Survey community mismatch")
                 
             # Check if survey exists
@@ -65,7 +70,7 @@ async def sync_surveys(
             
             if record:
                 # Update existing
-                if record.created_by_student_id != current_user.id:
+                if record.created_by_student_id != curr_user_id:
                     raise ValueError("Not authorized to edit this survey")
                     
                 if record.status == "SUBMITTED" and survey.status != "SUBMITTED":
@@ -87,13 +92,13 @@ async def sync_surveys(
                 # If no entity_id (offline creation), generate one
                 if not entity_id or entity_id.startswith("TEMP"):
                     from app.routers.student_surveys import get_entity_prefix
-                    clean_comm_name = re.sub(r'[^A-Za-z0-9]', '', community.name)
+                    clean_comm_name = re.sub(r'[^A-Za-z0-9]', '', comm_name)
                     prefix = get_entity_prefix(survey.survey_type.upper())
                     
                     # Robust logic for unique entity_id
                     count_res = await db.execute(
                         select(func.count()).where(
-                            models.SurveyRecord.community_id == community.id,
+                            models.SurveyRecord.community_id == comm_id,
                             models.SurveyRecord.survey_type == survey.survey_type.upper()
                         )
                     )
@@ -119,8 +124,8 @@ async def sync_surveys(
 
                 record = models.SurveyRecord(
                     id=survey.survey_id,
-                    community_id=community.id,
-                    created_by_student_id=current_user.id,
+                    community_id=comm_id,
+                    created_by_student_id=curr_user_id,
                     survey_type=survey.survey_type.upper(),
                     entity_id=entity_id,
                     status=survey.status,
@@ -143,6 +148,11 @@ async def sync_surveys(
                     answer=ans.answer
                 ))
                 
+            # Extract attributes before commit to avoid lazy load MissingGreenlet
+            rec_id = record.id
+            rec_entity_id = record.entity_id
+            rec_survey_type = record.survey_type
+            
             await db.commit()
             
             # Admin Notification on SUBMITTED
@@ -150,25 +160,27 @@ async def sync_surveys(
                 notif = models.AdminNotification(
                     type="survey_submit",
                     title="Survey Submitted",
-                    message=f"{current_user.name} submitted {record.survey_type.capitalize()} Survey\nCommunity: {community.name}\nEntity ID: {record.entity_id}"
+                    message=f"{curr_user_name} submitted {rec_survey_type.capitalize()} Survey\nCommunity: {comm_name}\nEntity ID: {rec_entity_id}"
                 )
                 db.add(notif)
                 await db.commit()
                 
             results.append({
                 "client_id": survey.survey_id,
-                "server_id": record.id,
-                "house_number": record.entity_id, # keep house_number in payload to avoid breaking old apps, or Dexie payload compatibility
+                "server_id": rec_id,
+                "house_number": rec_entity_id,
                 "success": True
             })
             
         except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
             await db.rollback()
             # Update sync error if record existed? Too complex to do in the same loop if rollback happens.
             results.append({
                 "client_id": survey.survey_id,
                 "success": False,
-                "error": str(e)
+                "error": f"{str(e)}\n{tb}"
             })
             
     return {"success": True, "results": results}

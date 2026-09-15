@@ -1,11 +1,12 @@
 "use client";
+import Link from 'next/link';
 
 import { useEffect } from 'react';
 import { useAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import DashboardLayout from '@/app/dashboard/layout';
-import { User as UserIcon } from 'lucide-react';
+import { User as UserIcon , ArrowLeft } from 'lucide-react';
 
 export default function StudentProfile() {
   const { user, token, logout, setAuth } = useAuthStore();
@@ -40,6 +41,14 @@ export default function StudentProfile() {
   return (
     <DashboardLayout>
       <div className="max-w-3xl mx-auto space-y-6 pb-12">
+
+        {/* Mobile Back Navigation */}
+        <div className="lg:hidden mb-4">
+          <Link href="/dashboard/more" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors">
+            <ArrowLeft size={16} className="mr-1" /> Back to More
+          </Link>
+        </div>
+
         {/* SECTION 1: PROFILE HEADER CARD */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-6">
           <div className="w-24 h-24 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-3xl shrink-0">

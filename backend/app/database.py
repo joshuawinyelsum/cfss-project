@@ -8,6 +8,8 @@ from app.settings import DATABASE_URL
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
+    pool_pre_ping=True,
+    pool_recycle=1800,
     connect_args={
         "statement_cache_size": 0,
         "prepared_statement_cache_size": 0

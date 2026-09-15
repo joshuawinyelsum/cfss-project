@@ -4,10 +4,10 @@ import { useState } from 'react';
 import { downloadExport } from '@/lib/export';
 import { Download, Users, ClipboardList, Loader2 } from 'lucide-react';
 
-import { useAuthStore } from '@/lib/store';
+import { useAdminAuthStore } from '@/lib/store';
 
 export default function ExportsPage() {
-  const { token } = useAuthStore();
+  const { token } = useAdminAuthStore();
   const [exportingStudents, setExportingStudents] = useState(false);
   const [exportingSurveys, setExportingSurveys] = useState(false);
 

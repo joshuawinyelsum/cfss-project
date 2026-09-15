@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from 'react';
-import { useAuthStore } from '@/lib/store';
+import { useAdminAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 
@@ -28,7 +28,7 @@ interface SurveyDetail extends SurveyList {
 }
 
 export default function AdminSurveysPage() {
-  const { user, token } = useAuthStore();
+  const { user, token } = useAdminAuthStore();
   const router = useRouter();
 
   const [surveys, setSurveys] = useState<SurveyList[]>([]);

@@ -1,0 +1,72 @@
+ M backend/app/database.py
+ M backend/app/routers/sync_router.py
+ M frontend/next.config.ts
+ M frontend/package-lock.json
+ M frontend/package.json
+ M frontend/src/app/admin/communities/page.tsx
+ M frontend/src/app/admin/exports/page.tsx
+ M frontend/src/app/admin/layout.tsx
+ M frontend/src/app/admin/login/page.tsx
+ M frontend/src/app/admin/notifications/page.tsx
+ M frontend/src/app/admin/page.tsx
+ M frontend/src/app/admin/registration/page.tsx
+ M frontend/src/app/admin/reports/page.tsx
+ M frontend/src/app/admin/settings/page.tsx
+ M frontend/src/app/admin/students/page.tsx
+ M frontend/src/app/admin/surveys/page.tsx
+ M frontend/src/app/admin/whitelist/page.tsx
+ M frontend/src/app/dashboard/layout.tsx
+ M frontend/src/app/dashboard/surveys/drafts/page.tsx
+ M frontend/src/app/dashboard/surveys/submitted/page.tsx
+ M frontend/src/app/dashboard/sync/page.tsx
+ M frontend/src/app/globals.css
+ M frontend/src/app/layout.tsx
+ M frontend/src/app/page.tsx
+ M frontend/src/app/surveys/[type]/fill/[id]/page.tsx
+ M frontend/src/app/surveys/[type]/page.tsx
+ M frontend/src/lib/api.ts
+ M frontend/src/lib/db.ts
+ M frontend/src/lib/store.ts
+ M frontend/src/lib/sync.ts
+?? backend/debug.py
+?? backend/debug2.py
+?? backend/fix3.py
+?? backend/fix_id.py
+?? backend/print.py
+?? backend/rewrite.py
+?? backend/test.py
+?? backend/test_conn.py
+?? backend/test_out.txt
+?? backend/test_stabilization.py
+?? backend/tests/append_test.py
+?? backend/tests/fix_test.py
+?? backend/tests/test_sync.py
+?? cfss-before-ui-recovery.patch
+?? check_layout.py
+?? fix_admin_store.py
+?? fix_colors.py
+?? fix_dashboard_layout.py
+?? fix_drafts.py
+?? fix_form.py
+?? fix_imports.py
+?? fix_layout_safe.py
+?? fix_login.py
+?? fix_login_safe.py
+?? fix_login_ui.py
+?? fix_quotes.py
+?? fix_submitted.py
+?? fix_sync.py
+?? fix_sync_duplicate_state.py
+?? fix_sync_imports.py
+?? fix_sync_logic.py
+?? frontend/public/manifest.json
+?? frontend/public/sw.js
+?? frontend/src/app/sw.ts
+?? implementation_plan.md
+?? replace_layout.py
+?? rewrite_css.js
+?? rewrite_layout.py
+?? rewrite_login.py
+?? rewrite_ui.js
+?? status.txt
+?? unfix_form.py

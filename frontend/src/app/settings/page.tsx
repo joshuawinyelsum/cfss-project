@@ -1,11 +1,12 @@
 "use client";
+import Link from 'next/link';
 
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/app/dashboard/layout';
 import { api } from '@/lib/api';
-import { Shield, Monitor, HelpCircle, Info, LogOut, Check, X, AlertCircle } from 'lucide-react';
+import { Shield, Monitor, HelpCircle, Info, LogOut, Check, X, AlertCircle , ArrowLeft } from 'lucide-react';
 
 export default function SettingsPage() {
   const { user, token, theme, setTheme, logout } = useAuthStore();
@@ -97,7 +98,15 @@ export default function SettingsPage() {
 
   if (!user || loading) return (
     <DashboardLayout>
-      <div className="flex justify-center items-center h-full text-gray-500">Loading settings...</div>
+      <div className="flex justify-center items-center h-full text-gray-500">
+
+        {/* Mobile Back Navigation */}
+        <div className="lg:hidden mb-4">
+          <Link href="/dashboard/more" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors">
+            <ArrowLeft size={16} className="mr-1" /> Back to More
+          </Link>
+        </div>
+Loading settings...</div>
     </DashboardLayout>
   );
 

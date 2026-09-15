@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useAuthStore } from '@/lib/store';
-import { getEntityLabel } from '@/lib/entityLabel';
 import { useRouter, useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import DashboardLayout from '@/app/dashboard/layout';
@@ -40,8 +39,22 @@ export default function QuestionnairePage() {
 
         if (recordId === 'new') {
           // Start a new survey draft locally
-          const qRes = await api.get('/api/student/surveys/questions', { params: { type: typeStr }, headers: { Authorization: `Bearer ${token}` } });
-          questionsData = qRes.data;
+          try {
+            const qRes = await api.get('/api/student/surveys/questions', { params: { type: typeStr }, headers: { Authorization: `Bearer ${token}` } });
+            questionsData = qRes.data;
+            // Cache definition offline
+            const { db } = await import('@/lib/db');
+            await db.definitions.put({ type: typeStr, questions: questionsData, updated_at: new Date().toISOString() });
+          } catch (e) {
+            // Offline fallback
+            const { db } = await import('@/lib/db');
+            const cachedDef = await db.definitions.get(typeStr);
+            if (cachedDef) {
+              questionsData = cachedDef.questions;
+            } else {
+              throw new Error("No internet and survey definition not cached.");
+            }
+          }
           
           recordData = {
             id: crypto.randomUUID(), // New UUID for offline sync mapping
@@ -58,9 +71,22 @@ export default function QuestionnairePage() {
           const { db } = await import('@/lib/db');
           const localRecord = await db.surveys.get(recordId);
           if (localRecord) {
+            if (localRecord.student_id !== user.id) {
+              throw new Error("You do not have permission to view this survey.");
+            }
             recordData = localRecord;
-            const qRes = await api.get('/api/student/surveys/questions', { params: { type: typeStr }, headers: { Authorization: `Bearer ${token}` } });
-            questionsData = qRes.data;
+            try {
+              const qRes = await api.get('/api/student/surveys/questions', { params: { type: typeStr }, headers: { Authorization: `Bearer ${token}` } });
+              questionsData = qRes.data;
+              await db.definitions.put({ type: typeStr, questions: questionsData, updated_at: new Date().toISOString() });
+            } catch (e) {
+              const cachedDef = await db.definitions.get(typeStr);
+              if (cachedDef) {
+                questionsData = cachedDef.questions;
+              } else {
+                throw new Error("No internet and survey definition not cached.");
+              }
+            }
             answersData = localRecord.answers || [];
           } else {
             // Fallback to server if not found locally
@@ -68,6 +94,10 @@ export default function QuestionnairePage() {
             recordData = res.data.record;
             questionsData = res.data.questions;
             answersData = res.data.answers || [];
+            
+            // Cache definitions
+            const { db } = await import('@/lib/db');
+            await db.definitions.put({ type: typeStr, questions: questionsData, updated_at: new Date().toISOString() });
           }
         }
 
@@ -194,17 +224,29 @@ export default function QuestionnairePage() {
       <div className="space-y-6 max-w-4xl mx-auto pb-24">
         
         {/* Header */}
-        <div className="flex items-center gap-4">
-          <Link href={`/surveys/${typeStr}`} className="p-2 rounded-lg bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors shrink-0">
-            <ArrowLeft size={20} />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 capitalize">{typeStr.toLowerCase()} Survey</h1>
-            <p className="text-gray-500 mt-0.5">{getEntityLabel(typeStr)}: <strong className="text-gray-900 bg-gray-100 px-2 py-0.5 rounded font-mono text-sm border border-gray-200">{record?.entity_id}</strong></p>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+          <div className="flex items-center gap-4">
+            <Link href={`/surveys/${typeStr}`} className="p-2 rounded-lg bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors shrink-0">
+              <ArrowLeft size={20} />
+            </Link>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <h1 className="text-xl font-bold text-gray-900 capitalize">{typeStr.toLowerCase()} {record?.entity_id ? record.entity_id : 'Draft'}</h1>
+                {record?.sync_status === 'pending' && (
+                  <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200">Pending Sync</span>
+                )}
+                {record?.status === 'DRAFT' && record?.sync_status === 'synced' && (
+                  <span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded border border-emerald-200">Saved ✓</span>
+                )}
+              </div>
+              <p className="text-sm font-medium text-gray-500">
+                Section {currentSectionIndex + 1} of {sections.length}: <strong className="text-gray-700">{sections[currentSectionIndex]}</strong>
+              </p>
+            </div>
           </div>
           
           {isReadonly && (
-            <div className="ml-auto bg-emerald-50 text-emerald-700 px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-2 border border-emerald-100">
+            <div className="sm:ml-auto bg-emerald-50 text-emerald-600 px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-2 border border-emerald-200 self-start sm:self-auto">
               <CheckCircle size={16} /> Read Only
             </div>
           )}
@@ -224,7 +266,7 @@ export default function QuestionnairePage() {
             <span className={progress === 100 ? 'text-emerald-600' : 'text-gray-900'}>{progress}%</span>
           </div>
           <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-            <div className="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+            <div className="bg-emerald-600 h-2.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
           </div>
         </div>
 
@@ -236,8 +278,8 @@ export default function QuestionnairePage() {
               onClick={() => setCurrentSectionIndex(idx)}
               className={`px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors border ${
                 idx === currentSectionIndex 
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                  : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                  ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
               }`}
             >
               {sec}
@@ -247,7 +289,7 @@ export default function QuestionnairePage() {
 
         {/* Questions Area */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="bg-gray-50 border-b border-gray-100 p-5">
+          <div className="bg-gray-50 border-b border-gray-200 p-5">
             <h2 className="text-lg font-bold text-gray-900">Section {currentSectionIndex + 1}: {currentSection}</h2>
           </div>
           
@@ -320,7 +362,7 @@ export default function QuestionnairePage() {
           </div>
           
           {/* Bottom Navigation */}
-          <div className="border-t border-gray-100 p-5 bg-gray-50 flex items-center justify-between">
+          <div className="border-t border-gray-200 p-5 bg-gray-50 flex items-center justify-between">
             <button 
               onClick={() => setCurrentSectionIndex(prev => Math.max(0, prev - 1))}
               disabled={currentSectionIndex === 0}

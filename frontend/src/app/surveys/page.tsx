@@ -54,15 +54,15 @@ export default function SurveysPage() {
         
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Surveys</h1>
-            <p className="text-gray-500 mt-1">Manage data collection for your assigned community: <strong className="text-gray-700">{user.community}</strong></p>
+            <h1 className="text-2xl font-bold text-primary">Surveys</h1>
+            <p className="text-muted mt-1">Manage data collection for your assigned community: <strong className="text-secondary">{user.community}</strong></p>
           </div>
         </div>
 
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[1, 2, 3, 4].map(i => (
-              <div key={i} className="bg-white p-6 rounded-xl border border-gray-200 animate-pulse h-48"></div>
+              <div key={i} className="bg-surface p-6 rounded-xl border border-border-strong animate-pulse h-48"></div>
             ))}
           </div>
         ) : (
@@ -72,25 +72,25 @@ export default function SurveysPage() {
               const Icon = type.icon;
               
               return (
-                <div key={type.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col hover:border-emerald-200 transition-colors">
+                <div key={type.id} className="bg-surface rounded-xl shadow-sm border border-border p-6 flex flex-col hover:border-emerald-200 transition-colors">
                   <div className="flex items-start gap-4 mb-4">
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${type.classes}`}>
                       <Icon size={24} />
                     </div>
                     <div>
-                      <h2 className="text-lg font-bold text-gray-900">{type.name}</h2>
-                      <p className="text-sm text-gray-500 mt-1">{type.desc}</p>
+                      <h2 className="text-lg font-bold text-primary">{type.name}</h2>
+                      <p className="text-sm text-muted mt-1">{type.desc}</p>
                     </div>
                   </div>
                   
                   <div className="flex items-center gap-6 mt-2 mb-6">
                     <div className="flex items-center gap-2">
-                      <ClipboardList className="text-gray-400" size={16} />
-                      <span className="text-sm font-medium text-gray-600">Completed: <strong className="text-gray-900">{typeStats.submitted}</strong></span>
+                      <ClipboardList className="text-muted" size={16} />
+                      <span className="text-sm font-medium text-secondary">Completed: <strong className="text-primary">{typeStats.submitted}</strong></span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <FileEdit className="text-gray-400" size={16} />
-                      <span className="text-sm font-medium text-gray-600">Drafts: <strong className="text-gray-900">{typeStats.drafts}</strong></span>
+                      <FileEdit className="text-muted" size={16} />
+                      <span className="text-sm font-medium text-secondary">Drafts: <strong className="text-primary">{typeStats.drafts}</strong></span>
                     </div>
                   </div>
                   

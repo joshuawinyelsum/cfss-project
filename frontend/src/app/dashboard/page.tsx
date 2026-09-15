@@ -97,15 +97,18 @@ export default function StudentDashboard() {
   if (!user) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-5xl mx-auto pb-8">
       
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Welcome, {user.full_name}</h1>
-        {loading && <RefreshCw className="w-5 h-5 text-gray-400 animate-spin" />}
+        <div>
+          <h1 className="text-2xl font-bold text-primary">Welcome, {user.full_name}</h1>
+          <p className="text-sm text-muted mt-1">Here is your fieldwork overview.</p>
+        </div>
+        {loading && <RefreshCw className="w-5 h-5 text-muted animate-spin" />}
       </div>
 
       {error ? (
-        <div className="bg-red-50 p-6 rounded-xl border border-red-100 flex flex-col items-center justify-center text-center">
+        <div className="bg-red-50 p-6 rounded-lg border border-red-100 flex flex-col items-center justify-center text-center">
           <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
           <h3 className="text-red-800 font-medium">Unable to load dashboard data</h3>
           <button 
@@ -117,103 +120,25 @@ export default function StudentDashboard() {
         </div>
       ) : (
         <>
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-            
-            {/* Total Surveys */}
-            <Link href="/surveys" className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-emerald-300 hover:shadow-md transition-all group">
-              <div className="flex flex-col sm:flex-row items-start gap-2 sm:gap-3 mb-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0 group-hover:bg-emerald-100 transition-colors">
-                  <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
-                </div>
-                <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-500 group-hover:text-gray-700 transition-colors">Total Surveys</p>
-                  <h3 className="text-sm sm:text-base font-bold text-gray-900 mt-0.5">{dashboardStats?.total_surveys || 0}</h3>
-                </div>
-              </div>
-            </Link>
-
-            {/* Drafts */}
-            <Link href="/dashboard/surveys/drafts" className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-emerald-300 hover:shadow-md transition-all group">
-              <div className="flex flex-col sm:flex-row items-start gap-2 sm:gap-3 mb-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-600 shrink-0 group-hover:bg-gray-100 transition-colors">
-                  <FileEdit className="w-4 h-4 sm:w-5 sm:h-5" />
-                </div>
-                <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-500 group-hover:text-gray-700 transition-colors">Drafts</p>
-                  <h3 className="text-sm sm:text-base font-bold text-gray-900 mt-0.5">{dashboardStats?.draft_surveys || 0}</h3>
-                </div>
-              </div>
-            </Link>
-
-            {/* Submitted */}
-            <Link href="/dashboard/surveys/submitted" className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-emerald-300 hover:shadow-md transition-all group">
-              <div className="flex flex-col sm:flex-row items-start gap-2 sm:gap-3 mb-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0 group-hover:bg-emerald-100 transition-colors">
-                  <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
-                </div>
-                <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-500 group-hover:text-gray-700 transition-colors">Submitted</p>
-                  <h3 className="text-sm sm:text-base font-bold text-gray-900 mt-0.5">{dashboardStats?.submitted_surveys || 0}</h3>
-                </div>
-              </div>
-            </Link>
-
-            {/* Pending Sync */}
-            <Link href="/dashboard/sync" className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-amber-300 hover:shadow-md transition-all group">
-              <div className="flex flex-col sm:flex-row items-start gap-2 sm:gap-3 mb-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 shrink-0 group-hover:bg-amber-100 transition-colors">
-                  <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
-                </div>
-                <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-500 group-hover:text-gray-700 transition-colors">Pending Sync</p>
-                  <h3 className="text-sm sm:text-base font-bold text-gray-900 mt-0.5">{dashboardStats?.pending_sync || 0}</h3>
-                </div>
-              </div>
-            </Link>
-
-            {/* Synced */}
-            <Link href="/dashboard/sync" className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-blue-300 hover:shadow-md transition-all group">
-              <div className="flex flex-col sm:flex-row items-start gap-2 sm:gap-3 mb-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 shrink-0 group-hover:bg-blue-100 transition-colors">
-                  <Cloud className="w-4 h-4 sm:w-5 sm:h-5" />
-                </div>
-                <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-500 group-hover:text-gray-700 transition-colors">Synced</p>
-                  <h3 className="text-sm sm:text-base font-bold text-gray-900 mt-0.5">{dashboardStats?.synced_surveys || 0}</h3>
-                </div>
-              </div>
-            </Link>
-
-          </div>
-
-          {/* Quick Actions */}
-          <section>
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Quick Actions</h2>
-            <div className="grid grid-cols-2 gap-3 md:gap-6">
-              
-              <Link href="/surveys/household" className="bg-white p-4 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center hover:border-emerald-200 transition-colors group">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-3 sm:mb-0 sm:mr-4 group-hover:bg-emerald-100 transition-colors shrink-0">
-                  <ClipboardList className="w-5 h-5 sm:w-6 sm:h-6" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-sm sm:text-base font-bold text-gray-900 leading-tight">Household Survey</h3>
-                  <p className="text-[10px] sm:text-sm text-gray-500 mt-1">Collect household info</p>
-                </div>
-                <ChevronRight className="hidden sm:block text-gray-400 group-hover:text-emerald-500 transition-colors ml-2" />
+          {/* Fieldwork Summary - Flat UI (Level 3) */}
+          <section className="bg-surface rounded-xl border border-border-strong overflow-hidden">
+            <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-border">
+              <Link href="/surveys" className="p-4 hover:bg-page transition-colors">
+                <p className="text-xs font-medium text-muted uppercase tracking-wider mb-1">Total</p>
+                <p className="text-2xl font-bold text-primary">{dashboardStats?.total_surveys || 0}</p>
               </Link>
-
-              <Link href="/surveys/health" className="bg-white p-4 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center hover:border-emerald-200 transition-colors group">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-3 sm:mb-0 sm:mr-4 group-hover:bg-emerald-100 transition-colors shrink-0">
-                  <Heart className="w-5 h-5 sm:w-6 sm:h-6" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-sm sm:text-base font-bold text-gray-900 leading-tight">Health Survey</h3>
-                  <p className="text-[10px] sm:text-sm text-gray-500 mt-1">Collect health data</p>
-                </div>
-                <ChevronRight className="hidden sm:block text-gray-400 group-hover:text-emerald-500 transition-colors ml-2" />
+              <Link href="/dashboard/surveys/drafts" className="p-4 hover:bg-page transition-colors">
+                <p className="text-xs font-medium text-muted uppercase tracking-wider mb-1">Drafts</p>
+                <p className="text-2xl font-bold text-[#093C22]">{dashboardStats?.draft_surveys || 0}</p>
               </Link>
-
+              <Link href="/dashboard/surveys/submitted" className="p-4 hover:bg-page transition-colors">
+                <p className="text-xs font-medium text-muted uppercase tracking-wider mb-1">Submitted</p>
+                <p className="text-2xl font-bold text-primary">{dashboardStats?.submitted_surveys || 0}</p>
+              </Link>
+              <Link href="/dashboard/sync" className="p-4 hover:bg-page transition-colors">
+                <p className="text-xs font-medium text-muted uppercase tracking-wider mb-1">Pending Sync</p>
+                <p className="text-2xl font-bold text-amber-600">{dashboardStats?.pending_sync || 0}</p>
+              </Link>
             </div>
           </section>
 
@@ -221,104 +146,81 @@ export default function StudentDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             {/* Recent Activity */}
-            <section className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col">
-              <div className="p-5 border-b border-gray-50 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-gray-900">Recent Activity</h2>
-                <Link href="/surveys" className="text-sm font-medium text-emerald-600 hover:text-emerald-700">
-                  View All
+            <section className="lg:col-span-2 bg-surface rounded-xl border border-border-strong flex flex-col overflow-hidden">
+              <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-page/50">
+                <h2 className="text-base font-bold text-primary">Recent Activity</h2>
+                <Link href="/dashboard/surveys/drafts" className="text-sm font-medium text-[#093C22] hover:underline">
+                  View Drafts
                 </Link>
               </div>
-              <div className="p-2 sm:p-5">
-                <div className="space-y-1">
-                  {dashboardStats?.recent_surveys?.length > 0 ? (
-                    dashboardStats.recent_surveys.map((survey: any) => (
-                      <Link 
-                        href={`/surveys/${survey.survey_type.toLowerCase()}/${survey.status === 'SUBMITTED' ? 'view' : 'fill'}/${survey.id}`}
-                        key={survey.id} 
-                        className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-lg transition-colors group cursor-pointer"
-                      >
-                        <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-600 shrink-0 group-hover:bg-white group-hover:shadow-sm transition-all">
-                          {survey.survey_type === 'HOUSEHOLD' ? <Home size={20} /> : 
-                           survey.survey_type === 'HEALTH' ? <Heart size={20} /> :
-                           survey.survey_type === 'EDUCATION' ? <Book size={20} /> :
-                           <ClipboardList size={20} />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-gray-900 truncate group-hover:text-emerald-700 transition-colors">
-                            {survey.survey_type} Survey #{survey.entity_id || survey.id.slice(0, 8)}
-                          </h4>
-                          <p className="text-sm text-gray-500 truncate mt-0.5">
-                            Status: {survey.status} {survey.sync_status === 'pending' ? '(Pending Sync)' : ''}
-                          </p>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-xs text-gray-500 mb-1 group-hover:text-gray-700 transition-colors">
-                            {survey.updated_at ? formatDistanceToNow(new Date(survey.updated_at), { addSuffix: true }) : 'Unknown'}
-                          </p>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                            survey.status === 'SUBMITTED' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+              <div className="divide-y divide-border">
+                {dashboardStats?.recent_surveys?.length > 0 ? (
+                  dashboardStats.recent_surveys.map((survey: any) => (
+                    <Link 
+                      href={`/surveys/${survey.survey_type.toLowerCase()}/${survey.status === 'SUBMITTED' ? 'view' : 'fill'}/${survey.id}`}
+                      key={survey.id} 
+                      className="flex items-center gap-4 p-4 hover:bg-page transition-colors group cursor-pointer"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-page flex items-center justify-center text-secondary shrink-0">
+                        {survey.survey_type === 'HOUSEHOLD' ? <Home size={20} /> : 
+                         survey.survey_type === 'HEALTH' ? <Heart size={20} /> :
+                         survey.survey_type === 'EDUCATION' ? <Book size={20} /> :
+                         <ClipboardList size={20} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-primary truncate">
+                          {survey.survey_type} Survey #{survey.entity_id || survey.id.slice(0, 8)}
+                        </h4>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase ${
+                            survey.status === 'SUBMITTED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
                           }`}>
                             {survey.status}
                           </span>
+                          <span className="text-xs text-muted">
+                            {survey.updated_at ? formatDistanceToNow(new Date(survey.updated_at), { addSuffix: true }) : ''}
+                          </span>
                         </div>
-                      </Link>
-                    ))
-                  ) : (
-                    <div className="py-8 text-center flex flex-col items-center">
-                      <p className="text-gray-500 mb-4">No surveys yet. Start your first survey.</p>
-                      <Link href="/surveys/household" className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium shadow-sm">
-                        Start Survey
-                      </Link>
-                    </div>
-                  )}
-                </div>
+                      </div>
+                      <ChevronRight size={18} className="text-gray-300 group-hover:text-muted transition-colors" />
+                    </Link>
+                  ))
+                ) : (
+                  <div className="p-8 text-center">
+                    <p className="text-sm text-muted">No recent activity.</p>
+                  </div>
+                )}
               </div>
             </section>
 
             {/* Community Overview */}
-            <section className="bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col">
-              <div className="p-5 border-b border-gray-50">
-                <h2 className="text-lg font-bold text-gray-900">Community Overview</h2>
+            <section className="bg-surface rounded-xl border border-border-strong flex flex-col overflow-hidden">
+              <div className="px-5 py-4 border-b border-border bg-page/50">
+                <h2 className="text-base font-bold text-primary">Community Context</h2>
               </div>
-              <div className="p-5 space-y-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
-                    <Users size={20} />
+              <div className="p-0 divide-y divide-border">
+                <div className="flex items-center justify-between p-4">
+                  <div className="flex items-center gap-3">
+                    <Users size={18} className="text-muted" />
+                    <span className="text-sm font-medium text-secondary">Households</span>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Total Households</p>
-                    <h3 className="font-bold text-gray-900 text-lg mt-0.5">{communityStats?.summary?.household?.total || 0}</h3>
-                  </div>
+                  <span className="font-bold text-primary">{communityStats?.summary?.household?.total || 0}</span>
                 </div>
 
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-600 shrink-0">
-                    <PlusSquare size={20} />
+                <div className="flex items-center justify-between p-4">
+                  <div className="flex items-center gap-3">
+                    <PlusSquare size={18} className="text-muted" />
+                    <span className="text-sm font-medium text-secondary">Health Facilities</span>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Health Facilities</p>
-                    <h3 className="font-bold text-gray-900 text-lg mt-0.5">{communityStats?.summary?.health?.hospitals || 0}</h3>
-                  </div>
+                  <span className="font-bold text-primary">{communityStats?.summary?.health?.hospitals || 0}</span>
                 </div>
 
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-600 shrink-0">
-                    <Book size={20} />
+                <div className="flex items-center justify-between p-4">
+                  <div className="flex items-center gap-3">
+                    <Droplet size={18} className="text-muted" />
+                    <span className="text-sm font-medium text-secondary">Water Points</span>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Schools</p>
-                    <h3 className="font-bold text-gray-900 text-lg mt-0.5">{communityStats?.summary?.education?.schools || 0}</h3>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-600 shrink-0">
-                    <Droplet size={20} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Water Sources</p>
-                    <h3 className="font-bold text-gray-900 text-lg mt-0.5">{communityStats?.summary?.governance?.water_access || 0}</h3>
-                  </div>
+                  <span className="font-bold text-primary">{communityStats?.summary?.water?.boreholes || 0}</span>
                 </div>
               </div>
             </section>
@@ -326,7 +228,6 @@ export default function StudentDashboard() {
           </div>
         </>
       )}
-
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import { db } from '@/lib/db';
 import { getEntityLabel } from '@/lib/entityLabel';
 import Link from 'next/link';
-import { Search, Filter, Loader2, ArrowRight } from 'lucide-react';
+import { Search, Filter, Loader2, ArrowRight, Cloud, RefreshCw } from 'lucide-react';
 
 export default function SubmittedSurveysPage() {
   const { user, token } = useAuthStore();
@@ -30,9 +30,9 @@ export default function SubmittedSurveysPage() {
       
       // Load local submitted
       const { db } = await import('@/lib/db');
-      const allLocal = await db.surveys.where('status').equals('SUBMITTED').toArray();
-      // Simple local filtering
-      let localSubmitted = allLocal.filter(d => d.student_id === user?.id);
+      const userSurveys = await db.surveys.where('student_id').equals(user?.id as number).toArray();
+      const allLocal = userSurveys.filter(s => s.status === 'SUBMITTED');
+      let localSubmitted = allLocal;
       if (search) localSubmitted = localSubmitted.filter(d => d.entity_id?.toLowerCase().includes(search.toLowerCase()));
       if (typeFilter) localSubmitted = localSubmitted.filter(d => d.survey_type.toLowerCase() === typeFilter.toLowerCase());
 
@@ -111,29 +111,29 @@ export default function SubmittedSurveysPage() {
       <div className="space-y-6 max-w-3xl mx-auto pb-12">
         
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Submitted Surveys</h1>
-          <p className="text-gray-500 mt-1">These surveys have been finalized for <strong className="text-gray-700">{user.community}</strong> and cannot be edited.</p>
+          <h1 className="text-2xl font-bold text-primary">Submitted Surveys</h1>
+          <p className="text-muted mt-1">These surveys have been finalized for <strong className="text-secondary">{user.community}</strong> and cannot be edited.</p>
         </div>
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4">
           <form onSubmit={handleSearch} className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
             <input 
               type="text"
               placeholder="Search house number..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm text-gray-900"
+              className="w-full pl-10 pr-4 py-2 border border-border-strong rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm text-primary"
             />
           </form>
           
           <div className="relative shrink-0 w-full sm:w-48">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
             <select
               value={typeFilter}
               onChange={handleTypeChange}
-              className="w-full pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm appearance-none bg-white text-gray-900"
+              className="w-full pl-10 pr-8 py-2 border border-border-strong rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm appearance-none bg-surface text-primary"
             >
               <option value="">All Types</option>
               <option value="HOUSEHOLD">Household</option>
@@ -144,46 +144,59 @@ export default function SubmittedSurveysPage() {
           </div>
         </div>
 
-        {/* List Layout */}
-        <div className="space-y-4">
+        {/* Flat List UI */}
+        <div className="bg-surface rounded-xl border border-border-strong overflow-hidden shadow-sm">
           {records.length === 0 && !loading ? (
-            <div className="py-12 text-center border-2 border-dashed border-gray-200 rounded-xl">
-              <p className="text-gray-500 font-medium">No submitted surveys.</p>
+            <div className="py-12 text-center bg-page">
+              <p className="text-muted mb-2">No submitted surveys found.</p>
             </div>
           ) : (
-            records.map(record => (
-              <div key={record.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col hover:border-emerald-200 transition-colors">
-                <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-                  <h3 className="font-bold text-gray-900 capitalize">{record.survey_type.toLowerCase()} Survey</h3>
-                  <span className="text-xs font-semibold px-2 py-1 bg-emerald-100 text-emerald-800 rounded">SUBMITTED</span>
-                </div>
-                
-                <div className="p-5 space-y-4">
-                  <div>
-                    <div className="text-sm text-gray-500 mb-1">{getEntityLabel(record.survey_type)}:</div>
-                    <div className="font-mono text-gray-900 font-medium bg-gray-50 inline-block px-2 py-1 rounded border border-gray-100">{record.entity_id}</div>
-                  </div>
-                  
-                  <div>
-                    <div className="text-sm text-gray-500 mb-1">Submitted:</div>
-                    <div className="text-sm font-medium text-gray-900">
-                      {new Date(record.submitted_at || record.updated_at).toLocaleDateString()}
+            <div className="divide-y divide-border">
+              {records.map(record => (
+                <Link 
+                  key={record.id}
+                  href={`/surveys/${record.survey_type.toLowerCase()}/view/${record.id}`}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 hover:bg-page transition-colors group cursor-pointer gap-4"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="font-bold text-primary capitalize text-base">{record.survey_type.toLowerCase()} Survey</h3>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded uppercase tracking-wide border border-emerald-100">Submitted</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-4 text-sm text-muted">
+                      <div>
+                        <span className="font-medium text-primary">{getEntityLabel(record.survey_type)}: </span>
+                        <span className="font-mono text-secondary">{record.entity_id}</span>
+                      </div>
+                      <span className="hidden sm:inline text-gray-300">•</span>
+                      <div className="hidden sm:block">
+                        Submitted: {new Date(record.updated_at).toLocaleDateString()}
+                      </div>
                     </div>
                   </div>
-                </div>
-                
-                <div className="p-4 bg-gray-50">
-                  <Link 
-                    href={`/surveys/${record.survey_type.toLowerCase()}/view/${record.id}`}
-                    className="w-full py-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center justify-center gap-2"
-                  >
-                    View Survey <ArrowRight size={16} />
-                  </Link>
-                </div>
-              </div>
-            ))
+                  
+                  <div className="shrink-0 flex flex-col sm:items-end gap-1">
+                    <div className="flex items-center gap-2">
+                      {record.sync_status === 'synced' ? (
+                         <span className="flex items-center gap-1 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                           <Cloud size={14} /> Synced
+                         </span>
+                      ) : (
+                         <span className="flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                           <RefreshCw size={14} /> Pending Sync
+                         </span>
+                      )}
+                    </div>
+                    <div className="text-sm font-medium text-muted group-hover:text-[#093C22] flex items-center gap-1">
+                      View <ArrowRight size={16} />
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
           )}
-          
+        </div>
           {loading && (
             <div className="flex justify-center py-6">
               <Loader2 className="animate-spin text-emerald-600" size={24} />
@@ -194,13 +207,11 @@ export default function SubmittedSurveysPage() {
             <button 
               onClick={() => loadSubmitted(false)}
               disabled={loading}
-              className="w-full py-3 bg-white border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition-colors mt-4"
+              className="w-full py-3 bg-surface border border-border-strong rounded-lg font-medium text-secondary hover:bg-page transition-colors mt-4"
             >
               Load More
             </button>
           )}
-        </div>
-
       </div>
     </>
   );

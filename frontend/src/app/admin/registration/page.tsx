@@ -3,10 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { ShieldCheck, ShieldAlert, Settings, Loader2, KeyRound } from 'lucide-react';
-import { useAuthStore } from '@/lib/store';
+import { useAdminAuthStore } from '@/lib/store';
 
 export default function RegistrationControlPage() {
-  const { token } = useAuthStore();
+  const { token } = useAdminAuthStore();
   
   // Actual verified state from the backend
   const [registrationEnabled, setRegistrationEnabled] = useState(false);
