@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import func
 from typing import List
 
 from app import schemas, models, auth
@@ -96,37 +97,31 @@ async def get_community_surveys(skip: int = 0, limit: int = 100, deps: tuple = D
 @router.get("/community/stats")
 async def get_community_stats(deps: tuple = Depends(get_db_and_student)):
     db, current_user = deps
-    result = await db.execute(
-        select(models.Survey)
-        .filter(models.Survey.community_id == current_user.community_id)
-    )
-    surveys = result.scalars().all()
     
-    # This generates report stats
+    # Query the modern SurveyRecord table instead of the deprecated Survey table
+    result = await db.execute(
+        select(models.SurveyRecord.survey_type, func.count(models.SurveyRecord.id))
+        .filter(
+            models.SurveyRecord.community_id == current_user.community_id,
+            models.SurveyRecord.created_by_student_id == current_user.id,
+            models.SurveyRecord.status == "SUBMITTED"
+        )
+        .group_by(models.SurveyRecord.survey_type)
+    )
+    counts = dict(result.all())
+    
+    # Map to the frontend's expected structure
     stats = {
-        "household": {"total": 0, "population": 0},
-        "education": {"total": 0, "schools": 0},
-        "health": {"total": 0, "hospitals": 0},
-        "governance": {"total": 0, "water_access": 0}
+        "household": {"total": counts.get("HOUSEHOLD", 0), "population": 0},
+        "education": {"total": counts.get("EDUCATION", 0), "schools": counts.get("EDUCATION", 0)},
+        "health": {"total": counts.get("HEALTH", 0), "hospitals": counts.get("HEALTH", 0)},
+        "governance": {"total": counts.get("GOVERNANCE", 0), "water_access": counts.get("GOVERNANCE", 0)}
     }
     
-    for s in surveys:
-        if s.type == "Household":
-            stats["household"]["total"] += 1
-            stats["household"]["population"] += s.data.get("population_total", 0)
-        elif s.type == "Education":
-            stats["education"]["total"] += 1
-            stats["education"]["schools"] += s.data.get("number_of_schools", 0)
-        elif s.type == "Health":
-            stats["health"]["total"] += 1
-            stats["health"]["hospitals"] += s.data.get("hospitals", 0)
-        elif s.type == "Governance":
-            stats["governance"]["total"] += 1
-            if s.data.get("water_access"):
-                stats["governance"]["water_access"] += 1
+    total_surveys = sum(counts.values())
                 
     return {
         "community_id": current_user.community_id,
-        "total_surveys": len(surveys),
+        "total_surveys": total_surveys,
         "summary": stats
     }

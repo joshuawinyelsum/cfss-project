@@ -115,24 +115,44 @@ export default function DashboardLayout({
   const [draftCount, setDraftCount] = useState(0);
   
   useEffect(() => {
-    if (!user) return;
+    if (!user || !token) return;
     const fetchCount = async () => {
       try {
-        const { db } = await import('@/lib/db');
-        const drafts = await db.surveys.where('status').equals('DRAFT').toArray();
-        setDraftCount(drafts.filter(d => d.student_id === user.id).length);
+        let count = 0;
+        // First try to get real count from server if online
+        if (navigator.onLine) {
+           const { api } = await import('@/lib/api');
+           const res = await api.get('/api/student/surveys/dashboard/stats', {
+              headers: { Authorization: `Bearer ${token}` }
+           }).catch(() => null);
+           if (res?.data) {
+              count = res.data.draft_surveys || 0;
+           }
+        }
+        
+        // If offline, fallback to Dexie local count
+        if (!navigator.onLine) {
+           const { db } = await import('@/lib/db');
+           const drafts = await db.surveys.where('status').equals('DRAFT').toArray();
+           count = drafts.filter(d => d.student_id === user.id).length;
+        }
+
+        setDraftCount(count);
       } catch (e) {
         // Ignored
       }
     };
     fetchCount();
+    
+    const interval = setInterval(fetchCount, 30000); // refresh every 30s
     window.addEventListener('sync-queued', fetchCount);
     window.addEventListener('sync-completed', fetchCount);
     return () => {
+      clearInterval(interval);
       window.removeEventListener('sync-queued', fetchCount);
       window.removeEventListener('sync-completed', fetchCount);
     };
-  }, [user]);
+  }, [user, token]);
 
   const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
@@ -258,7 +278,7 @@ export default function DashboardLayout({
           <div className="flex items-center gap-4 lg:gap-6 ml-auto">
             <button className="relative text-gray-500 hover:text-gray-700">
               <Bell size={20} />
-              <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+              {/* Notification badge removed because no backend notification system exists yet */}
             </button>
             
             <div className="flex items-center gap-3">

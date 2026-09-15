@@ -121,69 +121,69 @@ export default function StudentDashboard() {
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
             
             {/* Total Surveys */}
-            <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-emerald-200 transition-colors">
+            <Link href="/surveys" className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-emerald-300 hover:shadow-md transition-all group">
               <div className="flex flex-col sm:flex-row items-start gap-2 sm:gap-3 mb-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0 group-hover:bg-emerald-100 transition-colors">
                   <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-500">Total Surveys</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500 group-hover:text-gray-700 transition-colors">Total Surveys</p>
                   <h3 className="text-sm sm:text-base font-bold text-gray-900 mt-0.5">{dashboardStats?.total_surveys || 0}</h3>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* Drafts */}
-            <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-emerald-200 transition-colors">
+            <Link href="/dashboard/surveys/drafts" className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-emerald-300 hover:shadow-md transition-all group">
               <div className="flex flex-col sm:flex-row items-start gap-2 sm:gap-3 mb-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-600 shrink-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-600 shrink-0 group-hover:bg-gray-100 transition-colors">
                   <FileEdit className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-500">Drafts</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500 group-hover:text-gray-700 transition-colors">Drafts</p>
                   <h3 className="text-sm sm:text-base font-bold text-gray-900 mt-0.5">{dashboardStats?.draft_surveys || 0}</h3>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* Submitted */}
-            <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-emerald-200 transition-colors">
+            <Link href="/dashboard/surveys/submitted" className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-emerald-300 hover:shadow-md transition-all group">
               <div className="flex flex-col sm:flex-row items-start gap-2 sm:gap-3 mb-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0 group-hover:bg-emerald-100 transition-colors">
                   <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-500">Submitted</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500 group-hover:text-gray-700 transition-colors">Submitted</p>
                   <h3 className="text-sm sm:text-base font-bold text-gray-900 mt-0.5">{dashboardStats?.submitted_surveys || 0}</h3>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* Pending Sync */}
-            <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-emerald-200 transition-colors">
+            <Link href="/dashboard/sync" className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-amber-300 hover:shadow-md transition-all group">
               <div className="flex flex-col sm:flex-row items-start gap-2 sm:gap-3 mb-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 shrink-0 group-hover:bg-amber-100 transition-colors">
                   <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-500">Pending Sync</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500 group-hover:text-gray-700 transition-colors">Pending Sync</p>
                   <h3 className="text-sm sm:text-base font-bold text-gray-900 mt-0.5">{dashboardStats?.pending_sync || 0}</h3>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* Synced */}
-            <div className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-emerald-200 transition-colors">
+            <Link href="/dashboard/sync" className="bg-white p-3 sm:p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col hover:border-blue-300 hover:shadow-md transition-all group">
               <div className="flex flex-col sm:flex-row items-start gap-2 sm:gap-3 mb-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 shrink-0 group-hover:bg-blue-100 transition-colors">
                   <Cloud className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-500">Synced</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500 group-hover:text-gray-700 transition-colors">Synced</p>
                   <h3 className="text-sm sm:text-base font-bold text-gray-900 mt-0.5">{dashboardStats?.synced_surveys || 0}</h3>
                 </div>
               </div>
-            </div>
+            </Link>
 
           </div>
 
@@ -232,30 +232,36 @@ export default function StudentDashboard() {
                 <div className="space-y-1">
                   {dashboardStats?.recent_surveys?.length > 0 ? (
                     dashboardStats.recent_surveys.map((survey: any) => (
-                      <div key={survey.id} className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-                        <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-600 shrink-0">
+                      <Link 
+                        href={`/surveys/${survey.survey_type.toLowerCase()}/${survey.status === 'SUBMITTED' ? 'view' : 'fill'}/${survey.id}`}
+                        key={survey.id} 
+                        className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-lg transition-colors group cursor-pointer"
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-600 shrink-0 group-hover:bg-white group-hover:shadow-sm transition-all">
                           {survey.survey_type === 'HOUSEHOLD' ? <Home size={20} /> : 
                            survey.survey_type === 'HEALTH' ? <Heart size={20} /> :
                            survey.survey_type === 'EDUCATION' ? <Book size={20} /> :
                            <ClipboardList size={20} />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-gray-900 truncate">{survey.survey_type} Survey #{survey.entity_id || survey.id.slice(0, 8)}</h4>
+                          <h4 className="font-semibold text-gray-900 truncate group-hover:text-emerald-700 transition-colors">
+                            {survey.survey_type} Survey #{survey.entity_id || survey.id.slice(0, 8)}
+                          </h4>
                           <p className="text-sm text-gray-500 truncate mt-0.5">
                             Status: {survey.status} {survey.sync_status === 'pending' ? '(Pending Sync)' : ''}
                           </p>
                         </div>
                         <div className="text-right flex-shrink-0">
-                          <p className="text-xs text-gray-500 mb-1">
+                          <p className="text-xs text-gray-500 mb-1 group-hover:text-gray-700 transition-colors">
                             {survey.updated_at ? formatDistanceToNow(new Date(survey.updated_at), { addSuffix: true }) : 'Unknown'}
                           </p>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                            survey.status === 'SUBMITTED' ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-600'
+                            survey.status === 'SUBMITTED' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
                           }`}>
                             {survey.status}
                           </span>
                         </div>
-                      </div>
+                      </Link>
                     ))
                   ) : (
                     <div className="py-8 text-center flex flex-col items-center">
