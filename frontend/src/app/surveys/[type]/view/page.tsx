@@ -62,7 +62,7 @@ function ViewSurveyContent() {
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex justify-center p-12 text-gray-500">Loading survey details...</div>
+        <div className="flex justify-center p-12 text-muted">Loading survey details...</div>
       </DashboardLayout>
     );
   }
@@ -83,11 +83,11 @@ function ViewSurveyContent() {
         
         {/* Header Navigation */}
         <div className="flex items-center gap-4">
-          <Link href="/dashboard/surveys/submitted" className="p-2 rounded-lg bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors shrink-0">
+          <Link href="/dashboard/surveys/submitted" className="p-2 rounded-lg bg-surface border border-border-strong text-muted hover:bg-page hover:text-primary transition-colors shrink-0">
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 capitalize">View Survey</h1>
+            <h1 className="text-2xl font-bold text-primary capitalize">View Survey</h1>
           </div>
           
           <div className="ml-auto bg-emerald-50 text-emerald-700 px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-2 border border-emerald-100">
@@ -96,23 +96,23 @@ function ViewSurveyContent() {
         </div>
 
         {/* Survey Metadata */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden p-6">
+        <div className="bg-surface rounded-xl shadow-sm border border-border-strong overflow-hidden p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
             <div>
-              <p className="text-sm text-gray-500 mb-1">Survey Type</p>
-              <p className="font-bold text-gray-900 capitalize">{record.survey_type.toLowerCase()} Survey</p>
+              <p className="text-sm text-muted mb-1">Survey Type</p>
+              <p className="font-bold text-primary capitalize">{record.survey_type.toLowerCase()} Survey</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">House Number</p>
-              <p className="font-mono font-bold text-gray-900 bg-gray-50 inline-block px-2 py-0.5 rounded border border-gray-100">{record.entity_id}</p>
+              <p className="text-sm text-muted mb-1">House Number</p>
+              <p className="font-mono font-bold text-primary bg-page inline-block px-2 py-0.5 rounded border border-border">{record.entity_id}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">Community</p>
-              <p className="font-bold text-gray-900">{user?.community}</p>
+              <p className="text-sm text-muted mb-1">Community</p>
+              <p className="font-bold text-primary">{user?.community}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">Submission Date</p>
-              <p className="font-bold text-gray-900">
+              <p className="text-sm text-muted mb-1">Submission Date</p>
+              <p className="font-bold text-primary">
                 {new Date(record.updated_at).toLocaleDateString()}
               </p>
             </div>
@@ -120,22 +120,22 @@ function ViewSurveyContent() {
         </div>
 
         {/* Responses */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="bg-gray-50 border-b border-gray-100 p-5">
-            <h2 className="text-lg font-bold text-gray-900">Responses</h2>
+        <div className="bg-surface rounded-xl shadow-sm border border-border-strong overflow-hidden">
+          <div className="bg-page border-b border-border p-5">
+            <h2 className="text-lg font-bold text-primary">Responses</h2>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-border">
             {questions.map((q, index) => {
               const answer = answers[q.id];
               return (
-                <div key={q.id} className="p-5 hover:bg-gray-50/50 transition-colors">
-                  <p className="text-sm font-medium text-gray-500 mb-2">{q.section}</p>
-                  <p className="font-medium text-gray-900 mb-2">{index + 1}. {q.question_text}</p>
-                  <div className="bg-gray-50 border border-gray-100 rounded-lg p-3 text-gray-800">
+                <div key={q.id} className="p-5 hover:bg-page/50 transition-colors">
+                  <p className="text-sm font-medium text-muted mb-2">{q.section}</p>
+                  <p className="font-medium text-primary mb-2">{index + 1}. {q.question_text}</p>
+                  <div className="bg-page border border-border rounded-lg p-3 text-primary">
                     {answer !== undefined && answer !== null && answer !== '' ? (
                       <span className="font-medium">{String(answer)}</span>
                     ) : (
-                      <span className="text-gray-400 italic">No answer provided</span>
+                      <span className="text-muted italic">No answer provided</span>
                     )}
                   </div>
                 </div>
@@ -151,7 +151,7 @@ function ViewSurveyContent() {
 
 export default function ViewSurveyPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-gray-500">Loading survey...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-muted">Loading survey...</div>}>
       <ViewSurveyContent />
     </Suspense>
   );

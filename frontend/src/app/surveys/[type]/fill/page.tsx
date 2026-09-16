@@ -223,7 +223,7 @@ function QuestionnaireContent() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 max-w-4xl mx-auto pb-24">
+      <div className="space-y-6 max-w-4xl mx-auto pb-8">
         
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
@@ -383,33 +383,30 @@ function QuestionnaireContent() {
           </div>
         </div>
 
-      </div>
-
-      {/* Action Bar (Fixed to bottom) */}
-      {!isReadonly && (
-        <div className="fixed bottom-0 left-0 lg:left-64 right-0 bg-white border-t border-gray-200 p-4 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-          <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+        {/* Action Bar (Normal Flow Footer) */}
+        {!isReadonly && (
+          <div className="bg-surface border border-border-strong p-4 sm:p-6 rounded-xl shadow-sm mt-8 flex flex-col-reverse sm:flex-row items-center justify-between gap-4">
             <button 
               onClick={() => saveAnswers(false)}
               disabled={saving || submitting}
-              className="px-6 py-3 bg-white border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-70 flex-1 sm:flex-none"
+              className="w-full sm:w-auto px-6 py-3 bg-page border border-border-strong text-primary font-medium rounded-xl hover:bg-border/50 transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
             >
-              {saving ? <div className="w-5 h-5 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div> : <Save size={18} />}
-              <span className="hidden sm:inline">Save Draft</span>
-              <span className="sm:hidden">Save</span>
+              {saving ? <div className="w-5 h-5 border-2 border-muted border-t-transparent rounded-full animate-spin"></div> : <Save size={18} />}
+              <span>Save Draft</span>
             </button>
             
             <button 
               onClick={() => saveAnswers(true)}
               disabled={saving || submitting}
-              className="px-6 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-70 flex-1 sm:flex-none"
+              className="w-full sm:w-auto px-6 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-70 shadow-sm"
             >
               {submitting ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <CheckCircle size={18} />}
               Submit Survey
             </button>
           </div>
-        </div>
-      )}
+        )}
+
+      </div>
     </DashboardLayout>
   );
 }
