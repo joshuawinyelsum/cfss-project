@@ -157,7 +157,7 @@ export default function StudentDashboard() {
                 {dashboardStats?.recent_surveys?.length > 0 ? (
                   dashboardStats.recent_surveys.map((survey: any) => (
                     <Link 
-                      href={`/surveys/${survey.survey_type.toLowerCase()}/${survey.status === 'SUBMITTED' ? 'view' : 'fill'}/${survey.id}`}
+                      href={`/surveys/${survey.survey_type.toLowerCase()}/${survey.status === 'SUBMITTED' ? 'view' : 'fill'}?id=${survey.id}`}
                       key={survey.id} 
                       className="flex items-center gap-4 p-4 hover:bg-page transition-colors group cursor-pointer"
                     >

@@ -6,11 +6,25 @@ const withSerwist = withSerwistInit({
   swDest: "public/sw.js",
   disable: process.env.NODE_ENV === "development",
   additionalPrecacheEntries: [
-    { url: "/dashboard", revision: "offline-spa-1" },
-    { url: "/~offline", revision: "offline-spa-1" },
-    { url: "/", revision: "offline-spa-1" }
+    "/dashboard",
+    "/dashboard/work",
+    "/dashboard/surveys/drafts",
+    "/dashboard/surveys/submitted",
+    "/dashboard/sync",
+    "/dashboard/more",
+    "/surveys",
+    "/surveys/household",
+    "/surveys/education",
+    "/surveys/health",
+    "/surveys/governance",
+    "/surveys/household/fill",
+    "/surveys/education/fill",
+    "/surveys/health/fill",
+    "/surveys/governance/fill",
+    "/~offline",
+    "/profile",
+    "/settings"
   ],
-  
 });
 
 const nextConfig: NextConfig = {

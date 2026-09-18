@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import Link from '@/components/SpaLink';
-import { useAuthStore, useDashboardStore } from '@/lib/store';
+import Link from 'next/link';
+import { useAuthStore } from '@/lib/store';
 import { formatDistanceToNow } from 'date-fns';
 
 
@@ -106,7 +106,6 @@ export default function DashboardLayout({
   const { user, token, logout } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
-  const activeTab = useDashboardStore((state: any) => state.activeTab);
   
   const [syncStatus, setSyncStatus] = useState('Online');
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
@@ -292,10 +291,10 @@ export default function DashboardLayout({
 
 
   return (
-    <div className="flex h-screen bg-page overflow-hidden font-sans">
+    <div className="flex h-[100dvh] bg-page overflow-hidden font-sans">
       
       {/* Desktop Sidebar */}
-      {activeTab !== "fill" && activeTab !== "view" && (
+      {!pathname.includes("/fill") && !pathname.includes("/view") && (
 <aside className="hidden lg:flex flex-col w-64 bg-[#093C22] shrink-0 z-10">
         <div className="p-6 flex items-center gap-3 border-b border-[#0c512e]">
           <div className="w-10 h-10 bg-surface rounded-lg flex items-center justify-center shrink-0">
@@ -310,18 +309,7 @@ export default function DashboardLayout({
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
           <div className="text-xs font-semibold text-emerald-100/50 mb-2 px-3 uppercase tracking-wider">Fieldwork</div>
           {primaryNavItems.map((item) => {
-            const tabMap: Record<string, string> = {
-                '/dashboard': 'home',
-                '/dashboard/work': 'work',
-                '/surveys': 'collect',
-                '/dashboard/surveys/submitted': 'submitted',
-                '/dashboard/sync': 'sync',
-                '/dashboard/more': 'more',
-                '/dashboard/group': 'group',
-                '/profile': 'profile',
-                '/settings': 'settings'
-              };
-              const isActive = tabMap[item.href] === activeTab;
+            const isActive = pathname === item.href || (pathname.startsWith(item.href + '/') && item.href !== '/dashboard');
             return (
               <Link
                 key={item.name}
@@ -345,18 +333,7 @@ export default function DashboardLayout({
 
           <div className="text-xs font-semibold text-emerald-100/50 mt-8 mb-2 px-3 uppercase tracking-wider">Account & System</div>
           {secondaryNavItems.map((item) => {
-            const tabMap: Record<string, string> = {
-                '/dashboard': 'home',
-                '/dashboard/work': 'work',
-                '/surveys': 'collect',
-                '/dashboard/surveys/submitted': 'submitted',
-                '/dashboard/sync': 'sync',
-                '/dashboard/more': 'more',
-                '/dashboard/group': 'group',
-                '/profile': 'profile',
-                '/settings': 'settings'
-              };
-              const isActive = tabMap[item.href] === activeTab;
+            const isActive = pathname === item.href || (pathname.startsWith(item.href + '/') && item.href !== '/dashboard');
             return (
               <Link
                 key={item.name}
@@ -438,21 +415,10 @@ export default function DashboardLayout({
         </main>
 
         {/* Mobile Bottom Navigation */}
-        {activeTab !== "fill" && activeTab !== "view" && (
+        {!pathname.includes("/fill") && !pathname.includes("/view") && (
 <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-border-strong flex items-center justify-around h-[calc(4rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] z-50">
           {mobileNavItems.map((item) => {
-            const tabMap: Record<string, string> = {
-                '/dashboard': 'home',
-                '/dashboard/work': 'work',
-                '/surveys': 'collect',
-                '/dashboard/surveys/submitted': 'submitted',
-                '/dashboard/sync': 'sync',
-                '/dashboard/more': 'more',
-                '/dashboard/group': 'group',
-                '/profile': 'profile',
-                '/settings': 'settings'
-              };
-              const isActive = tabMap[item.href] === activeTab;
+            const isActive = pathname === item.href || (pathname.startsWith(item.href + '/') && item.href !== '/dashboard');
             
             if (item.prominent) {
                return (
