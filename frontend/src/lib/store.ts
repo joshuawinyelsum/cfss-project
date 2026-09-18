@@ -107,3 +107,22 @@ export const useAdminAuthStore = create<AuthState>()(
     }
   )
 );
+
+
+export type DashboardTab = 'home' | 'work' | 'collect' | 'submitted' | 'sync' | 'more' | 'profile' | 'settings' | 'group' | 'fill' | 'view';
+
+interface DashboardState {
+  activeTab: DashboardTab;
+  setActiveTab: (tab: DashboardTab) => void;
+  activeSurveyType: string | null;
+  activeSurveyId: string | null;
+  startSurvey: (type: string, id?: string) => void;
+}
+
+export const useDashboardStore = create<DashboardState>()((set) => ({
+  activeTab: 'home',
+  setActiveTab: (tab) => set({ activeTab: tab }),
+  activeSurveyType: null,
+  activeSurveyId: null,
+  startSurvey: (type, id = undefined) => set({ activeTab: 'fill', activeSurveyType: type, activeSurveyId: id })
+}));

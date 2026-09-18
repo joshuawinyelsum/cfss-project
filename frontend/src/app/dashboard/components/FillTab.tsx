@@ -1,0 +1,418 @@
+"use client";
+
+import { useEffect, useState, useMemo } from 'react';
+import { useAuthStore } from '@/lib/store';
+import { useDashboardStore } from '@/lib/store';
+import { Suspense } from 'react';
+import { api } from '@/lib/api';
+import DashboardLayout from '@/app/dashboard/layout';
+import Link from '@/components/SpaLink';
+import { ArrowLeft, Save, CheckCircle, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+
+import { syncEngine } from '@/lib/sync';
+
+function QuestionnaireContent() {
+  const { user, token } = useAuthStore();
+  const { activeSurveyType: typeStr, activeSurveyId: recordId, setActiveTab } = useDashboardStore();
+    const safeType = typeStr as string;
+    const safeRecordId = recordId as string;
+  
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  
+  const [record, setRecord] = useState<any>(null);
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [answers, setAnswers] = useState<Record<string, any>>({});
+  
+  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
+
+  useEffect(() => {
+    if (!token || !user) return;
+    
+    const loadData = async () => {
+      try {
+        let recordData = null;
+        let questionsData = [];
+        let answersData = [];
+
+        if (recordId === 'new') {
+          // Start a new survey draft locally
+          try {
+            const qRes = await api.get('/api/student/surveys/questions', { params: { type: safeType }, headers: { Authorization: `Bearer ${token}` } });
+            questionsData = qRes.data;
+            // Cache definition offline
+            const { db } = await import('@/lib/db');
+            await db.definitions.put({ type: safeType, questions: questionsData, updated_at: new Date().toISOString() });
+          } catch (e) {
+            // Offline fallback
+            const { db } = await import('@/lib/db');
+            const cachedDef = await db.definitions.get(safeType);
+            if (cachedDef) {
+              questionsData = cachedDef.questions;
+            } else {
+              throw new Error("No internet and survey definition not cached.");
+            }
+          }
+          
+          recordData = {
+            id: crypto.randomUUID(), // New UUID for offline sync mapping
+            survey_type: safeType.toUpperCase(),
+            community_id: user.community_id,
+            entity_id: null,
+            status: 'DRAFT',
+            sync_status: 'pending',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+        } else {
+          // Check IndexedDB first
+          const { db } = await import('@/lib/db');
+          const localRecord = await db.surveys.get(safeRecordId);
+          if (localRecord) {
+            if (localRecord.student_id !== user.id) {
+              throw new Error("You do not have permission to view this survey.");
+            }
+            recordData = localRecord;
+            try {
+              const qRes = await api.get('/api/student/surveys/questions', { params: { type: safeType }, headers: { Authorization: `Bearer ${token}` } });
+              questionsData = qRes.data;
+              await db.definitions.put({ type: safeType, questions: questionsData, updated_at: new Date().toISOString() });
+            } catch (e) {
+              const cachedDef = await db.definitions.get(safeType);
+              if (cachedDef) {
+                questionsData = cachedDef.questions;
+              } else {
+                throw new Error("No internet and survey definition not cached.");
+              }
+            }
+            answersData = localRecord.answers || [];
+          } else {
+            // Fallback to server if not found locally
+            const res = await api.get(`/api/student/surveys/record/${safeRecordId}`, { headers: { Authorization: `Bearer ${token}` } });
+            recordData = res.data.record;
+            questionsData = res.data.questions;
+            answersData = res.data.answers || [];
+            
+            // Cache definitions
+            const { db } = await import('@/lib/db');
+            await db.definitions.put({ type: safeType, questions: questionsData, updated_at: new Date().toISOString() });
+          }
+        }
+
+        setRecord(recordData);
+        setQuestions(questionsData);
+        
+        // Map answers
+        const ansMap: Record<string, any> = {};
+        answersData.forEach((a: any) => {
+          ansMap[a.question_id] = a.answer;
+        });
+        setAnswers(ansMap);
+      } catch (e: any) {
+        setError(e.response?.data?.detail || "Failed to load survey. Please check your connection.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
+  }, [token, user, recordId, typeStr]);
+
+  const sections = useMemo(() => {
+    const secs: string[] = [];
+    questions.forEach(q => {
+      if (!secs.includes(q.section)) secs.push(q.section);
+    });
+    return secs;
+  }, [questions]);
+  
+  const currentSection = sections[currentSectionIndex];
+  const sectionQuestions = questions.filter(q => q.section === currentSection);
+  
+  // Progress calculation
+  const progress = useMemo(() => {
+    if (questions.length === 0) return 0;
+    const answeredCount = questions.filter(q => {
+      const val = answers[q.id];
+      return val !== undefined && val !== null && val !== '';
+    }).length;
+    return Math.round((answeredCount / questions.length) * 100);
+  }, [questions, answers]);
+  
+  const handleAnswerChange = (questionId: string, value: any) => {
+    if (record?.status === 'SUBMITTED') return;
+    setAnswers(prev => ({ ...prev, [questionId]: value }));
+  };
+
+  const saveAnswers = async (isSubmit: boolean) => {
+    if (record?.status === 'SUBMITTED' || !user || !record) return;
+    setError('');
+
+    if (!token) {
+      setError("Your session has expired. Please log in again.");
+      return;
+    }
+
+    if (user.community_id == null) {
+      setError("You have no assigned community, so surveys cannot be saved.");
+      return;
+    }
+
+    const formattedAnswers = Object.keys(answers).map(qid => ({
+      question_id: qid,
+      answer: answers[qid]
+    }));
+    
+    try {
+      if (isSubmit) {
+        setSubmitting(true);
+      } else {
+        setSaving(true);
+      }
+
+      await syncEngine.queueSurvey({
+        id: record.id,
+        survey_type: record.survey_type,
+        community_id: user.community_id,
+        student_id: user.id as number,
+        entity_id: record.entity_id,
+        answers: formattedAnswers,
+        status: isSubmit ? 'SUBMITTED' : 'DRAFT',
+        sync_status: 'pending',
+        created_at: record.created_at,
+        updated_at: new Date().toISOString(),
+        submitted_at: isSubmit ? new Date().toISOString() : undefined
+      }, token);
+
+      if (isSubmit) {
+        setActiveTab('submitted');
+      } else {
+        setActiveTab('work');
+      }
+    } catch (e: any) {
+      setError(e.message || "An error occurred while saving locally.");
+      setSaving(false);
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex justify-center p-12 text-gray-500">Loading questionnaire...</div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error && !record) {
+    return (
+      <DashboardLayout>
+        <div className="bg-red-50 text-red-600 p-6 rounded-xl border border-red-100 max-w-3xl mx-auto flex items-center gap-3">
+          <AlertCircle />
+          <div className="font-medium">{error}</div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const isReadonly = record?.status === 'SUBMITTED';
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6 max-w-4xl mx-auto pb-8">
+        
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+          <div className="flex items-center gap-4">
+            <Link href={`/surveys/${safeType}`} className="p-2 rounded-lg bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors shrink-0">
+              <ArrowLeft size={20} />
+            </Link>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <h1 className="text-xl font-bold text-gray-900 capitalize">{safeType.toLowerCase()} {record?.entity_id ? record.entity_id : 'Draft'}</h1>
+                {record?.sync_status === 'pending' && (
+                  <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200">Pending Sync</span>
+                )}
+                {record?.status === 'DRAFT' && record?.sync_status === 'synced' && (
+                  <span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded border border-emerald-200">Saved ✓</span>
+                )}
+              </div>
+              <p className="text-sm font-medium text-gray-500">
+                Section {currentSectionIndex + 1} of {sections.length}: <strong className="text-gray-700">{sections[currentSectionIndex]}</strong>
+              </p>
+            </div>
+          </div>
+          
+          {isReadonly && (
+            <div className="sm:ml-auto bg-emerald-50 text-emerald-600 px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-2 border border-emerald-200 self-start sm:self-auto">
+              <CheckCircle size={16} /> Read Only
+            </div>
+          )}
+        </div>
+        
+        {error && (
+          <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 text-sm font-medium flex items-center gap-2">
+            <AlertCircle size={18} />
+            {error}
+          </div>
+        )}
+
+        {/* Progress Bar */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+          <div className="flex justify-between text-sm font-medium mb-2">
+            <span className="text-gray-500">Overall Progress</span>
+            <span className={progress === 100 ? 'text-emerald-600' : 'text-gray-900'}>{progress}%</span>
+          </div>
+          <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+            <div className="bg-emerald-600 h-2.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+          </div>
+        </div>
+
+        {/* Sections Tabs */}
+        <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide">
+          {sections.map((sec, idx) => (
+            <button
+              key={sec}
+              onClick={() => setCurrentSectionIndex(idx)}
+              className={`px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors border ${
+                idx === currentSectionIndex 
+                  ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              {sec}
+            </button>
+          ))}
+        </div>
+
+        {/* Questions Area */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-gray-50 border-b border-gray-200 p-5">
+            <h2 className="text-lg font-bold text-gray-900">Section {currentSectionIndex + 1}: {currentSection}</h2>
+          </div>
+          
+          <div className="p-6 space-y-8">
+            {sectionQuestions.map((q, index) => (
+              <div key={q.id} className="space-y-3">
+                <label className="block text-gray-900 font-medium">
+                  {index + 1}. {q.question_text}
+                  {q.required && <span className="text-red-500 ml-1">*</span>}
+                </label>
+                
+                {q.question_type === 'text' && (
+                  <input 
+                    type="text" 
+                    disabled={isReadonly}
+                    value={answers[q.id] || ''}
+                    onChange={(e) => handleAnswerChange(q.id, e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg p-3 text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-gray-50 disabled:text-gray-500"
+                    placeholder="Enter answer..."
+                  />
+                )}
+                
+                {q.question_type === 'number' && (
+                  <input 
+                    type="number" 
+                    disabled={isReadonly}
+                    value={answers[q.id] || ''}
+                    onChange={(e) => handleAnswerChange(q.id, e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg p-3 text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-gray-50 disabled:text-gray-500 max-w-xs"
+                    placeholder="0"
+                  />
+                )}
+                
+                {q.question_type === 'radio' && q.options && (
+                  <div className="space-y-2">
+                    {(q.options as string[]).map(opt => (
+                      <label key={opt} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          disabled={isReadonly}
+                          name={`q_${q.id}`} 
+                          value={opt}
+                          checked={answers[q.id] === opt}
+                          onChange={() => handleAnswerChange(q.id, opt)}
+                          className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300"
+                        />
+                        <span className="text-gray-700">{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                
+                {q.question_type === 'select' && q.options && (
+                  <select 
+                    disabled={isReadonly}
+                    value={answers[q.id] || ''}
+                    onChange={(e) => handleAnswerChange(q.id, e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg p-3 text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-gray-50 disabled:text-gray-500"
+                  >
+                    <option value="" disabled>Select an option...</option>
+                    {(q.options as string[]).map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                )}
+                
+                {/* Checkbox and Date can be added similarly if needed */}
+              </div>
+            ))}
+          </div>
+          
+          {/* Bottom Navigation */}
+          <div className="border-t border-gray-200 p-5 bg-gray-50 flex items-center justify-between">
+            <button 
+              onClick={() => setCurrentSectionIndex(prev => Math.max(0, prev - 1))}
+              disabled={currentSectionIndex === 0}
+              className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <ChevronLeft size={18} /> Previous
+            </button>
+            
+            <button 
+              onClick={() => setCurrentSectionIndex(prev => Math.min(sections.length - 1, prev + 1))}
+              disabled={currentSectionIndex === sections.length - 1}
+              className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              Next <ChevronRight size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Action Bar (Normal Flow Footer) */}
+        {!isReadonly && (
+          <div className="bg-surface border border-border-strong p-4 sm:p-6 rounded-xl shadow-sm mt-8 flex flex-col-reverse sm:flex-row items-center justify-between gap-4">
+            <button 
+              onClick={() => saveAnswers(false)}
+              disabled={saving || submitting}
+              className="w-full sm:w-auto px-6 py-3 bg-page border border-border-strong text-primary font-medium rounded-xl hover:bg-border/50 transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
+            >
+              {saving ? <div className="w-5 h-5 border-2 border-muted border-t-transparent rounded-full animate-spin"></div> : <Save size={18} />}
+              <span>Save Draft</span>
+            </button>
+            
+            <button 
+              onClick={() => saveAnswers(true)}
+              disabled={saving || submitting}
+              className="w-full sm:w-auto px-6 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-70 shadow-sm"
+            >
+              {submitting ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <CheckCircle size={18} />}
+              Submit Survey
+            </button>
+          </div>
+        )}
+
+      </div>
+    </DashboardLayout>
+  );
+}
+
+export default function QuestionnairePage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-gray-500">Loading survey...</div>}>
+      <QuestionnaireContent />
+    </Suspense>
+  );
+}

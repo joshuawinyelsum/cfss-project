@@ -20,7 +20,7 @@ const serwist = new Serwist({
   fallbacks: {
     entries: [
       {
-        url: "/~offline",
+        url: "/dashboard",
         matcher({ request }) {
           return request.destination === "document";
         },
