@@ -39,6 +39,9 @@ function QuestionnaireContent() {
         let questionsData = [];
         let answersData = [];
 
+        const { normalizeSurveyType } = await import('@/lib/surveyType');
+        const normalizedType = normalizeSurveyType(typeStr);
+
         if (recordId === 'new') {
           // Start a new survey draft locally
           try {
@@ -46,11 +49,11 @@ function QuestionnaireContent() {
             questionsData = qRes.data;
             // Cache definition offline
             const { db } = await import('@/lib/db');
-            await db.definitions.put({ type: typeStr, questions: questionsData, updated_at: new Date().toISOString() });
+            await db.definitions.put({ type: normalizedType, questions: questionsData, updated_at: new Date().toISOString() });
           } catch (e) {
             // Offline fallback
             const { db } = await import('@/lib/db');
-            const cachedDef = await db.definitions.get(typeStr);
+            const cachedDef = await db.definitions.get(normalizedType);
             if (cachedDef) {
               questionsData = cachedDef.questions;
             } else {
@@ -80,9 +83,9 @@ function QuestionnaireContent() {
             try {
               const qRes = await api.get('/api/student/surveys/questions', { params: { type: typeStr }, headers: { Authorization: `Bearer ${token}` } });
               questionsData = qRes.data;
-              await db.definitions.put({ type: typeStr, questions: questionsData, updated_at: new Date().toISOString() });
+              await db.definitions.put({ type: normalizedType, questions: questionsData, updated_at: new Date().toISOString() });
             } catch (e) {
-              const cachedDef = await db.definitions.get(typeStr);
+              const cachedDef = await db.definitions.get(normalizedType);
               if (cachedDef) {
                 questionsData = cachedDef.questions;
               } else {
@@ -99,7 +102,7 @@ function QuestionnaireContent() {
             
             // Cache definitions
             const { db } = await import('@/lib/db');
-            await db.definitions.put({ type: typeStr, questions: questionsData, updated_at: new Date().toISOString() });
+            await db.definitions.put({ type: normalizedType, questions: questionsData, updated_at: new Date().toISOString() });
           }
         }
 

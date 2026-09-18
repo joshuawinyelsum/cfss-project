@@ -67,7 +67,12 @@ export default function StudentDashboard() {
     if (!user) {
       api.get('/api/v2/students/me', { headers: { Authorization: `Bearer ${token}` } })
         .then(res => useAuthStore.getState().setAuth(token, { ...res.data, role: 'student' }))
-        .catch(() => { logout(); router.push('/login'); });
+        .catch((err: any) => { 
+          if (err.response?.status === 401) {
+            logout(); 
+            router.push('/login'); 
+          }
+        });
       return;
     }
     

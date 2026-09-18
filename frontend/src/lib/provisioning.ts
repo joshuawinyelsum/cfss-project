@@ -21,7 +21,8 @@ export async function executeProvisioning(userId: number, token: string): Promis
         params: { type },
         headers: { Authorization: `Bearer ${token}` }
       });
-      definitionsData.push({ type: type.toLowerCase(), questions: qRes.data });
+      const { normalizeSurveyType } = await import('@/lib/surveyType');
+      definitionsData.push({ type: normalizeSurveyType(type), questions: qRes.data });
     }
 
     setStatus(userId, "PROVISIONING_DATA");

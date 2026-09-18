@@ -34,8 +34,31 @@ export default function SurveyWorkspace() {
     
     const loadRecords = async () => {
       try {
-        const res = await api.get(`/api/student/surveys/${typeStr}`, { headers: { Authorization: `Bearer ${token}` } });
-        setRecords(res.data);
+        const { db } = await import('@/lib/db');
+        const localSurveys = await db.surveys.where('student_id').equals(user.id as number).toArray();
+        const typeLocal = localSurveys.filter(s => s.survey_type.toLowerCase() === typeStr.toLowerCase());
+
+        let serverRecords: any[] = [];
+        if (navigator.onLine) {
+          try {
+            const res = await api.get(`/api/student/surveys/${typeStr}`, { headers: { Authorization: `Bearer ${token}` } });
+            serverRecords = res.data;
+          } catch(e) {
+            console.warn("Could not fetch server records", e);
+          }
+        }
+        
+        // Merge records (local takes precedence if ID matches)
+        const mergedMap = new Map();
+        for (const sr of serverRecords) {
+          mergedMap.set(sr.id, sr);
+        }
+        for (const lr of typeLocal) {
+          mergedMap.set(lr.id, lr); // overwrites server if local exists
+        }
+        
+        const merged = Array.from(mergedMap.values()).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+        setRecords(merged);
       } catch (e) {
         console.error("Failed to load records", e);
       } finally {
@@ -50,31 +73,27 @@ export default function SurveyWorkspace() {
     if (creating || !user) return;
     setCreating(true);
     try {
-      if (navigator.onLine) {
-        const res = await api.post('/api/student/surveys/create', { survey_type: typeStr }, { headers: { Authorization: `Bearer ${token}` } });
-        const newRecord = res.data;
-        router.push(`/surveys/${typeStr}/fill?id=${newRecord.id}`);
-      } else {
-        // Offline fallback creation
-        const { db } = await import('@/lib/db');
-        const pseudoId = crypto.randomUUID();
-        const now = new Date().toISOString();
-        await db.surveys.put({
-          id: pseudoId,
-          student_id: user.id as number,
-          survey_type: typeStr.toUpperCase(),
-          community_id: user.community_id as number,
-          entity_id: null,
-          answers: [],
-          status: 'DRAFT',
-          sync_status: 'pending',
-          created_at: now,
-          updated_at: now
-        });
-        router.push(`/surveys/${typeStr}/fill?id=${pseudoId}`);
-      }
+      // Always create local draft first for offline-first architecture
+      const { db } = await import('@/lib/db');
+      const pseudoId = crypto.randomUUID();
+      const now = new Date().toISOString();
+      await db.surveys.put({
+        id: pseudoId,
+        student_id: user.id as number,
+        survey_type: typeStr.toUpperCase(),
+        community_id: user.community_id as number,
+        entity_id: null,
+        answers: [],
+        status: 'DRAFT',
+        sync_status: 'pending',
+        created_at: now,
+        updated_at: now
+      });
+      
+      // Let sync engine handle the upload later, immediately go to form
+      router.push(`/surveys/${typeStr}/fill?id=${pseudoId}`);
     } catch (e) {
-      console.error("Failed to create survey", e);
+      console.error("Failed to create survey locally", e);
       alert("Failed to create survey. Please try again.");
       setCreating(false);
     }

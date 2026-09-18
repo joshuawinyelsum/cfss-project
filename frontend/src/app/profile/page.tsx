@@ -24,7 +24,12 @@ export default function StudentProfile() {
           setAuth(token, { ...res.data, role: 'student' });
           console.log("Profile loaded:", { ...res.data, role: 'student' });
         })
-        .catch(() => { logout(); router.push('/login'); });
+        .catch((err: any) => { 
+          if (err.response?.status === 401) {
+            logout(); 
+            router.push('/login'); 
+          }
+        });
       return;
     }
     
