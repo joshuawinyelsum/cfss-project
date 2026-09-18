@@ -26,6 +26,78 @@ import {
 import { syncEngine } from '@/lib/sync';
 
 
+
+function ProvisioningScreen({ user, token, logout }: { user: any, token: string, logout: () => void }) {
+  const status = useAuthStore((state: any) => state.provisionedUsers[user.id]?.status) || 'UNPROVISIONED';
+  const setStatus = useAuthStore((state: any) => state.setProvisioningStatus);
+  const [retrying, setRetrying] = useState(false);
+
+  useEffect(() => {
+    // If the component mounts and the status is an "active" provisioning state, 
+    // it means the previous attempt was interrupted by a page reload.
+    if (['PROVISIONING_DEVICE', 'PROVISIONING_DATA', 'VERIFYING_LOCAL_STATE'].includes(status)) {
+      if (user.id) setStatus(user.id, 'PROVISIONING_FAILED');
+      return;
+    }
+
+    if (status === 'UNPROVISIONED' && !retrying) {
+      if (user.id) import('@/lib/provisioning').then(m => m.executeProvisioning(user.id as number, token));
+    }
+  }, [status, retrying, user.id, token, setStatus]);
+
+  const handleRetry = () => {
+    setRetrying(true);
+    if (user.id) import('@/lib/provisioning').then(m => m.executeProvisioning(user.id as number, token).finally(() => setRetrying(false)));
+  };
+
+  const getStatusText = () => {
+    switch (status) {
+      case 'UNPROVISIONED':
+      case 'AUTHENTICATING':
+      case 'AUTHENTICATED': return "Starting provisioning...";
+      case 'PROVISIONING_DEVICE': return "Fetching survey schemas...";
+      case 'PROVISIONING_DATA': return "Downloading historical records...";
+      case 'VERIFYING_LOCAL_STATE': return "Syncing local database...";
+      case 'PROVISIONED':
+      case 'READY': return "Device ready!";
+      case 'PROVISIONING_FAILED': return "Provisioning interrupted or failed.";
+      default: return "Please wait...";
+    }
+  };
+
+  const isFailed = status === 'PROVISIONING_FAILED';
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-page p-6 text-center">
+      <div className="bg-surface p-8 rounded-2xl shadow-sm border border-border max-w-md w-full">
+        <div className="w-16 h-16 bg-[#093C22]/10 text-[#093C22] rounded-full flex items-center justify-center mx-auto mb-6">
+          {isFailed ? <X size={32} className="text-red-600" /> : <RefreshCw size={32} className="animate-spin" />}
+        </div>
+        <h2 className="text-xl font-bold text-primary mb-2">Setting up your workspace</h2>
+        <p className="text-secondary mb-8">{getStatusText()}</p>
+        
+        {isFailed && (
+          <div className="flex flex-col gap-3">
+            <button 
+              onClick={handleRetry}
+              disabled={retrying}
+              className="w-full py-3 bg-[#093C22] text-white rounded-xl font-medium hover:bg-[#0c512e] transition-colors disabled:opacity-70"
+            >
+              {retrying ? "Retrying..." : "Retry Provisioning"}
+            </button>
+            <button 
+              onClick={logout}
+              className="w-full py-3 bg-red-50 text-red-700 rounded-xl font-medium hover:bg-red-100 transition-colors"
+            >
+              Cancel and Logout
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -197,6 +269,9 @@ export default function DashboardLayout({
     { name: 'More', href: '/dashboard/more', icon: MoreHorizontal },
   ];
 
+  
+  const provisionedUsers = useAuthStore((state: any) => state.provisionedUsers);
+
   if (!user) return null;
 
   if (!hydrated || !authVerified) {
@@ -206,6 +281,14 @@ export default function DashboardLayout({
       </div>
     );
   }
+
+  const provRecord = user.id ? provisionedUsers[user.id] : null;
+  const isReady = provRecord?.status === 'READY' || provRecord?.status === 'PROVISIONED';
+
+  if (!isReady) {
+    return <ProvisioningScreen user={user} token={token as string} logout={logout} />;
+  }
+
 
   return (
     <div className="flex h-screen bg-page overflow-hidden font-sans">

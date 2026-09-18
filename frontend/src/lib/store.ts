@@ -1,6 +1,22 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export type ProvisioningStatus = 
+  | 'UNPROVISIONED' 
+  | 'AUTHENTICATING' 
+  | 'AUTHENTICATED' 
+  | 'PROVISIONING_DEVICE' 
+  | 'PROVISIONING_DATA' 
+  | 'VERIFYING_LOCAL_STATE' 
+  | 'PROVISIONED' 
+  | 'READY' 
+  | 'PROVISIONING_FAILED';
+
+export interface ProvisioningRecord {
+  status: ProvisioningStatus;
+  provisionedAt: string | null;
+}
+
 interface AuthState {
   token: string | null;
   user: {
@@ -19,6 +35,9 @@ interface AuthState {
     role: string;
   } | null;
   theme: string;
+  provisionedUsers: Record<number, ProvisioningRecord>;
+  currentProvisioningStatus: ProvisioningStatus;
+  setProvisioningStatus: (userId: number, status: ProvisioningStatus) => void;
   setAuth: (token: string, user: any) => void;
   logout: () => void;
   setTheme: (theme: string) => void;
@@ -30,6 +49,19 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       user: null,
       theme: 'light',
+      provisionedUsers: {},
+      currentProvisioningStatus: 'UNPROVISIONED',
+      setProvisioningStatus: (userId: number, status: ProvisioningStatus) => 
+        set((state: any) => {
+          const now = status === 'PROVISIONED' || status === 'READY' ? new Date().toISOString() : state.provisionedUsers[userId]?.provisionedAt || null;
+          return {
+            currentProvisioningStatus: status,
+            provisionedUsers: {
+              ...state.provisionedUsers,
+              [userId]: { status, provisionedAt: now }
+            }
+          };
+        }),
       setAuth: (token: string, user: any) => set({ token, user }),
       logout: () => {
         set({ token: null, user: null });
@@ -51,6 +83,19 @@ export const useAdminAuthStore = create<AuthState>()(
       token: null,
       user: null,
       theme: 'light',
+      provisionedUsers: {},
+      currentProvisioningStatus: 'UNPROVISIONED',
+      setProvisioningStatus: (userId: number, status: ProvisioningStatus) => 
+        set((state: any) => {
+          const now = status === 'PROVISIONED' || status === 'READY' ? new Date().toISOString() : state.provisionedUsers[userId]?.provisionedAt || null;
+          return {
+            currentProvisioningStatus: status,
+            provisionedUsers: {
+              ...state.provisionedUsers,
+              [userId]: { status, provisionedAt: now }
+            }
+          };
+        }),
       setAuth: (token: string, user: any) => set({ token, user }),
       logout: () => {
         set({ token: null, user: null });

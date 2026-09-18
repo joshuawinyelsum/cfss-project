@@ -217,3 +217,36 @@ async def get_sync_status(
         "server_submitted": counts.get("SUBMITTED", 0),
         "last_synced_at": last_sync.isoformat() if last_sync else None
     }
+
+@router.get("/download")
+async def download_surveys(
+    db: AsyncSession = Depends(get_db),
+    user_data: tuple = Depends(get_current_student)
+):
+    current_user, community = user_data
+    
+    query = select(models.SurveyRecord).where(
+        models.SurveyRecord.created_by_student_id == current_user.id
+    )
+    result = await db.execute(query)
+    records = result.scalars().all()
+    
+    surveys = []
+    for record in records:
+        ans_query = select(models.SurveyAnswer).where(models.SurveyAnswer.survey_record_id == record.id)
+        ans_res = await db.execute(ans_query)
+        answers = ans_res.scalars().all()
+        
+        surveys.append({
+            "survey_id": record.id,
+            "survey_type": record.survey_type,
+            "community_id": record.community_id,
+            "house_number": record.entity_id,
+            "status": record.status,
+            "answers": [{"question_id": a.question_id, "answer": a.answer} for a in answers],
+            "created_at": record.created_at.isoformat() if record.created_at else None,
+            "updated_at": record.updated_at.isoformat() if record.updated_at else None,
+            "submitted_at": record.updated_at.isoformat() if record.status == "SUBMITTED" and record.updated_at else None
+        })
+        
+    return {"surveys": surveys}
