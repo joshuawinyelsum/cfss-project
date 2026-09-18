@@ -192,7 +192,7 @@ export default function WorkWorkspacePage() {
                   {recent.slice(0, 5).map(record => (
                     <Link 
                       key={record.id} 
-                      href={`/surveys/${record.survey_type.toLowerCase()}/${record.status === 'SUBMITTED' ? 'view' : 'fill'}/${record.id}`}
+                      href={`/surveys/${record.survey_type.toLowerCase()}/${record.status === 'SUBMITTED' ? 'view' : 'fill'}?id=${record.id}`}
                       className="block p-4 sm:p-5 hover:bg-page transition-colors group"
                     >
                       <div className="flex items-center justify-between">

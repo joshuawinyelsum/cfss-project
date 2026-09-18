@@ -13,6 +13,9 @@ declare const self: any;
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
+  precacheOptions: {
+    ignoreURLParametersMatching: [/.*/]
+  },
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,

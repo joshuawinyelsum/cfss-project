@@ -152,7 +152,7 @@ export default function SurveyWorkspace() {
                     </div>
                     
                     <Link 
-                      href={`/surveys/${typeStr}/${record.status === 'SUBMITTED' ? 'view' : 'fill'}/${record.id}`}
+                      href={`/surveys/${typeStr}/${record.status === 'SUBMITTED' ? 'view' : 'fill'}?id=${record.id}`}
                       className={`px-4 py-2 font-medium rounded-lg transition-colors text-sm text-center ${
                         record.status === 'SUBMITTED' 
                           ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' 
