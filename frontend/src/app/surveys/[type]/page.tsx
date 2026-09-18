@@ -6,14 +6,14 @@ import { useRouter, useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import DashboardLayout from '@/app/dashboard/layout';
 import Link from 'next/link';
-import { Plus, ArrowLeft, Home, Building, Heart, Book, FileText, Clock, CheckCircle } from 'lucide-react';
+import { Plus, ArrowLeft, Home, Building, Heart, Book, FileText, Clock, CheckCircle, LucideIcon } from 'lucide-react';
 
 
-const SURVEY_CONFIG: Record<string, { name: string, actionLabel: string, icon: any, colorClass: string, submitColor: string }> = {
+const SURVEY_CONFIG: Record<string, { name: string, actionLabel: string, icon: LucideIcon, colorClass: string, submitColor: string }> = {
   'household': { name: 'Household Survey', actionLabel: 'Household', icon: Home, colorClass: 'bg-emerald-50 text-emerald-600', submitColor: 'bg-emerald-100 text-emerald-700' },
-  'education': { name: 'Education Survey', actionLabel: 'School', icon: Book, colorClass: 'bg-blue-50 text-blue-600', submitColor: 'bg-blue-100 text-blue-700' },
-  'health': { name: 'Health Survey', actionLabel: 'Health Facility', icon: Heart, colorClass: 'bg-red-50 text-red-600', submitColor: 'bg-red-100 text-red-700' },
-  'governance': { name: 'Governance & Infrastructure Survey', actionLabel: 'Infrastructure', icon: Building, colorClass: 'bg-purple-50 text-purple-600', submitColor: 'bg-purple-100 text-purple-700' }
+  'education': { name: 'Education Survey', actionLabel: 'Education', icon: Book, colorClass: 'bg-blue-50 text-blue-600', submitColor: 'bg-blue-100 text-blue-700' },
+  'health': { name: 'Health Survey', actionLabel: 'Health', icon: Heart, colorClass: 'bg-red-50 text-red-600', submitColor: 'bg-red-100 text-red-700' },
+  'governance': { name: 'Governance & Infrastructure Survey', actionLabel: 'Governance & Infrastructure', icon: Building, colorClass: 'bg-purple-50 text-purple-600', submitColor: 'bg-purple-100 text-purple-700' }
 };
 
 export default function SurveyWorkspace() {
@@ -194,5 +194,6 @@ export default function SurveyWorkspace() {
     </DashboardLayout>
   );
 }
+
 
 
