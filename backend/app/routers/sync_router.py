@@ -43,144 +43,164 @@ async def get_current_student(db: AsyncSession = Depends(get_db), current_user: 
         
     return current_user, community
 
-@router.post("/surveys")
-async def sync_surveys(
-    payload: SyncPayload,
+@router.post("/operations")
+async def sync_operations(
+    payload: SyncOperationsPayload,
     db: AsyncSession = Depends(get_db),
     user_data: tuple = Depends(get_current_student)
 ):
     current_user, community = user_data
-    
+    curr_user_id = current_user.id
     comm_id = community.id
     comm_name = community.name
-    curr_user_id = current_user.id
-    curr_user_name = current_user.name
-    
     results = []
     
-    for survey in payload.surveys:
+    for op in payload.operations:
         try:
-            # Validate community
-            if survey.community_id != comm_id:
-                raise ValueError("Survey community mismatch")
+            if op.entity_type != "SURVEY":
+                raise ValueError(f"Unsupported entity type {op.entity_type}")
                 
-            # Check if survey exists
-            result = await db.execute(select(models.SurveyRecord).where(models.SurveyRecord.id == survey.survey_id))
+            # Check if record exists
+            result = await db.execute(select(models.SurveyRecord).where(models.SurveyRecord.id == op.entity_id))
             record = result.scalars().first()
             
-            if record:
-                # Update existing
-                if record.created_by_student_id != curr_user_id:
-                    raise ValueError("Not authorized to edit this survey")
-                    
-                if record.status == "SUBMITTED" and survey.status != "SUBMITTED":
-                    raise ValueError("Cannot revert a submitted survey")
-                    
-                record.status = survey.status
-                record.sync_status = "synced"
-                record.last_synced_at = func.now()
-                record.sync_error = None
-                if survey.updated_at:
-                    record.updated_at = survey.updated_at
+            if op.operation_type == "DELETE":
+                if record:
+                    if record.created_by_student_id != curr_user_id:
+                        raise ValueError("Not authorized to delete this survey")
+                    # Soft delete
+                    record.status = "DELETED"
+                    record.last_synced_at = func.now()
+                    await db.commit()
                 
-                # Update answers
-                await db.execute(delete(models.SurveyAnswer).where(models.SurveyAnswer.survey_record_id == record.id))
-            else:
-                # Create new
-                entity_id = survey.house_number
+                results.append({
+                    "operation_id": op.operation_id,
+                    "success": True,
+                    "action": "deleted"
+                })
                 
-                # If no entity_id (offline creation), generate one
-                if not entity_id or entity_id.startswith("TEMP"):
-                    from app.routers.student_surveys import get_entity_prefix
-                    clean_comm_name = re.sub(r'[^A-Za-z0-9]', '', comm_name)
-                    prefix = get_entity_prefix(survey.survey_type.upper())
+            elif op.operation_type in ["CREATE", "UPDATE"]:
+                survey_data = op.payload or {}
+                
+                if record:
+                    # Update
+                    if record.created_by_student_id != curr_user_id:
+                        raise ValueError("Not authorized to edit this survey")
+                    if record.status == "DELETED":
+                        raise ValueError("Cannot update a deleted survey")
                     
-                    # Robust logic for unique entity_id
-                    count_res = await db.execute(
-                        select(func.count()).where(
-                            models.SurveyRecord.community_id == comm_id,
-                            models.SurveyRecord.survey_type == survey.survey_type.upper()
-                        )
-                    )
-                    count = count_res.scalar() or 0
-                    next_num = count + 1
+                    record.status = survey_data.get("status", record.status)
+                    record.last_synced_at = func.now()
                     
-                    while True:
-                        generated_num = f"{clean_comm_name}/TTFPP/{prefix}{next_num:04d}"
+                    # Parse dates if they are strings
+                    def parse_dt(dt_val):
+                        if isinstance(dt_val, str):
+                            try:
+                                return datetime.fromisoformat(dt_val.replace('Z', '+00:00'))
+                            except ValueError:
+                                return None
+                        return dt_val
                         
-                        # Verify uniqueness in DB just in case
-                        existing_hn = await db.execute(
-                            select(models.SurveyRecord.id).where(
-                                models.SurveyRecord.entity_id == generated_num
-                            )
-                        )
-                        if not existing_hn.scalars().first():
-                            entity_id = generated_num
-                            break
-                        next_num += 1
-                            
-                    if not entity_id or entity_id.startswith("TEMP"):
-                        raise ValueError("Failed to generate unique entity id")
-
-                record = models.SurveyRecord(
-                    id=survey.survey_id,
-                    community_id=comm_id,
-                    created_by_student_id=curr_user_id,
-                    survey_type=survey.survey_type.upper(),
-                    entity_id=entity_id,
-                    status=survey.status,
-                    sync_status="synced",
-                    last_synced_at=func.now(),
-                    sync_error=None
-                )
-                if survey.created_at:
-                    record.created_at = survey.created_at
-                if survey.updated_at:
-                    record.updated_at = survey.updated_at
+                    if survey_data.get("submitted_at"):
+                        record.submitted_at = parse_dt(survey_data.get("submitted_at"))
+                    if survey_data.get("updated_at"):
+                        record.updated_at = parse_dt(survey_data.get("updated_at"))
                     
-                db.add(record)
-            
-            # Insert new answers
-            for ans in survey.answers:
-                db.add(models.SurveyAnswer(
-                    survey_record_id=record.id,
-                    question_id=ans.question_id,
-                    answer=ans.answer
-                ))
-                
-            # Extract attributes before commit to avoid lazy load MissingGreenlet
-            rec_id = record.id
-            rec_entity_id = record.entity_id
-            rec_survey_type = record.survey_type
-            
-            await db.commit()
-            
-            # Admin Notification on SUBMITTED
-            if survey.status == "SUBMITTED":
-                notif = models.AdminNotification(
-                    type="survey_submit",
-                    title="Survey Submitted",
-                    message=f"{curr_user_name} submitted {rec_survey_type.capitalize()} Survey\nCommunity: {comm_name}\nEntity ID: {rec_entity_id}"
-                )
-                db.add(notif)
+                    await db.execute(delete(models.SurveyAnswer).where(models.SurveyAnswer.survey_record_id == record.id))
+                    
+                else:
+                    # CREATE (or UPSERT if missing)
+                    survey_type = survey_data.get("survey_type", "HOUSEHOLD").upper()
+                    
+                    from app.routers.student_surveys import get_entity_prefix
+                    prefix = get_entity_prefix(survey_type)
+                    clean_comm_name = re.sub(r'[^A-Za-z0-9]', '', comm_name)
+                    
+                    # Use transactional counter for safe concurrent ID generation
+                    counter_res = await db.execute(
+                        select(models.SurveyCounter).where(
+                            models.SurveyCounter.community_id == comm_id,
+                            models.SurveyCounter.survey_type == survey_type
+                        ).with_for_update()
+                    )
+                    counter = counter_res.scalars().first()
+                    
+                    if not counter:
+                        counter = models.SurveyCounter(
+                            community_id=comm_id,
+                            survey_type=survey_type,
+                            last_count=1
+                        )
+                        db.add(counter)
+                        next_num = 1
+                    else:
+                        counter.last_count += 1
+                        next_num = counter.last_count
+                    
+                    entity_id = f"{clean_comm_name}/TTFPP/{prefix}{next_num:04d}"
+                    
+                    def parse_dt(dt_val):
+                        if isinstance(dt_val, str):
+                            try:
+                                return datetime.fromisoformat(dt_val.replace('Z', '+00:00'))
+                            except ValueError:
+                                return None
+                        return dt_val
+                    
+                    record = models.SurveyRecord(
+                        id=op.entity_id,
+                        community_id=comm_id,
+                        created_by_student_id=curr_user_id,
+                        survey_type=survey_type,
+                        entity_id=entity_id,
+                        status=survey_data.get("status", "DRAFT"),
+                        sync_status="synced",
+                        last_synced_at=func.now(),
+                        submitted_at=parse_dt(survey_data.get("submitted_at")),
+                        created_at=parse_dt(survey_data.get("created_at")),
+                        updated_at=parse_dt(survey_data.get("updated_at"))
+                    )
+                    db.add(record)
+                    
+                # Insert answers for both CREATE and UPDATE
+                for ans in survey_data.get("answers", []):
+                    db.add(models.SurveyAnswer(
+                        survey_record_id=record.id,
+                        question_id=ans.get("question_id"),
+                        answer=ans.get("answer")
+                    ))
+                    
                 await db.commit()
+                await db.refresh(record)
+                rec_id = record.id
+                rec_entity_id = record.entity_id
                 
-            results.append({
-                "client_id": survey.survey_id,
-                "server_id": rec_id,
-                "house_number": rec_entity_id,
-                "success": True
-            })
-            
+                # Admin Notification on SUBMITTED
+                if record.status == "SUBMITTED":
+                    notif = models.AdminNotification(
+                        type="survey_submit",
+                        title="Survey Submitted",
+                        message=f"{current_user.name} submitted {record.survey_type.capitalize()} Survey\nCommunity: {comm_name}\nEntity ID: {rec_entity_id}"
+                    )
+                    db.add(notif)
+                    await db.commit()
+                
+                results.append({
+                    "operation_id": op.operation_id,
+                    "server_id": rec_id,
+                    "house_number": rec_entity_id,
+                    "success": True,
+                    "action": "upserted"
+                })
+                
         except Exception as e:
             import traceback
             tb = traceback.format_exc()
             await db.rollback()
-            # Update sync error if record existed? Too complex to do in the same loop if rollback happens.
             results.append({
-                "client_id": survey.survey_id,
+                "operation_id": op.operation_id,
                 "success": False,
-                "error": f"{str(e)}\n{tb}"
+                "error": str(e)
             })
             
     return {"success": True, "results": results}
@@ -226,7 +246,8 @@ async def download_surveys(
     current_user, community = user_data
     
     query = select(models.SurveyRecord).where(
-        models.SurveyRecord.created_by_student_id == current_user.id
+        models.SurveyRecord.created_by_student_id == current_user.id,
+        models.SurveyRecord.status != "DELETED"
     )
     result = await db.execute(query)
     records = result.scalars().all()
@@ -246,7 +267,7 @@ async def download_surveys(
             "answers": [{"question_id": a.question_id, "answer": a.answer} for a in answers],
             "created_at": record.created_at.isoformat() if record.created_at else None,
             "updated_at": record.updated_at.isoformat() if record.updated_at else None,
-            "submitted_at": record.updated_at.isoformat() if record.status == "SUBMITTED" and record.updated_at else None
+            "submitted_at": record.submitted_at.isoformat() if record.submitted_at else (record.updated_at.isoformat() if record.status == "SUBMITTED" and record.updated_at else None)
         })
         
     return {"surveys": surveys}

@@ -4,8 +4,8 @@ import uuid
 
 @pytest.mark.asyncio
 async def test_unauthenticated_sync(client: AsyncClient):
-    payload = {"surveys": []}
-    response = await client.post("/api/sync/surveys", json=payload)
+    payload = {"operations": []}
+    response = await client.post("/api/sync/operations", json=payload)
     assert response.status_code == 401
 
 @pytest.mark.asyncio
@@ -14,18 +14,22 @@ async def test_student_can_sync_own_record(client: AsyncClient, student_with_com
     community_id = user.community_id
     client_id = str(uuid.uuid4())
     payload = {
-        "surveys": [
+        "operations": [
             {
-                "survey_id": client_id,
-                "survey_type": "HOUSEHOLD",
-                "community_id": community_id,
-                "house_number": "TEMP_123",
-                "answers": [],
-                "status": "DRAFT"
+                "operation_id": str(uuid.uuid4()),
+                "operation_type": "CREATE",
+                "entity_type": "SURVEY",
+                "entity_id": client_id,
+                "payload": {
+                    "survey_type": "HOUSEHOLD",
+                    "community_id": community_id,
+                    "status": "DRAFT",
+                    "answers": []
+                }
             }
         ]
     }
-    response = await client.post("/api/sync/surveys", json=payload, headers={"Authorization": f"Bearer {student_token}"})
+    response = await client.post("/api/sync/operations", json=payload, headers={"Authorization": f"Bearer {student_token}"})
     assert response.status_code == 200
     res_data = response.json()
     assert res_data["success"] is True
@@ -38,22 +42,28 @@ async def test_sync_duplicate_idempotency(client: AsyncClient, student_with_comm
     community_id = user.community_id
     client_id = str(uuid.uuid4())
     payload = {
-        "surveys": [
+        "operations": [
             {
-                "survey_id": client_id,
-                "survey_type": "HOUSEHOLD",
-                "community_id": community_id,
-                "answers": [],
-                "status": "DRAFT"
+                "operation_id": str(uuid.uuid4()),
+                "operation_type": "CREATE",
+                "entity_type": "SURVEY",
+                "entity_id": client_id,
+                "payload": {
+                    "survey_type": "HOUSEHOLD",
+                    "community_id": community_id,
+                    "status": "DRAFT",
+                    "answers": []
+                }
             }
         ]
     }
     # First sync
-    res1 = await client.post("/api/sync/surveys", json=payload, headers={"Authorization": f"Bearer {student_token}"})
+    res1 = await client.post("/api/sync/operations", json=payload, headers={"Authorization": f"Bearer {student_token}"})
     assert res1.status_code == 200
     
-    # Second sync (duplicate retry)
-    res2 = await client.post("/api/sync/surveys", json=payload, headers={"Authorization": f"Bearer {student_token}"})
+    # Second sync (duplicate retry - simulate UPDATE)
+    payload["operations"][0]["operation_type"] = "UPDATE"
+    res2 = await client.post("/api/sync/operations", json=payload, headers={"Authorization": f"Bearer {student_token}"})
     assert res2.status_code == 200
     assert res2.json()["results"][0]["success"] is True
 
@@ -63,9 +73,6 @@ async def test_cannot_edit_other_students_record(client: AsyncClient, student_wi
     community_id = user.community_id
     
     # We need a second student to test isolation.
-    # To keep it simple without a student2_token fixture, we can just hit the API without auth and expect 401, 
-    # but the prompt wants testing "Student B sends Student A's UUID -> reject".
-    # Let's generate a second student.
     from app.models import User
     from app.auth import get_password_hash, create_access_token
     student2 = User(
@@ -85,33 +92,42 @@ async def test_cannot_edit_other_students_record(client: AsyncClient, student_wi
     # Student 1 creates
     client_id = str(uuid.uuid4())
     payload = {
-        "surveys": [
+        "operations": [
             {
-                "survey_id": client_id,
-                "survey_type": "HOUSEHOLD",
-                "community_id": community_id,
-                "answers": [],
-                "status": "DRAFT"
+                "operation_id": str(uuid.uuid4()),
+                "operation_type": "CREATE",
+                "entity_type": "SURVEY",
+                "entity_id": client_id,
+                "payload": {
+                    "survey_type": "HOUSEHOLD",
+                    "community_id": community_id,
+                    "status": "DRAFT",
+                    "answers": []
+                }
             }
         ]
     }
-    await client.post("/api/sync/surveys", json=payload, headers={"Authorization": f"Bearer {student_token}"})
+    await client.post("/api/sync/operations", json=payload, headers={"Authorization": f"Bearer {student_token}"})
     
     # Student 2 tries to edit
     payload2 = {
-        "surveys": [
+        "operations": [
             {
-                "survey_id": client_id,
-                "survey_type": "HOUSEHOLD",
-                "community_id": community_id,
-                "answers": [],
-                "status": "SUBMITTED"
+                "operation_id": str(uuid.uuid4()),
+                "operation_type": "UPDATE",
+                "entity_type": "SURVEY",
+                "entity_id": client_id,
+                "payload": {
+                    "survey_type": "HOUSEHOLD",
+                    "community_id": community_id,
+                    "status": "SUBMITTED",
+                    "answers": []
+                }
             }
         ]
     }
-    res = await client.post("/api/sync/surveys", json=payload2, headers={"Authorization": f"Bearer {student2_token}"})
+    res = await client.post("/api/sync/operations", json=payload2, headers={"Authorization": f"Bearer {student2_token}"})
     assert res.status_code == 200
-    # The batch should succeed, but the specific record should fail with an error
     assert res.json()["results"][0]["success"] is False
     assert "Not authorized" in res.json()["results"][0]["error"]
 
@@ -121,25 +137,30 @@ async def test_partial_batch_failure(client: AsyncClient, student_with_community
     community_id = user.community_id
     valid_id = str(uuid.uuid4())
     payload = {
-        "surveys": [
+        "operations": [
             {
-                "survey_id": valid_id,
-                "survey_type": "HOUSEHOLD",
-                "community_id": community_id,
-                "answers": [],
-                "status": "DRAFT"
+                "operation_id": str(uuid.uuid4()),
+                "operation_type": "CREATE",
+                "entity_type": "SURVEY",
+                "entity_id": valid_id,
+                "payload": {
+                    "survey_type": "HOUSEHOLD",
+                    "community_id": community_id,
+                    "status": "DRAFT",
+                    "answers": []
+                }
             },
             {
-                # Invalid community ID should fail
-                "survey_id": str(uuid.uuid4()),
-                "survey_type": "HOUSEHOLD",
-                "community_id": 99999,
-                "answers": [],
-                "status": "DRAFT"
+                # Invalid entity_type should fail
+                "operation_id": str(uuid.uuid4()),
+                "operation_type": "CREATE",
+                "entity_type": "INVALID",
+                "entity_id": str(uuid.uuid4()),
+                "payload": {}
             }
         ]
     }
-    res = await client.post("/api/sync/surveys", json=payload, headers={"Authorization": f"Bearer {student_token}"})
+    res = await client.post("/api/sync/operations", json=payload, headers={"Authorization": f"Bearer {student_token}"})
     data = res.json()
     print("partial batch data:", data)
     assert data["success"] is True

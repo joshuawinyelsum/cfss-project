@@ -314,45 +314,45 @@ async def create_survey(
     clean_comm_name = re.sub(r'[^A-Za-z0-9]', '', community.name)
     prefix = get_entity_prefix(s_type)
     
-    # Retry mechanism for generating entity_id safely
-    result = await db.execute(
-        select(func.count())
-        .where(
-            models.SurveyRecord.community_id == community.id,
-            models.SurveyRecord.survey_type == s_type
-        )
+    # Use transactional counter for safe concurrent ID generation
+    counter_res = await db.execute(
+        select(models.SurveyCounter).where(
+            models.SurveyCounter.community_id == community.id,
+            models.SurveyCounter.survey_type == s_type
+        ).with_for_update()
     )
-    count = result.scalar() or 0
-    next_num = count + 1
+    counter = counter_res.scalars().first()
     
-    while True:
-        entity_id = f"{clean_comm_name}/TTFPP/{prefix}{next_num:04d}"
-        
-        # Check if exists
-        exists_check = await db.execute(
-            select(models.SurveyRecord.id).where(models.SurveyRecord.entity_id == entity_id)
+    if not counter:
+        counter = models.SurveyCounter(
+            community_id=community.id,
+            survey_type=s_type,
+            last_count=1
         )
-        if not exists_check.scalars().first():
-            # Available
-            record = models.SurveyRecord(
-                community_id=community.id,
-                created_by_student_id=current_user.id,
-                survey_type=s_type,
-                entity_id=entity_id,
-                status="DRAFT"
-            )
-            db.add(record)
-            try:
-                await db.commit()
-                await db.refresh(record)
-                return record
-            except IntegrityError:
-                await db.rollback()
-                next_num += 1
-                continue
-                
-        next_num += 1
-    raise HTTPException(status_code=500, detail="Failed to generate unique house number after multiple attempts")
+        db.add(counter)
+        next_num = 1
+    else:
+        counter.last_count += 1
+        next_num = counter.last_count
+        
+    entity_id = f"{clean_comm_name}/TTFPP/{prefix}{next_num:04d}"
+    
+    record = models.SurveyRecord(
+        community_id=community.id,
+        created_by_student_id=current_user.id,
+        survey_type=s_type,
+        entity_id=entity_id,
+        status="DRAFT"
+    )
+    db.add(record)
+    
+    try:
+        await db.commit()
+        await db.refresh(record)
+        return record
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to create survey due to concurrent conflicts")
 
 @router.get("/record/{record_id}")
 async def get_survey_record(

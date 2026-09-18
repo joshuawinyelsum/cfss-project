@@ -29,6 +29,18 @@ function QuestionnaireContent() {
   const [answers, setAnswers] = useState<Record<string, any>>({});
   
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   useEffect(() => {
     if (!token || !user) return;
@@ -69,7 +81,8 @@ function QuestionnaireContent() {
             status: 'DRAFT',
             sync_status: 'pending',
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            has_been_saved: false
           };
         } else {
           // Check IndexedDB first
@@ -79,7 +92,7 @@ function QuestionnaireContent() {
             if (localRecord.student_id !== user.id) {
               throw new Error("You do not have permission to view this survey.");
             }
-            recordData = localRecord;
+            recordData = { ...localRecord, has_been_saved: true };
             try {
               const qRes = await api.get('/api/student/surveys/questions', { params: { type: typeStr }, headers: { Authorization: `Bearer ${token}` } });
               questionsData = qRes.data;
@@ -96,45 +109,44 @@ function QuestionnaireContent() {
           } else {
             // Fallback to server if not found locally
             const res = await api.get(`/api/student/surveys/record/${recordId}`, { headers: { Authorization: `Bearer ${token}` } });
-            recordData = res.data.record;
+            recordData = { ...res.data.record, has_been_saved: true };
             questionsData = res.data.questions;
             answersData = res.data.answers || [];
-            
-            // Cache definitions
-            const { db } = await import('@/lib/db');
-            await db.definitions.put({ type: normalizedType, questions: questionsData, updated_at: new Date().toISOString() });
           }
         }
 
+        const answersObj: Record<string, any> = {};
+        answersData.forEach((a: any) => {
+          answersObj[a.question_id] = a.answer;
+        });
+        
         setRecord(recordData);
         setQuestions(questionsData);
-        
-        // Map answers
-        const ansMap: Record<string, any> = {};
-        answersData.forEach((a: any) => {
-          ansMap[a.question_id] = a.answer;
-        });
-        setAnswers(ansMap);
-      } catch (e: any) {
-        setError(e.response?.data?.detail || "Failed to load survey. Please check your connection.");
+        setAnswers(answersObj);
+      } catch (err: any) {
+        setError(err.message || "Failed to load questionnaire");
       } finally {
         setLoading(false);
       }
     };
     
     loadData();
-  }, [token, user, recordId, typeStr]);
+  }, [typeStr, recordId, token, user]);
 
   const sections = useMemo(() => {
-    const secs: string[] = [];
-    questions.forEach(q => {
-      if (!secs.includes(q.section)) secs.push(q.section);
-    });
-    return secs;
+    const secs = new Set<string>();
+    questions.forEach(q => secs.add(q.section));
+    return Array.from(secs);
   }, [questions]);
   
+  const currentSectionQuestions = useMemo(() => {
+    if (sections.length === 0) return [];
+    const currentSection = sections[currentSectionIndex];
+    return questions.filter(q => q.section === currentSection);
+  }, [questions, sections, currentSectionIndex]);
+
   const currentSection = sections[currentSectionIndex];
-  const sectionQuestions = questions.filter(q => q.section === currentSection);
+  const sectionQuestions = currentSectionQuestions;
   
   // Progress calculation
   const progress = useMemo(() => {
@@ -149,6 +161,7 @@ function QuestionnaireContent() {
   const handleAnswerChange = (questionId: string, value: any) => {
     if (record?.status === 'SUBMITTED') return;
     setAnswers(prev => ({ ...prev, [questionId]: value }));
+    setHasUnsavedChanges(true);
   };
 
   const saveAnswers = async (isSubmit: boolean) => {
@@ -177,7 +190,10 @@ function QuestionnaireContent() {
         setSaving(true);
       }
 
-      await syncEngine.queueSurvey({
+      const opType = !record.has_been_saved ? 'CREATE' : 'UPDATE';
+      const submittedAt = isSubmit ? (record.submitted_at || new Date().toISOString()) : record.submitted_at;
+
+      await syncEngine.queueOperation(opType, record.id, {
         id: record.id,
         survey_type: record.survey_type,
         community_id: user.community_id,
@@ -188,8 +204,14 @@ function QuestionnaireContent() {
         sync_status: 'pending',
         created_at: record.created_at,
         updated_at: new Date().toISOString(),
-        submitted_at: isSubmit ? new Date().toISOString() : undefined
+        submitted_at: submittedAt
       }, token);
+
+      setHasUnsavedChanges(false);
+      
+      if (!isSubmit && recordId === 'new') {
+        setRecord((prev: any) => ({ ...prev, has_been_saved: true, submitted_at: submittedAt }));
+      }
 
       if (isSubmit) {
         router.push('/dashboard/surveys/submitted');

@@ -5,6 +5,7 @@ import { useAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { db } from '@/lib/db';
+import { syncEngine } from '@/lib/sync';
 import { getEntityLabel } from '@/lib/entityLabel';
 import Link from 'next/link';
 import { Search, Filter, Loader2, ArrowRight, Trash2 } from 'lucide-react';
@@ -22,7 +23,7 @@ export default function DraftsPage() {
     e.stopPropagation();
     if (confirm("Delete draft? This action cannot be undone.")) {
       try {
-        await db.surveys.delete(id);
+        await syncEngine.queueOperation('DELETE', id, null, token || '');
         setRecords(records.filter(r => r.id !== id));
         setTotal(total - 1);
       } catch (err) {

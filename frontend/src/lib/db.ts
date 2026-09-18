@@ -21,9 +21,23 @@ export interface LocalSurveyDefinition {
   updated_at: string;
 }
 
+export interface SyncOperation {
+  id: string; // uuid for the operation
+  student_id: number;
+  operation_type: 'CREATE' | 'UPDATE' | 'DELETE';
+  entity_type: 'SURVEY';
+  entity_id: string; // Survey UUID
+  payload?: any;
+  status: 'PENDING' | 'SYNCING' | 'FAILED';
+  retry_count: number;
+  last_error?: string;
+  created_at: string;
+}
+
 class CFSSDatabase extends Dexie {
   surveys!: EntityTable<LocalSurvey, 'id'>;
   definitions!: EntityTable<LocalSurveyDefinition, 'type'>;
+  sync_operations!: EntityTable<SyncOperation, 'id'>;
 
   constructor() {
     super('CFSSDatabase');
@@ -48,6 +62,13 @@ class CFSSDatabase extends Dexie {
     this.version(5).stores({
       surveys: 'id, student_id, survey_type, status, sync_status, updated_at',
       definitions: 'type'
+    });
+
+    // Version 6 adds explicit sync_operations queue
+    this.version(6).stores({
+      surveys: 'id, student_id, survey_type, status, sync_status, updated_at',
+      definitions: 'type',
+      sync_operations: 'id, student_id, operation_type, entity_id, status, created_at'
     });
   }
 }

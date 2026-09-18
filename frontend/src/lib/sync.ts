@@ -1,5 +1,5 @@
 import { api } from './api';
-import { db, LocalSurvey } from './db';
+import { db, LocalSurvey, SyncOperation } from './db';
 import { useAuthStore } from './store';
 
 export const syncEngine = {
@@ -16,94 +16,111 @@ export const syncEngine = {
     }
 
     try {
-      // Get all pending or failed surveys for the current user
-      const userSurveys = await db.surveys.where('student_id').equals(userId).toArray();
-      const queueItems = userSurveys.filter(s => s.sync_status === 'pending' || s.sync_status === 'failed');
+      const userOperations = await db.sync_operations.where('student_id').equals(userId).toArray();
+      const queueItems = userOperations
+        .filter(op => op.status === 'PENDING' || op.status === 'FAILED')
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
       if (queueItems.length === 0) {
         this.isSyncing = false;
         return;
       }
 
-      // Mark as syncing locally so UI updates
       for (const item of queueItems) {
-        await db.surveys.update(item.id, { sync_status: 'syncing' });
+        await db.sync_operations.update(item.id, { status: 'SYNCING' });
+        // Also reflect syncing state on survey if it exists
+        if (item.operation_type !== 'DELETE') {
+            await db.surveys.update(item.entity_id, { sync_status: 'syncing' });
+        }
       }
 
-      // Map to payload format
-      const surveysPayload = queueItems.map(item => ({
-        survey_id: item.id,
-        survey_type: item.survey_type,
-        community_id: item.community_id,
-        house_number: item.entity_id, // keep payload key as house_number for backward compatibility with older servers
-        answers: item.answers,
-        status: item.status,
-        submitted_at: item.submitted_at,
-        created_at: item.created_at,
-        updated_at: item.updated_at
+      const operationsPayload = queueItems.map(item => ({
+        operation_id: item.id,
+        operation_type: item.operation_type,
+        entity_type: item.entity_type,
+        entity_id: item.entity_id,
+        payload: item.payload,
+        created_at: item.created_at
       }));
 
-      // Send to backend
-      const res = await api.post('/api/sync/surveys', { surveys: surveysPayload }, {
+      const res = await api.post('/api/sync/operations', { operations: operationsPayload }, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // Update local db with results
       const results = res.data.results;
       for (const result of results) {
-        const currentRecord = await db.surveys.get(result.client_id);
-        if (!currentRecord) continue;
+        const op = queueItems.find(q => q.id === result.operation_id);
+        if (!op) continue;
 
         if (result.success) {
-          // Check if it was modified (e.g. submitted) while this sync was in flight
-          if (currentRecord.sync_status === 'syncing') {
-            await db.surveys.update(result.client_id, {
-              sync_status: 'synced',
-              sync_error: undefined,
-              entity_id: result.house_number // Update with server generated entity_id
-            });
+          await db.sync_operations.delete(op.id);
+
+          if (op.operation_type === 'DELETE') {
+            await db.surveys.delete(op.entity_id);
           } else {
-            // It was queued again (pending) while we were syncing. Just update entity_id.
-            await db.surveys.update(result.client_id, {
-              entity_id: result.house_number
-            });
+            const survey = await db.surveys.get(op.entity_id);
+            if (survey) {
+              // If not overwritten by another pending op
+              if (survey.sync_status === 'syncing') {
+                await db.surveys.update(op.entity_id, {
+                  sync_status: 'synced',
+                  sync_error: undefined,
+                  entity_id: result.house_number || survey.entity_id
+                });
+              } else {
+                await db.surveys.update(op.entity_id, {
+                  entity_id: result.house_number || survey.entity_id
+                });
+              }
+            }
           }
         } else {
-          // If it failed, only revert to failed if it wasn't re-queued
-          if (currentRecord.sync_status === 'syncing') {
-            await db.surveys.update(result.client_id, {
-              sync_status: 'failed',
-              sync_error: result.error
-            });
+          const isFatal = result.error?.includes('400') || result.error?.includes('403') || result.error?.includes('Cannot revert') || result.error?.includes('Cannot update a deleted');
+          
+          if (isFatal) {
+             // We drop the operation to avoid infinite retry loop
+             await db.sync_operations.delete(op.id);
+             if (op.operation_type !== 'DELETE') {
+                 await db.surveys.update(op.entity_id, { sync_status: 'failed', sync_error: "Fatal: " + result.error });
+             }
+          } else {
+             // Recoverable (Network/500/timeout)
+             await db.sync_operations.update(op.id, {
+               status: 'FAILED',
+               last_error: result.error,
+               retry_count: (op.retry_count || 0) + 1
+             });
+             if (op.operation_type !== 'DELETE') {
+                 await db.surveys.update(op.entity_id, { sync_status: 'failed', sync_error: result.error });
+             }
           }
         }
       }
     } catch (error: any) {
       console.error("Sync Engine Error:", error);
       
-      // If unauthorized, do not delete data, just fail the sync to force re-auth
       if (error.response?.status === 401) {
         useAuthStore.getState().logout();
       }
 
-      // Revert syncing items back to failed
-      const userSurveys = await db.surveys.where('student_id').equals(userId).toArray();
-      const syncingItems = userSurveys.filter(s => s.sync_status === 'syncing');
+      const userOperations = await db.sync_operations.where('student_id').equals(userId).toArray();
+      const syncingItems = userOperations.filter(s => s.status === 'SYNCING');
       for (const item of syncingItems) {
-        await db.surveys.update(item.id, {
-          sync_status: 'failed',
-          sync_error: error.response?.status === 401 ? "Session expired. Please log in again." : (error.message || "Network error during sync")
+        await db.sync_operations.update(item.id, {
+          status: 'FAILED',
+          last_error: error.response?.status === 401 ? "Session expired." : "Network error"
         });
+        if (item.operation_type !== 'DELETE') {
+           await db.surveys.update(item.entity_id, { sync_status: 'failed' });
+        }
       }
     } finally {
       this.isSyncing = false;
-      // Emit event so UI can re-render
       window.dispatchEvent(new Event('sync-completed'));
 
-      // Check if any items were queued while this sync was running
       if (userId) {
-        const userSurveysAfter = await db.surveys.where('student_id').equals(userId).toArray();
-        const hasPending = userSurveysAfter.some(s => s.sync_status === 'pending');
+        const userOperationsAfter = await db.sync_operations.where('student_id').equals(userId).toArray();
+        const hasPending = userOperationsAfter.some(s => s.status === 'PENDING');
         if (hasPending && navigator.onLine) {
           this.processQueue(token);
         }
@@ -111,25 +128,75 @@ export const syncEngine = {
     }
   },
 
-  async queueSurvey(survey: LocalSurvey, token: string) {
+  async queueOperation(operationType: 'CREATE' | 'UPDATE' | 'DELETE', entityId: string, payload: any | null, token: string) {
     const userId = useAuthStore.getState().user?.id;
-    if (userId && survey.student_id !== userId) {
-      console.error("Attempted to queue survey belonging to a different user.");
-      return;
+    if (!userId) return;
+
+    if (operationType !== 'DELETE' && payload) {
+        payload.sync_status = 'pending';
+        payload.updated_at = new Date().toISOString();
+        await db.surveys.put(payload);
     }
 
-    // Save or update in IndexedDB
-    survey.sync_status = 'pending';
-    survey.updated_at = new Date().toISOString();
-    
-    // put() inserts or fully replaces - .update() rejects a whole LocalSurvey
-    // because Dexie expects a partial update spec, not the complete record.
-    await db.surveys.put(survey);
+    // Coalescing logic
+    const existingOps = await db.sync_operations.where('entity_id').equals(entityId).toArray();
+    const pendingOps = existingOps.filter(op => op.status === 'PENDING' || op.status === 'FAILED');
 
-    // Emit event so UI updates immediately
+    if (operationType === 'DELETE') {
+       // If there's a pending CREATE that never reached the server, just delete locally
+       const hasCreate = pendingOps.some(o => o.operation_type === 'CREATE');
+       
+       for (const op of pendingOps) {
+           await db.sync_operations.delete(op.id);
+       }
+       
+       if (hasCreate) {
+           await db.surveys.delete(entityId);
+           window.dispatchEvent(new Event('sync-queued'));
+           return; // Stop here, no need to tell the server
+       } else {
+           // Mark local survey as pending delete so UI can hide it
+           await db.surveys.update(entityId, { sync_status: 'pending', status: 'DELETED' });
+       }
+    } else if (operationType === 'UPDATE') {
+       const hasCreate = pendingOps.find(o => o.operation_type === 'CREATE');
+       if (hasCreate) {
+           // Coalesce into the existing CREATE
+           await db.sync_operations.update(hasCreate.id, { payload, status: 'PENDING' });
+           for (const op of pendingOps) {
+               if (op.id !== hasCreate.id) await db.sync_operations.delete(op.id);
+           }
+           window.dispatchEvent(new Event('sync-queued'));
+           if (navigator.onLine) this.processQueue(token);
+           return;
+       }
+       
+       const hasUpdate = pendingOps.find(o => o.operation_type === 'UPDATE');
+       if (hasUpdate) {
+           // Coalesce into existing UPDATE
+           await db.sync_operations.update(hasUpdate.id, { payload, status: 'PENDING' });
+           window.dispatchEvent(new Event('sync-queued'));
+           if (navigator.onLine) this.processQueue(token);
+           return;
+       }
+    }
+
+    // If no coalescing, add new operation
+    const op: SyncOperation = {
+        id: crypto.randomUUID(),
+        student_id: userId,
+        operation_type: operationType,
+        entity_type: 'SURVEY',
+        entity_id: entityId,
+        payload: payload,
+        status: 'PENDING',
+        retry_count: 0,
+        created_at: new Date().toISOString()
+    };
+    
+    await db.sync_operations.put(op);
     window.dispatchEvent(new Event('sync-queued'));
 
-    // Trigger background sync if online
     if (navigator.onLine) {
       this.processQueue(token);
     }

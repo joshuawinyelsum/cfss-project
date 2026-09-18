@@ -124,6 +124,15 @@ class AuditLog(Base):
     trace_id = Column(String, index=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
 
+class SurveyCounter(Base):
+    __tablename__ = "survey_counters"
+    __table_args__ = (UniqueConstraint('community_id', 'survey_type', name='uq_survey_counters_comm_type'),)
+    
+    id = Column(Integer, primary_key=True, index=True)
+    community_id = Column(Integer, ForeignKey("communities.id"), nullable=False, index=True)
+    survey_type = Column(String, nullable=False, index=True)
+    last_count = Column(Integer, default=0, nullable=False)
+
 class SurveyRecord(Base):
     __tablename__ = "survey_records"
     __table_args__ = (UniqueConstraint('community_id', 'survey_type', 'entity_id', name='uq_survey_record_entity'),)
@@ -133,9 +142,10 @@ class SurveyRecord(Base):
     created_by_student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     survey_type = Column(String, nullable=False, index=True) # HOUSEHOLD, EDUCATION, HEALTH, GOVERNANCE
     entity_id = Column(String, nullable=False, index=True)
-    status = Column(String, nullable=False, default="DRAFT") # DRAFT, SUBMITTED
+    status = Column(String, nullable=False, default="DRAFT") # DRAFT, SUBMITTED, DELETED
     sync_status = Column(String, nullable=False, default="synced") # pending, syncing, synced, failed
     last_synced_at = Column(DateTime(timezone=True), nullable=True)
+    submitted_at = Column(DateTime(timezone=True), nullable=True)
     sync_error = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
