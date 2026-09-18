@@ -6,13 +6,14 @@ import { useRouter, useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import DashboardLayout from '@/app/dashboard/layout';
 import Link from 'next/link';
-import { Plus, ArrowLeft, Home, FileText, Clock, CheckCircle } from 'lucide-react';
+import { Plus, ArrowLeft, Home, Building, Heart, Book, FileText, Clock, CheckCircle } from 'lucide-react';
 
-const SURVEY_NAMES: Record<string, string> = {
-  'household': 'Household Survey',
-  'education': 'Education Survey',
-  'health': 'Health Survey',
-  'governance': 'Governance & Infrastructure Survey'
+
+const SURVEY_CONFIG: Record<string, { name: string, actionLabel: string, icon: any, colorClass: string, submitColor: string }> = {
+  'household': { name: 'Household Survey', actionLabel: 'Household', icon: Home, colorClass: 'bg-emerald-50 text-emerald-600', submitColor: 'bg-emerald-100 text-emerald-700' },
+  'education': { name: 'Education Survey', actionLabel: 'School', icon: Book, colorClass: 'bg-blue-50 text-blue-600', submitColor: 'bg-blue-100 text-blue-700' },
+  'health': { name: 'Health Survey', actionLabel: 'Health Facility', icon: Heart, colorClass: 'bg-red-50 text-red-600', submitColor: 'bg-red-100 text-red-700' },
+  'governance': { name: 'Governance & Infrastructure Survey', actionLabel: 'Infrastructure', icon: Building, colorClass: 'bg-purple-50 text-purple-600', submitColor: 'bg-purple-100 text-purple-700' }
 };
 
 export default function SurveyWorkspace() {
@@ -20,7 +21,9 @@ export default function SurveyWorkspace() {
   const router = useRouter();
   const params = useParams();
   const typeStr = params.type as string;
-  const surveyName = SURVEY_NAMES[typeStr] || 'Survey';
+  const config = SURVEY_CONFIG[typeStr.toLowerCase()] || SURVEY_CONFIG['household'];
+  const surveyName = config.name;
+  const SurveyIcon = config.icon;
   
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,7 +133,7 @@ export default function SurveyWorkspace() {
                 </>
               ) : (
                 <>
-                  <Plus size={18} /> Add New House Survey
+                  <Plus size={18} /> Add New {config.actionLabel} Survey
                 </>
               )}
             </button>
@@ -152,13 +155,13 @@ export default function SurveyWorkspace() {
                 {records.map(record => (
                   <div key={record.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50 transition-colors">
                     <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${record.status === 'SUBMITTED' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                        <Home size={20} />
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${record.status === 'SUBMITTED' ? config.colorClass : 'bg-amber-50 text-amber-600'}`}>
+                        <SurveyIcon size={20} />
                       </div>
                       <div>
-                        <h4 className="font-bold text-gray-900">{record.entity_id}</h4>
+                        <h4 className="font-bold text-gray-900">{record.entity_id || <span className="text-gray-400 italic">Pending Sync</span>}</h4>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold ${record.status === 'SUBMITTED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold ${record.status === 'SUBMITTED' ? config.submitColor : 'bg-amber-100 text-amber-700'}`}>
                             {record.status === 'SUBMITTED' ? <CheckCircle size={12} /> : <Clock size={12} />}
                             {record.status}
                           </span>

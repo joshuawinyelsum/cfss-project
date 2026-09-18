@@ -291,7 +291,7 @@ export default function DashboardLayout({
 
 
   return (
-    <div className="flex h-[100dvh] bg-page overflow-hidden font-sans">
+    <div className="flex flex-1 w-full bg-page overflow-hidden font-sans">
       
       {/* Desktop Sidebar */}
       {!pathname.includes("/fill") && !pathname.includes("/view") && (
@@ -409,7 +409,7 @@ export default function DashboardLayout({
 
         {/* Scrollable Main Content */}
         <main className="flex-1 overflow-y-auto bg-page p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-4 lg:p-8">
-          <div className="max-w-6xl mx-auto h-full">
+          <div className="max-w-6xl mx-auto">
             {children}
           </div>
         </main>
