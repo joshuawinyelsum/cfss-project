@@ -26,7 +26,7 @@ export async function executeProvisioning(userId: number, token: string): Promis
 
     setStatus(userId, "PROVISIONING_DATA");
     
-    const downloadRes = await api.get("/api/student/sync/download", {
+    const downloadRes = await api.get("/api/sync/download", {
       headers: { Authorization: `Bearer ${token}` }
     });
     
@@ -81,8 +81,16 @@ export async function executeProvisioning(userId: number, token: string): Promis
     }, 1500);
     
     return true;
-  } catch (err) {
-    console.error("Provisioning failed:", err);
+  } catch (err: any) {
+    console.error("Provisioning failed. Detailed Diagnostic Log:");
+    console.error("Error name:", err.name);
+    console.error("Error message:", err.message);
+    if (err.response) {
+      console.error("HTTP status:", err.response.status);
+      console.error("Response body:", err.response.data);
+    }
+    console.error("Stack trace:", err.stack);
+    console.error("Original error:", err);
     setStatus(userId, "PROVISIONING_FAILED");
     return false;
   }
