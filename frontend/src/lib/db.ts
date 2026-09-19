@@ -7,7 +7,7 @@ export interface LocalSurvey {
   community_id: number;
   entity_id: string | null;
   answers: { question_id: string; answer: any }[];
-  status: 'DRAFT' | 'SUBMITTED';
+  status: 'DRAFT' | 'SUBMITTED' | 'DELETED';
   sync_status: 'pending' | 'syncing' | 'synced' | 'failed';
   sync_error?: string;
   created_at: string;

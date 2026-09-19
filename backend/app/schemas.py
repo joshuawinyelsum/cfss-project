@@ -223,3 +223,15 @@ class ChangePasswordRequest(BaseModel):
 
 class ThemeUpdate(BaseModel):
     theme: str
+
+class SyncOperationItem(BaseModel):
+    operation_id: str
+    operation_type: str
+    entity_type: str
+    entity_id: str
+    payload: Optional[Dict[str, Any]] = None
+    created_at: Optional[datetime] = None
+
+class SyncOperationsPayload(BaseModel):
+    operations: List[SyncOperationItem]
+

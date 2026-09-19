@@ -235,14 +235,17 @@ async def get_settings(db: AsyncSession = Depends(get_db_and_admin)):
 
 @router.get("/surveys/stats", response_model=schemas.AdminSurveyStatsResponse)
 async def get_survey_stats(db: AsyncSession = Depends(get_db_and_admin)):
-    # Total surveys
-    total_result = await db.execute(select(func.count(models.Survey.id)))
+    # Sync writes to SurveyRecord; only submitted records are collected data.
+    total_result = await db.execute(
+        select(func.count(models.SurveyRecord.id)).where(models.SurveyRecord.status == "SUBMITTED")
+    )
     total_surveys = total_result.scalar() or 0
     
     # By community
     by_comm_query = (
-        select(models.Community.name, func.count(models.Survey.id))
-        .join(models.Survey, models.Community.id == models.Survey.community_id)
+        select(models.Community.name, func.count(models.SurveyRecord.id))
+        .join(models.SurveyRecord, models.Community.id == models.SurveyRecord.community_id)
+        .where(models.SurveyRecord.status == "SUBMITTED")
         .group_by(models.Community.name)
         .order_by(models.Community.name)
     )
@@ -260,10 +263,11 @@ async def get_survey_stats(db: AsyncSession = Depends(get_db_and_admin)):
 @router.get("/surveys", response_model=List[schemas.AdminSurveyListResponse])
 async def get_all_surveys(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db_and_admin)):
     query = (
-        select(models.Survey, models.User, models.Community)
-        .join(models.User, models.Survey.user_id == models.User.id)
-        .join(models.Community, models.User.community_id == models.Community.id)
-        .order_by(models.Survey.created_at.desc())
+        select(models.SurveyRecord, models.User, models.Community)
+        .join(models.User, models.SurveyRecord.created_by_student_id == models.User.id)
+        .join(models.Community, models.SurveyRecord.community_id == models.Community.id)
+        .where(models.SurveyRecord.status == "SUBMITTED")
+        .order_by(models.SurveyRecord.submitted_at.desc(), models.SurveyRecord.created_at.desc())
         .offset(skip)
         .limit(limit)
     )
@@ -276,24 +280,19 @@ async def get_all_surveys(skip: int = 0, limit: int = 100, db: AsyncSession = De
             "student_email": user.email or "",
             "community_name": comm.name,
             "group_number": comm.group_number,
-            "submitted_at": survey.created_at,
+            "submitted_at": survey.submitted_at or survey.created_at,
             "status": survey.status,
-            "type": survey.type
+            "type": survey.survey_type
         })
     return response
 
 @router.get("/surveys/{survey_id}", response_model=schemas.AdminSurveyDetailResponse)
 async def get_survey(survey_id: str, db: AsyncSession = Depends(get_db_and_admin)):
-    try:
-        survey_id_int = int(survey_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid survey ID format")
-        
     query = (
-        select(models.Survey, models.User, models.Community)
-        .join(models.User, models.Survey.user_id == models.User.id)
-        .join(models.Community, models.User.community_id == models.Community.id)
-        .filter(models.Survey.id == survey_id_int)
+        select(models.SurveyRecord, models.User, models.Community)
+        .join(models.User, models.SurveyRecord.created_by_student_id == models.User.id)
+        .join(models.Community, models.SurveyRecord.community_id == models.Community.id)
+        .where(models.SurveyRecord.id == survey_id, models.SurveyRecord.status == "SUBMITTED")
     )
     result = await db.execute(query)
     row = result.first()
@@ -302,15 +301,18 @@ async def get_survey(survey_id: str, db: AsyncSession = Depends(get_db_and_admin
         raise HTTPException(status_code=404, detail="Survey not found")
         
     survey, user, comm = row
+    answers = await db.execute(
+        select(models.SurveyAnswer).where(models.SurveyAnswer.survey_record_id == survey.id)
+    )
     return {
         "id": str(survey.id),
         "student_email": user.email or "",
         "community_name": comm.name,
         "group_number": comm.group_number,
-        "submitted_at": survey.created_at,
+        "submitted_at": survey.submitted_at or survey.created_at,
         "status": survey.status,
-        "type": survey.type,
-        "responses": survey.data
+        "type": survey.survey_type,
+        "responses": {answer.question_id: answer.answer for answer in answers.scalars()}
     }
 
 @router.get("/students", response_model=List[schemas.UserResponse])

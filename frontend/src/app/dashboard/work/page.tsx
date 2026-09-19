@@ -5,6 +5,7 @@ import { useAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { db } from '@/lib/db';
+import { syncEngine } from '@/lib/sync';
 import { getEntityLabel } from '@/lib/entityLabel';
 import Link from 'next/link';
 import { ArrowRight, Clock, Trash2, AlertCircle, FileEdit, RefreshCw, FileText } from 'lucide-react';
@@ -24,7 +25,7 @@ export default function WorkWorkspacePage() {
     e.stopPropagation();
     if (confirm("Delete draft? This action cannot be undone.")) {
       try {
-        await db.surveys.delete(id);
+        await syncEngine.queueOperation('DELETE', id, null, token || '');
         setDrafts(drafts.filter(r => r.id !== id));
       } catch (err) {
         console.error("Failed to delete draft:", err);
@@ -45,7 +46,7 @@ export default function WorkWorkspacePage() {
         
         // Categorize local
         const localDrafts = localSurveys.filter(s => s.status === 'DRAFT').sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-        const localPending = localSurveys.filter(s => s.sync_status === 'pending' || s.sync_status === 'failed' || s.status === 'SUBMITTED' && s.sync_status !== 'synced');
+        const localPending = localSurveys.filter(s => s.status !== 'DELETED' && (s.sync_status === 'pending' || s.sync_status === 'failed' || (s.status === 'SUBMITTED' && s.sync_status !== 'synced')));
         
         // 2. Try fetching server data for recent submitted records
         let serverRecent = [];

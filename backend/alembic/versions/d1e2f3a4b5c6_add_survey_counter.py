@@ -44,3 +44,4 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_survey_counters_community_id'), table_name='survey_counters')
     op.drop_table('survey_counters')
     # ### end Alembic commands ###
+

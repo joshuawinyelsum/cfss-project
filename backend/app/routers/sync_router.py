@@ -7,28 +7,10 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 import re
 
-from app import models, auth
+from app import models, auth, schemas
 from app.database import get_db
 
 router = APIRouter(prefix="/api/sync", tags=["sync"])
-
-class SyncAnswer(BaseModel):
-    question_id: str
-    answer: Any
-
-class SyncSurvey(BaseModel):
-    survey_id: str
-    survey_type: str
-    community_id: int
-    house_number: Optional[str] = None
-    answers: List[SyncAnswer]
-    status: str
-    submitted_at: Optional[datetime] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-
-class SyncPayload(BaseModel):
-    surveys: List[SyncSurvey]
 
 async def get_current_student(db: AsyncSession = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     if current_user.role != "student":
@@ -45,7 +27,7 @@ async def get_current_student(db: AsyncSession = Depends(get_db), current_user: 
 
 @router.post("/operations")
 async def sync_operations(
-    payload: SyncOperationsPayload,
+    payload: schemas.SyncOperationsPayload,
     db: AsyncSession = Depends(get_db),
     user_data: tuple = Depends(get_current_student)
 ):
@@ -68,6 +50,8 @@ async def sync_operations(
                 if record:
                     if record.created_by_student_id != curr_user_id:
                         raise ValueError("Not authorized to delete this survey")
+                    if record.status == "SUBMITTED":
+                        raise ValueError("Cannot delete a submitted survey")
                     # Soft delete
                     record.status = "DELETED"
                     record.last_synced_at = func.now()
@@ -88,6 +72,8 @@ async def sync_operations(
                         raise ValueError("Not authorized to edit this survey")
                     if record.status == "DELETED":
                         raise ValueError("Cannot update a deleted survey")
+                    if record.status == "SUBMITTED":
+                        raise ValueError("Cannot edit a submitted survey")
                     
                     record.status = survey_data.get("status", record.status)
                     record.last_synced_at = func.now()

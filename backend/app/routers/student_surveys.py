@@ -86,7 +86,10 @@ async def get_dashboard_stats(
             func.sum(case((models.SurveyRecord.sync_status == "synced", 1), else_=0)).label("synced"),
             func.sum(case((models.SurveyRecord.sync_status == "failed", 1), else_=0)).label("failed"),
         )
-        .where(models.SurveyRecord.created_by_student_id == current_user.id)
+        .where(
+            models.SurveyRecord.created_by_student_id == current_user.id,
+            models.SurveyRecord.status != "DELETED"
+        )
     )
     counts = result.first()
     
@@ -100,14 +103,20 @@ async def get_dashboard_stats(
     # Last activity
     last_act_res = await db.execute(
         select(func.max(models.SurveyRecord.updated_at))
-        .where(models.SurveyRecord.created_by_student_id == current_user.id)
+        .where(
+            models.SurveyRecord.created_by_student_id == current_user.id,
+            models.SurveyRecord.status != "DELETED"
+        )
     )
     last_act = last_act_res.scalar()
     
     # Recent surveys
     recent_res = await db.execute(
         select(models.SurveyRecord)
-        .where(models.SurveyRecord.created_by_student_id == current_user.id)
+        .where(
+            models.SurveyRecord.created_by_student_id == current_user.id,
+            models.SurveyRecord.status != "DELETED"
+        )
         .order_by(models.SurveyRecord.updated_at.desc())
         .limit(5)
     )
@@ -289,7 +298,9 @@ async def get_surveys_by_type(
         select(models.SurveyRecord)
         .where(
             models.SurveyRecord.community_id == community.id,
-            models.SurveyRecord.survey_type == s_type
+            models.SurveyRecord.created_by_student_id == current_user.id,
+            models.SurveyRecord.survey_type == s_type,
+            models.SurveyRecord.status != "DELETED"
         )
         .order_by(models.SurveyRecord.entity_id)
     )

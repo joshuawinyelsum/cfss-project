@@ -132,6 +132,13 @@ export const syncEngine = {
     const userId = useAuthStore.getState().user?.id;
     if (!userId) return;
 
+    // A delete is terminal for this local record. Do not let a late form save
+    // recreate it while its deletion is waiting to be acknowledged.
+    const existingOps = await db.sync_operations.where('entity_id').equals(entityId).toArray();
+    if (operationType !== 'DELETE' && existingOps.some(op => op.operation_type === 'DELETE')) {
+        return;
+    }
+
     if (operationType !== 'DELETE' && payload) {
         payload.sync_status = 'pending';
         payload.updated_at = new Date().toISOString();
@@ -139,7 +146,6 @@ export const syncEngine = {
     }
 
     // Coalescing logic
-    const existingOps = await db.sync_operations.where('entity_id').equals(entityId).toArray();
     const pendingOps = existingOps.filter(op => op.status === 'PENDING' || op.status === 'FAILED');
 
     if (operationType === 'DELETE') {
