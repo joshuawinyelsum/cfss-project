@@ -14,11 +14,8 @@ import {
   User as UserIcon, 
   Settings, 
   LogOut, 
-  Menu, 
   X, 
-  Bell, 
   Users, 
-  BarChart2,
   ClipboardList,
   MoreHorizontal,
   RefreshCw
@@ -27,9 +24,9 @@ import { syncEngine } from '@/lib/sync';
 
 
 
-function ProvisioningScreen({ user, token, logout }: { user: any, token: string, logout: () => void }) {
-  const status = useAuthStore((state: any) => state.provisionedUsers[user.id]?.status) || 'UNPROVISIONED';
-  const setStatus = useAuthStore((state: any) => state.setProvisioningStatus);
+function ProvisioningScreen({ user, token, logout }: { user: { id: number | null }, token: string, logout: () => void }) {
+  const status = useAuthStore((state) => state.provisionedUsers[user.id ?? -1]?.status) || 'UNPROVISIONED';
+  const setStatus = useAuthStore((state) => state.setProvisioningStatus);
   const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
@@ -66,6 +63,7 @@ function ProvisioningScreen({ user, token, logout }: { user: any, token: string,
   };
 
   const isFailed = status === 'PROVISIONING_FAILED';
+  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-page p-6 text-center">
@@ -75,6 +73,12 @@ function ProvisioningScreen({ user, token, logout }: { user: any, token: string,
         </div>
         <h2 className="text-xl font-bold text-primary mb-2">Setting up your workspace</h2>
         <p className="text-secondary mb-8">{getStatusText()}</p>
+        
+        {isFailed && isOffline && (
+          <div className="mb-6 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 text-left">
+            <strong>You appear to be offline.</strong> Initial workspace setup requires an internet connection. Please connect to the internet and tap Retry.
+          </div>
+        )}
         
         {isFailed && (
           <div className="flex flex-col gap-3">
@@ -107,8 +111,12 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   
-  const [syncStatus, setSyncStatus] = useState('Online');
-  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState(() =>
+    typeof navigator !== 'undefined' && !navigator.onLine ? 'Offline' : 'Online'
+  );
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(() =>
+    typeof window === 'undefined' ? null : localStorage.getItem('cfss_last_sync')
+  );
   const [lastSyncText, setLastSyncText] = useState('Never');
   const [isSyncing, setIsSyncing] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -116,10 +124,6 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!token || !user || user.role !== 'student') return;
-
-    // Load initial sync time
-    const stored = localStorage.getItem('cfss_last_sync');
-    if (stored) setLastSyncTime(stored);
 
     const handleOnline = () => {
       setSyncStatus('Online');
@@ -142,10 +146,15 @@ export default function DashboardLayout({
     window.addEventListener('sync-completed', handleSyncCompleted);
 
     if (navigator.onLine && token) {
-      setIsSyncing(true);
-      syncEngine.processQueue(token).finally(() => setIsSyncing(false));
-    } else if (!navigator.onLine) {
-      setSyncStatus('Offline');
+      const syncInitialQueue = async () => {
+        setIsSyncing(true);
+        try {
+          await syncEngine.processQueue(token);
+        } finally {
+          setIsSyncing(false);
+        }
+      };
+      setTimeout(syncInitialQueue, 0);
     }
 
     return () => {
@@ -160,7 +169,7 @@ export default function DashboardLayout({
     const updateText = () => {
       try {
         setLastSyncText(formatDistanceToNow(new Date(lastSyncTime), { addSuffix: true }));
-      } catch (e) {
+      } catch {
         // Ignored
       }
     };
@@ -175,6 +184,7 @@ export default function DashboardLayout({
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHydrated(true);
   }, []);
 
@@ -190,15 +200,29 @@ export default function DashboardLayout({
     const verifyToken = async () => {
       try {
         const { api } = await import('@/lib/api');
-        await api.get('/api/v2/students/me', {
-          headers: { Authorization: 'Bearer ' + token }
-        });
-      } catch (err: any) {
-        if (err.response?.status === 401) {
+        // Race the network call against a 4-second timeout.
+        // On a dead network, browser TCP timeouts can take 20-30s.
+        // If the timeout wins, we treat the existing local token as valid
+        // (offline-first: a local token is sufficient for local data access).
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('TIMEOUT')), 4000)
+        );
+        await Promise.race([
+          api.get('/api/v2/students/me', { headers: { Authorization: 'Bearer ' + token } }),
+          timeout
+        ]);
+      } catch (err: unknown) {
+        const status =
+          typeof err === 'object' && err !== null && 'response' in err
+            ? (err.response as { status?: number } | undefined)?.status
+            : undefined;
+        if (status === 401) {
+          // Genuine auth rejection from server — log out.
           logout();
           router.push('/login');
           return;
         }
+        // Network error or timeout — preserve local session for offline use.
       }
       setAuthVerified(true);
     };
@@ -231,7 +255,7 @@ export default function DashboardLayout({
         }
 
         setDraftCount(count);
-      } catch (e) {
+      } catch {
         // Ignored
       }
     };
@@ -270,7 +294,7 @@ export default function DashboardLayout({
   ];
 
   
-  const provisionedUsers = useAuthStore((state: any) => state.provisionedUsers);
+  const provisionedUsers = useAuthStore((state) => state.provisionedUsers);
 
   if (!user) return null;
 
