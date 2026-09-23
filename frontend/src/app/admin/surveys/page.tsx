@@ -149,19 +149,19 @@ export default function AdminSurveysPage() {
       {/* Stats Cards */}
       {!loading && stats && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
-            <h3 className="text-sm font-medium text-slate-500 mb-1">Total Surveys</h3>
-            <p className="text-3xl font-bold text-slate-900">{stats.total_surveys}</p>
+          <div className="bg-surface p-5 rounded-xl border border-border-strong shadow-sm flex flex-col">
+            <h3 className="text-sm font-medium text-muted mb-1">Total Surveys</h3>
+            <p className="text-3xl font-bold text-primary">{stats.total_surveys}</p>
           </div>
           {/* We only show top 3 community counts to save space */}
           {stats.by_community.slice(0, 3).map((comm, idx) => (
-            <div key={idx} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col hidden sm:flex">
-              <h3 className="text-sm font-medium text-slate-500 mb-1 truncate" title={comm.community_name}>
+            <div key={idx} className="bg-surface p-5 rounded-xl border border-border-strong shadow-sm flex flex-col hidden sm:flex">
+              <h3 className="text-sm font-medium text-muted mb-1 truncate" title={comm.community_name}>
                 {comm.community_name}
               </h3>
               <div className="flex items-end gap-2">
-                <p className="text-3xl font-bold text-slate-900">{comm.count}</p>
-                <span className="text-sm text-slate-400 mb-1">surveys</span>
+                <p className="text-3xl font-bold text-primary">{comm.count}</p>
+                <span className="text-sm text-muted mb-1">surveys</span>
               </div>
             </div>
           ))}
@@ -171,21 +171,21 @@ export default function AdminSurveysPage() {
       {/* Header & Controls */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Surveys</h1>
-          <p className="text-sm text-slate-500 mt-1">Review all student submitted surveys</p>
+          <h1 className="text-2xl font-bold text-primary">Surveys</h1>
+          <p className="text-sm text-muted mt-1">Review all student submitted surveys</p>
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto flex-wrap xl:flex-nowrap">
           {/* Search */}
           <div className="relative w-full sm:w-64 shrink-0">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
             <input
               type="text"
-              className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-cfss-green focus:border-cfss-green sm:text-sm shadow-sm disabled:opacity-50"
+              className="block w-full pl-10 pr-3 py-2 border border-border-strong rounded-lg focus:ring-cfss-green focus:border-cfss-green sm:text-sm shadow-sm disabled:opacity-50"
               placeholder="Search by student email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -195,7 +195,7 @@ export default function AdminSurveysPage() {
 
           {/* Group Filter */}
           <select
-            className="block w-full sm:w-auto xl:w-40 pl-3 pr-10 py-2 border border-slate-300 bg-white rounded-lg focus:outline-none focus:ring-cfss-green focus:border-cfss-green sm:text-sm shadow-sm disabled:opacity-50"
+            className="block w-full sm:w-auto xl:w-40 pl-3 pr-10 py-2 border border-border-strong bg-surface rounded-lg focus:outline-none focus:ring-cfss-green focus:border-cfss-green sm:text-sm shadow-sm disabled:opacity-50"
             value={selectedGroup}
             onChange={(e) => setSelectedGroup(e.target.value)}
             disabled={loading}
@@ -208,7 +208,7 @@ export default function AdminSurveysPage() {
 
           {/* Community Filter */}
           <select
-            className="block w-full sm:w-auto xl:w-56 pl-3 pr-10 py-2 border border-slate-300 bg-white rounded-lg focus:outline-none focus:ring-cfss-green focus:border-cfss-green sm:text-sm shadow-sm disabled:opacity-50"
+            className="block w-full sm:w-auto xl:w-56 pl-3 pr-10 py-2 border border-border-strong bg-surface rounded-lg focus:outline-none focus:ring-cfss-green focus:border-cfss-green sm:text-sm shadow-sm disabled:opacity-50"
             value={selectedCommunity}
             onChange={(e) => setSelectedCommunity(e.target.value)}
             disabled={loading}
@@ -223,7 +223,7 @@ export default function AdminSurveysPage() {
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md">
+        <div className="bg-status-error/10 border-l-4 border-status-error p-4 rounded-md">
           <div className="flex items-center">
             <svg className="w-5 h-5 text-red-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -236,15 +236,15 @@ export default function AdminSurveysPage() {
       {/* Main Content Area */}
       {loading ? (
         <div className="flex justify-center items-center py-20">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-cfss-green"></div>
         </div>
       ) : filteredSurveys.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
-          <svg className="mx-auto h-12 w-12 text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="bg-surface rounded-xl shadow-sm border border-border-strong p-12 text-center">
+          <svg className="mx-auto h-12 w-12 text-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          <h3 className="text-lg font-medium text-slate-900 mb-1">No surveys found</h3>
-          <p className="text-slate-500">
+          <h3 className="text-lg font-medium text-primary mb-1">No surveys found</h3>
+          <p className="text-muted">
             {surveys.length === 0 
               ? "No surveys have been submitted to the system yet." 
               : "No surveys match your current search and filter criteria."}
@@ -259,58 +259,58 @@ export default function AdminSurveysPage() {
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200">
-              <thead className="bg-slate-50">
+        <div className="bg-surface rounded-xl shadow-sm border border-border-strong overflow-hidden">
+          <div className="break-words">
+            <table className="w-full text-sm text-left divide-y divide-border">
+              <thead className="bg-page">
                 <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">
                     Student Email
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">
                     Survey Type
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">
                     Community & Group
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">
                     Submitted
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">
                     Status
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-slate-200">
+              <tbody className="bg-surface divide-y divide-border">
                 {filteredSurveys.map((survey) => (
                   <tr 
                     key={survey.id} 
                     onClick={() => handleRowClick(survey.id)}
-                    className="hover:bg-slate-50 cursor-pointer transition-colors"
+                    className="hover:bg-page cursor-pointer transition-colors"
                   >
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4">
                       <div className="flex items-center">
-                        <div className="text-sm font-medium text-slate-900">{survey.student_name || "Anonymous"}</div>
-                          <div className="text-xs text-slate-500">{survey.student_id}</div>
+                        <div className="text-sm font-medium text-primary">{survey.student_name || "Anonymous"}</div>
+                          <div className="text-xs text-muted">{survey.student_id}</div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-md bg-page text-secondary border border-border-strong capitalize">
+                    <td className="px-6 py-4">
+                      <span className="px-2.5 py-1 inline-flex whitespace-nowrap text-xs leading-5 font-semibold rounded-md bg-page text-secondary border border-border-strong capitalize">
                         {survey.type}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-slate-900 font-medium">{survey.community_name}</div>
-                      <div className="text-xs text-slate-500">Group {survey.group_number}</div>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-primary font-medium">{survey.community_name}</div>
+                      <div className="text-xs text-muted">Group {survey.group_number}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                    <td className="px-6 py-4 text-sm text-muted whitespace-nowrap">
                       {formatDate(survey.submitted_at)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-1 inline-flex whitespace-nowrap text-xs leading-5 font-semibold rounded-full ${
                         survey.status === 'completed' || survey.status === 'submitted' 
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          ? 'bg-status-success/10 text-status-success border border-status-success/20' 
+                          : 'bg-status-warning/10 text-status-warning border border-status-warning/20'
                       }`}>
                         {survey.status.charAt(0).toUpperCase() + survey.status.slice(1)}
                       </span>
@@ -327,28 +327,28 @@ export default function AdminSurveysPage() {
       {(selectedSurvey || surveyDetailsLoading) && (
         <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-slate-900 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setSelectedSurvey(null)}></div>
+            <div className="fixed inset-0 bg-black/50 transition-opacity" aria-hidden="true" onClick={() => setSelectedSurvey(null)}></div>
 
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-            <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-full">
+            <div className="inline-block align-bottom bg-surface rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-full">
               {surveyDetailsLoading ? (
                 <div className="p-12 flex flex-col justify-center items-center">
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-4"></div>
-                  <p className="text-sm text-slate-500">Loading survey responses...</p>
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-cfss-green mb-4"></div>
+                  <p className="text-sm text-muted">Loading survey responses...</p>
                 </div>
               ) : selectedSurvey ? (
                 <>
-                  <div className="bg-white px-6 pt-6 pb-4 sm:p-6 sm:pb-4 border-b border-slate-200 flex justify-between items-center">
+                  <div className="bg-surface px-6 pt-6 pb-4 sm:p-6 sm:pb-4 border-b border-border-strong flex justify-between items-center">
                     <div>
-                      <h3 className="text-xl leading-6 font-bold text-slate-900" id="modal-title">
+                      <h3 className="text-xl leading-6 font-bold text-primary" id="modal-title">
                         Survey Details
                       </h3>
-                      <p className="text-xs text-slate-500 mt-1 uppercase tracking-wider font-semibold">
+                      <p className="text-xs text-muted mt-1 uppercase tracking-wider font-semibold">
                         {selectedSurvey.type} Survey
                       </p>
                     </div>
-                    <button onClick={() => setSelectedSurvey(null)} className="text-slate-400 hover:text-slate-500">
+                    <button onClick={() => setSelectedSurvey(null)} className="text-muted hover:text-muted">
                       <span className="sr-only">Close</span>
                       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -356,30 +356,30 @@ export default function AdminSurveysPage() {
                     </button>
                   </div>
                   
-                  <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
+                  <div className="px-6 py-4 bg-page border-b border-border-strong">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase">Student</p>
-                        <p className="text-sm font-semibold text-slate-900">{selectedSurvey.student_name || "Anonymous"}</p>
-                          <p className="text-xs text-slate-500">{selectedSurvey.student_id}</p>
+                        <p className="text-xs font-medium text-muted uppercase">Student</p>
+                        <p className="text-sm font-semibold text-primary">{selectedSurvey.student_name || "Anonymous"}</p>
+                          <p className="text-xs text-muted">{selectedSurvey.student_id}</p>
                       </div>
                       <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase">Submitted</p>
-                        <p className="text-sm font-semibold text-slate-900">{formatDate(selectedSurvey.submitted_at)}</p>
+                        <p className="text-xs font-medium text-muted uppercase">Submitted</p>
+                        <p className="text-sm font-semibold text-primary">{formatDate(selectedSurvey.submitted_at)}</p>
                       </div>
                       <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase">Community</p>
-                        <p className="text-sm font-semibold text-slate-900">{selectedSurvey.community_name}</p>
+                        <p className="text-xs font-medium text-muted uppercase">Community</p>
+                        <p className="text-sm font-semibold text-primary">{selectedSurvey.community_name}</p>
                       </div>
                       <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase">Group</p>
-                        <p className="text-sm font-semibold text-slate-900">Group {selectedSurvey.group_number}</p>
+                        <p className="text-xs font-medium text-muted uppercase">Group</p>
+                        <p className="text-sm font-semibold text-primary">Group {selectedSurvey.group_number}</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="px-6 py-5 max-h-[60vh] overflow-y-auto custom-scrollbar">
-                    <h4 className="text-sm font-bold text-slate-900 mb-4">Responses</h4>
+                    <h4 className="text-sm font-bold text-primary mb-4">Responses</h4>
                     
                     {selectedSurvey.responses && Object.keys(selectedSurvey.responses).length > 0 ? (
                       <div className="space-y-4">
@@ -398,8 +398,8 @@ export default function AdminSurveysPage() {
                                 <div className="space-y-1">
                                   {Object.entries(ans).map(([k, v]) => (
                                     <div key={k} className="flex gap-2 text-sm break-words">
-                                      <span className="font-medium text-slate-700 capitalize shrink-0">{k.replace(/_/g, ' ')}:</span>
-                                      <span className="text-slate-600 break-words">{String(v)}</span>
+                                      <span className="font-medium text-secondary capitalize shrink-0">{k.replace(/_/g, ' ')}:</span>
+                                      <span className="text-secondary break-words">{String(v)}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -409,9 +409,9 @@ export default function AdminSurveysPage() {
                           };
 
                           return (
-                            <div key={idx} className="bg-white border border-slate-200 rounded-lg p-4">
-                              <p className="text-sm font-semibold text-slate-800 mb-2">{question}</p>
-                              <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded border border-slate-100 overflow-x-auto">
+                            <div key={idx} className="bg-surface border border-border-strong rounded-lg p-4">
+                              <p className="text-sm font-semibold text-primary mb-2">{question}</p>
+                              <div className="text-sm text-secondary bg-page p-3 rounded border border-border break-words">
                                 {renderAnswer(answer)}
                               </div>
                             </div>
@@ -419,16 +419,16 @@ export default function AdminSurveysPage() {
                         })}
                       </div>
                     ) : (
-                      <div className="text-center py-8 bg-slate-50 rounded-lg border border-slate-200">
-                        <p className="text-sm text-slate-500">No responses recorded for this survey.</p>
+                      <div className="text-center py-8 bg-page rounded-lg border border-border-strong">
+                        <p className="text-sm text-muted">No responses recorded for this survey.</p>
                       </div>
                     )}
                   </div>
                   
-                  <div className="bg-slate-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-slate-200">
+                  <div className="bg-page px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-border-strong">
                     <button 
                       type="button" 
-                      className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-slate-900 text-base font-medium text-white hover:bg-slate-800 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+                      className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-cfss-green text-base font-medium text-white hover:bg-cfss-green-hover focus:outline-none sm:ml-3 sm:w-auto sm:text-sm transition-colors"
                       onClick={() => setSelectedSurvey(null)}
                     >
                       Close
