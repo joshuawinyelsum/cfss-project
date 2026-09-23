@@ -11,6 +11,11 @@ import { Shield, Monitor, HelpCircle, Info, LogOut, Check, X, AlertCircle , Arro
 export default function SettingsPage() {
   const { user, token, theme, setTheme, logout } = useAuthStore();
   const router = useRouter();
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
   
   const [loading, setLoading] = useState(true);
   
@@ -27,6 +32,8 @@ export default function SettingsPage() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   useEffect(() => {
+    if (!hydrated) return;
+
     if (!token || user?.role !== 'student') {
       router.push('/login');
       return;
@@ -364,3 +371,5 @@ Loading settings...</div>
     </DashboardLayout>
   );
 }
+
+

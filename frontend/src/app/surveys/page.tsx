@@ -20,8 +20,15 @@ export default function SurveysPage() {
   const router = useRouter();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+
     if (!token) {
       router.push('/login');
       return;
@@ -68,16 +75,13 @@ export default function SurveysPage() {
           };
         }
         setStats(mergedStats);
-      } catch (e) {
-        console.error("Failed to load survey stats", e);
-        setStats(localStats);
-      } finally {
+      } catch (e) { console.error("Failed to load survey stats", e); setStats(localStats); } finally {
         setLoading(false);
       }
     };
     
     loadStats();
-  }, [user, token, router]);
+  }, [user, token, router, hydrated]);
 
   if (!user) return null;
 
@@ -142,3 +146,4 @@ export default function SurveysPage() {
     </DashboardLayout>
   );
 }
+

@@ -1,7 +1,7 @@
 "use client";
 import Link from 'next/link';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
@@ -11,8 +11,15 @@ import { User as UserIcon , ArrowLeft } from 'lucide-react';
 export default function StudentProfile() {
   const { user, token, logout, setAuth } = useAuthStore();
   const router = useRouter();
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+
     if (!token) {
       router.push('/login');
       return;
@@ -195,3 +202,5 @@ export default function StudentProfile() {
     </DashboardLayout>
   );
 }
+
+

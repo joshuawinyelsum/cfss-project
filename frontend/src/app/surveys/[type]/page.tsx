@@ -30,6 +30,11 @@ export default function SurveyWorkspace() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   const handleDelete = async (id: string) => {
     try {
@@ -44,6 +49,8 @@ export default function SurveyWorkspace() {
   };
 
   useEffect(() => {
+    if (!hydrated) return;
+
     if (!token || user?.role !== 'student') {
       router.push('/login');
       return;
@@ -84,7 +91,7 @@ export default function SurveyWorkspace() {
     };
     
     loadRecords();
-  }, [user, token, router, typeStr]);
+  }, [user, token, router, typeStr, hydrated]);
 
   const handleCreate = async () => {
     if (creating || !user) return;
@@ -245,5 +252,6 @@ export default function SurveyWorkspace() {
     </DashboardLayout>
   );
 }
+
 
 
