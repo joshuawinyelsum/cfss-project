@@ -112,7 +112,7 @@ export default function AdminDashboard() {
       {/* Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center gap-5">
-          <div className="p-4 bg-blue-50 text-blue-600 rounded-xl">
+          <div className="p-4 bg-blue-50 text-cfss-green rounded-xl">
              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
           </div>
           <div>
@@ -126,13 +126,13 @@ export default function AdminDashboard() {
         </div>
         
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center gap-5">
-          <div className="p-4 bg-emerald-50 text-emerald-600 rounded-xl">
+          <div className="p-4 bg-emerald-50 text-cfss-green rounded-xl">
              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
           </div>
           <div>
             <p className="text-sm font-semibold text-slate-500 mb-1">Total Surveys</p>
             <p className="text-3xl font-bold text-slate-900">{surveys.length}</p>
-            <p className="text-xs text-emerald-600 font-medium flex items-center gap-1 mt-1">
+            <p className="text-xs text-cfss-green font-medium flex items-center gap-1 mt-1">
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
               28 this week
             </p>
@@ -178,27 +178,27 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="px-6 py-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                <svg className="w-5 h-5 text-cfss-green" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 System Sync Overview
               </h2>
             </div>
             <div className="p-6">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
-                  <p className="text-sm font-medium text-slate-500 mb-1">Total Surveys</p>
-                  <p className="text-2xl font-bold text-slate-900">{syncStats.total}</p>
+                <div className="p-4 bg-page rounded-lg border border-border-strong">
+                  <p className="text-sm font-medium text-muted mb-1">Total Surveys</p>
+                  <p className="text-2xl font-bold text-primary">{syncStats.total}</p>
                 </div>
-                <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-100">
-                  <p className="text-sm font-medium text-emerald-600 mb-1">Synced</p>
-                  <p className="text-2xl font-bold text-emerald-700">{syncStats.synced}</p>
+                <div className="p-4 bg-page rounded-lg border border-border-strong">
+                  <p className="text-sm font-medium text-muted mb-1">Synced</p>
+                  <p className="text-2xl font-bold text-primary">{syncStats.synced}</p>
                 </div>
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
-                  <p className="text-sm font-medium text-blue-600 mb-1">Pending Sync</p>
-                  <p className="text-2xl font-bold text-blue-700">{syncStats.pending}</p>
+                <div className="p-4 bg-page rounded-lg border border-border-strong">
+                  <p className="text-sm font-medium text-muted mb-1">Pending Sync</p>
+                  <p className="text-2xl font-bold text-primary">{syncStats.pending}</p>
                 </div>
-                <div className="p-4 bg-red-50 rounded-lg border border-red-100">
-                  <p className="text-sm font-medium text-red-600 mb-1">Failed Syncs</p>
-                  <p className="text-2xl font-bold text-red-700">{syncStats.failed}</p>
+                <div className="p-4 bg-page rounded-lg border border-border-strong">
+                  <p className="text-sm font-medium text-muted mb-1">Failed Syncs</p>
+                  <p className="text-2xl font-bold text-primary">{syncStats.failed}</p>
                 </div>
               </div>
             </div>
@@ -211,7 +211,7 @@ export default function AdminDashboard() {
                 <svg className="w-5 h-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                 Communities & Groups
               </h2>
-              <button onClick={() => {}} className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-2 transition-colors">
+              <button onClick={() => {}} className="bg-cfss-green hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-2 transition-colors">
                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                  Create Community
               </button>
@@ -231,7 +231,7 @@ export default function AdminDashboard() {
                 <tbody className="divide-y divide-slate-100">
                   {communities.map(c => {
                     const progress = Math.min(100, Math.round((c.current_count / c.max_capacity) * 100)) || 0;
-                    const barColor = progress > 90 ? 'bg-red-500' : progress > 60 ? 'bg-emerald-500' : 'bg-emerald-500';
+                    const barColor = progress > 90 ? 'bg-red-500' : progress > 60 ? 'bg-cfss-green' : 'bg-cfss-green';
                     return (
                       <tr key={c.id} className="hover:bg-slate-50 transition-colors">
                         <td className="py-4 px-6 font-medium text-slate-900">{c.name}</td>
@@ -257,7 +257,7 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
               <div className="py-3 text-center border-t border-slate-100">
-                <button className="text-sm text-blue-600 hover:text-blue-700 font-medium inline-flex items-center gap-1">
+                <button className="text-sm text-cfss-green hover:text-cfss-green-hover font-medium inline-flex items-center gap-1">
                   View all communities <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                 </button>
               </div>
@@ -292,7 +292,7 @@ export default function AdminDashboard() {
                       <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                         <td className="py-4 px-6">
                           <div className="flex items-center gap-3">
-                             <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs border border-blue-200 shrink-0">
+                             <div className="w-9 h-9 rounded-full bg-blue-100 text-cfss-green flex items-center justify-center font-bold text-xs border border-cfss-green-soft shrink-0">
                                {student?.name?.substring(0,2).toUpperCase() || 'NA'}
                              </div>
                              <div>
@@ -313,7 +313,7 @@ export default function AdminDashboard() {
                            })}
                         </td>
                         <td className="py-4 px-6">
-                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border uppercase tracking-wide ${isSubmitted ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-orange-50 text-orange-500 border-orange-200'}`}>
+                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border uppercase tracking-wide ${isSubmitted ? 'bg-emerald-50 text-cfss-green border-emerald-200' : 'bg-orange-50 text-orange-500 border-orange-200'}`}>
                             {s.status}
                           </span>
                         </td>
@@ -323,7 +323,7 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
               <div className="py-3 text-center border-t border-slate-100">
-                <button className="text-sm text-blue-600 hover:text-blue-700 font-medium inline-flex items-center gap-1">
+                <button className="text-sm text-cfss-green hover:text-cfss-green-hover font-medium inline-flex items-center gap-1">
                   View all surveys <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                 </button>
               </div>
@@ -348,7 +348,7 @@ export default function AdminDashboard() {
                   <option>Information Technology</option>
                   <option>Engineering</option>
                 </select>
-                <button onClick={handleExportStudents} disabled={exporting} className="text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 py-2 px-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                <button onClick={handleExportStudents} disabled={exporting} className="text-cfss-green border border-cfss-green-soft bg-blue-50 hover:bg-blue-100 py-2 px-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                   {exporting ? "Exporting..." : "Export CSV"}
                 </button>
@@ -381,7 +381,7 @@ export default function AdminDashboard() {
                         <td className="py-4 px-6 text-slate-600">{community?.group_label || 'N/A'}</td>
                         <td className="py-4 px-6 text-slate-500 text-xs">May 10, 2024</td>
                         <td className="py-4 px-6">
-                          <span className="px-2 py-1 rounded text-xs font-semibold text-emerald-600">Active</span>
+                          <span className="px-2 py-1 rounded text-xs font-semibold text-cfss-green">Active</span>
                         </td>
                       </tr>
                     )
@@ -392,7 +392,7 @@ export default function AdminDashboard() {
                 <span>Showing 1 to {Math.min(5, students.length)} of {students.length} students</span>
                 <div className="flex gap-1 items-center">
                   <button className="w-8 h-8 flex items-center justify-center border border-slate-200 rounded text-slate-400 hover:bg-slate-50">&lt;</button>
-                  <button className="w-8 h-8 flex items-center justify-center border border-blue-600 bg-blue-600 text-white rounded">1</button>
+                  <button className="w-8 h-8 flex items-center justify-center border border-cfss-green bg-cfss-green text-white rounded">1</button>
                   <button className="w-8 h-8 flex items-center justify-center border border-slate-200 rounded hover:bg-slate-50">2</button>
                   <button className="w-8 h-8 flex items-center justify-center border border-slate-200 rounded hover:bg-slate-50">3</button>
                   <span className="px-1">...</span>
@@ -418,7 +418,7 @@ export default function AdminDashboard() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                  <span className="text-sm font-semibold text-slate-700">Current Status</span>
-                 <div className={`px-4 py-1.5 rounded-lg text-center font-bold text-sm ${settings.registration_open ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
+                 <div className={`px-4 py-1.5 rounded-lg text-center font-bold text-sm ${settings.registration_open ? 'bg-emerald-50 text-cfss-green border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
                    {settings.registration_open ? 'OPEN' : 'CLOSED'}
                  </div>
               </div>
@@ -427,7 +427,7 @@ export default function AdminDashboard() {
                  <span className="text-sm text-slate-600">Registration is currently open for students.</span>
                  <button 
                    onClick={handleToggleRegistration} 
-                   className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none shrink-0 ${settings.registration_open ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                   className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none shrink-0 ${settings.registration_open ? 'bg-cfss-green' : 'bg-slate-300'}`}
                  >
                    <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-sm transition-transform ${settings.registration_open ? 'translate-x-7' : 'translate-x-1'}`} />
                  </button>
@@ -438,7 +438,7 @@ export default function AdminDashboard() {
               <div>
                  <span className="text-sm font-semibold text-slate-800">Registration Control</span>
                  <div className="flex items-start gap-3 border border-slate-200 rounded-lg p-3 mt-3 shadow-sm bg-slate-50">
-                    <svg className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                    <svg className="w-5 h-5 text-cfss-green shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                     <div>
                       <p className="text-xs font-semibold text-slate-900">Open Registration</p>
                       <p className="text-[11px] text-slate-500">Opened on: May 10, 2024 08:00 AM</p>
@@ -455,7 +455,7 @@ export default function AdminDashboard() {
               Whitelist Management
             </h2>
             <p className="text-sm text-slate-600 mb-4">Go to the detailed whitelist management page to upload new whitelists and view history.</p>
-            <a href="/admin/whitelist" className="w-full inline-flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg shadow-sm transition-colors">
+            <a href="/admin/whitelist" className="w-full inline-flex justify-center items-center gap-2 bg-cfss-green hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg shadow-sm transition-colors">
               Manage Whitelists
             </a>
           </div>
@@ -468,15 +468,15 @@ export default function AdminDashboard() {
             </h2>
             
             <div className="space-y-3">
-              <button onClick={handleExportStudents} disabled={exporting} className="w-full flex items-center gap-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold py-3 px-4 rounded-xl transition-colors border border-emerald-200 shadow-sm text-sm">
+              <button onClick={handleExportStudents} disabled={exporting} className="w-full flex items-center gap-3 bg-page hover:bg-page/80 text-primary font-bold py-3 px-4 rounded-xl transition-colors border border-border-strong shadow-sm text-sm">
                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                  Export Students (CSV)
               </button>
-              <button onClick={handleExportSurveys} disabled={exporting} className="w-full flex items-center gap-3 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold py-3 px-4 rounded-xl transition-colors border border-blue-200 shadow-sm text-sm">
+              <button onClick={handleExportSurveys} disabled={exporting} className="w-full flex items-center gap-3 bg-page hover:bg-page/80 text-primary font-bold py-3 px-4 rounded-xl transition-colors border border-border-strong shadow-sm text-sm">
                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                  Export Surveys (CSV)
               </button>
-              <button className="w-full flex items-center gap-3 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold py-3 px-4 rounded-xl transition-colors border border-purple-200 shadow-sm text-sm">
+              <button className="w-full flex items-center gap-3 bg-page hover:bg-page/80 text-primary font-bold py-3 px-4 rounded-xl transition-colors border border-border-strong shadow-sm text-sm">
                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                  Export Reports (PDF)
               </button>

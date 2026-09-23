@@ -120,7 +120,11 @@ class SurveyResponse(BaseModel):
 
 class AdminSurveyListResponse(BaseModel):
     id: str
+    user_id: int
+    student_id: str
+    student_name: str
     student_email: str
+    community_id: int
     community_name: str
     group_number: int
     submitted_at: datetime

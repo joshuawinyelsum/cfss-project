@@ -28,7 +28,7 @@ function NavItem({ href, icon: Icon, label, active, pathname }: {
 }) {
   const isActive = active || pathname === href;
   return (
-    <Link href={href} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+    <Link href={href} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-cfss-green text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
       <Icon className="w-5 h-5" />
       {label}
     </Link>
@@ -111,7 +111,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (authLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cfss-green"></div>
       </div>
     );
   }
@@ -130,7 +130,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         
         {/* Logo */}
         <div className="h-20 flex items-center px-6 gap-3 border-b border-slate-800 shrink-0">
-          <div className="w-8 h-8 bg-emerald-500 rounded flex items-center justify-center">
+          <div className="w-8 h-8 bg-cfss-green rounded flex items-center justify-center">
             <ShieldCheck className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -161,7 +161,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* User Profile */}
         <div className="p-4 border-t border-slate-800 shrink-0">
           <div className="flex items-center gap-3 bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
-            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center font-bold shadow-sm">
+            <div className="w-10 h-10 bg-cfss-green rounded-full flex items-center justify-center font-bold shadow-sm">
               <Users className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
@@ -200,7 +200,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <input 
                 type="text" 
                 placeholder="Search students, surveys..." 
-                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm dark:text-white rounded-lg pl-10 pr-12 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm dark:text-white rounded-lg pl-10 pr-12 py-2.5 focus:outline-none focus:ring-2 focus:ring-cfss-green focus:border-transparent transition-all"
               />
               <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
                 <span className="text-xs text-slate-400 font-medium px-1.5 py-0.5 border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-800">⌘K</span>
@@ -210,11 +210,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div className="flex items-center gap-5 border-l border-slate-200 dark:border-slate-700 pl-6">
               <Link href="/admin/notifications" className="relative text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors">
                 <Bell className="w-5 h-5" />
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800"></span>
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-cfss-green rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800"></span>
               </Link>
               
               <div className="flex items-center gap-3">
-                 <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-200 rounded-full flex items-center justify-center font-bold">
+                 <div className="w-9 h-9 bg-cfss-green-soft dark:bg-blue-900 text-cfss-green dark:text-blue-200 rounded-full flex items-center justify-center font-bold">
                    A
                  </div>
                  <div className="hidden sm:block text-right">

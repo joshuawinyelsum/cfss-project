@@ -15,7 +15,11 @@ interface SurveyStats {
 
 interface SurveyList {
   id: string;
+  user_id: number;
+  student_id: string;
+  student_name: string;
   student_email: string;
+  community_id: number;
   community_name: string;
   group_number: number;
   submitted_at: string;
@@ -181,7 +185,7 @@ export default function AdminSurveysPage() {
             </div>
             <input
               type="text"
-              className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm shadow-sm disabled:opacity-50"
+              className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-cfss-green focus:border-cfss-green sm:text-sm shadow-sm disabled:opacity-50"
               placeholder="Search by student email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -191,7 +195,7 @@ export default function AdminSurveysPage() {
 
           {/* Group Filter */}
           <select
-            className="block w-full sm:w-auto xl:w-40 pl-3 pr-10 py-2 border border-slate-300 bg-white rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm shadow-sm disabled:opacity-50"
+            className="block w-full sm:w-auto xl:w-40 pl-3 pr-10 py-2 border border-slate-300 bg-white rounded-lg focus:outline-none focus:ring-cfss-green focus:border-cfss-green sm:text-sm shadow-sm disabled:opacity-50"
             value={selectedGroup}
             onChange={(e) => setSelectedGroup(e.target.value)}
             disabled={loading}
@@ -204,7 +208,7 @@ export default function AdminSurveysPage() {
 
           {/* Community Filter */}
           <select
-            className="block w-full sm:w-auto xl:w-56 pl-3 pr-10 py-2 border border-slate-300 bg-white rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm shadow-sm disabled:opacity-50"
+            className="block w-full sm:w-auto xl:w-56 pl-3 pr-10 py-2 border border-slate-300 bg-white rounded-lg focus:outline-none focus:ring-cfss-green focus:border-cfss-green sm:text-sm shadow-sm disabled:opacity-50"
             value={selectedCommunity}
             onChange={(e) => setSelectedCommunity(e.target.value)}
             disabled={loading}
@@ -248,7 +252,7 @@ export default function AdminSurveysPage() {
           {(searchTerm || selectedCommunity !== 'All' || selectedGroup !== 'All') && (
             <button 
               onClick={() => { setSearchTerm(''); setSelectedCommunity('All'); setSelectedGroup('All'); }}
-              className="mt-4 text-blue-600 hover:text-blue-800 font-medium text-sm"
+              className="mt-4 text-cfss-green hover:text-cfss-green-hover font-medium text-sm"
             >
               Clear filters
             </button>
@@ -286,11 +290,12 @@ export default function AdminSurveysPage() {
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="text-sm font-medium text-slate-900">{survey.student_email || "Anonymous"}</div>
+                        <div className="text-sm font-medium text-slate-900">{survey.student_name || "Anonymous"}</div>
+                          <div className="text-xs text-slate-500">{survey.student_id}</div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-md bg-purple-100 text-purple-800 capitalize">
+                      <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-md bg-page text-secondary border border-border-strong capitalize">
                         {survey.type}
                       </span>
                     </td>
@@ -304,8 +309,8 @@ export default function AdminSurveysPage() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         survey.status === 'completed' || survey.status === 'submitted' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-yellow-100 text-yellow-800'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
                       }`}>
                         {survey.status.charAt(0).toUpperCase() + survey.status.slice(1)}
                       </span>
@@ -355,7 +360,8 @@ export default function AdminSurveysPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs font-medium text-slate-500 uppercase">Student</p>
-                        <p className="text-sm font-semibold text-slate-900">{selectedSurvey.student_email || "Anonymous"}</p>
+                        <p className="text-sm font-semibold text-slate-900">{selectedSurvey.student_name || "Anonymous"}</p>
+                          <p className="text-xs text-slate-500">{selectedSurvey.student_id}</p>
                       </div>
                       <div>
                         <p className="text-xs font-medium text-slate-500 uppercase">Submitted</p>

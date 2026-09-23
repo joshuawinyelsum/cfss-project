@@ -267,7 +267,7 @@ async def get_all_surveys(skip: int = 0, limit: int = 100, db: AsyncSession = De
         .join(models.User, models.SurveyRecord.created_by_student_id == models.User.id)
         .join(models.Community, models.SurveyRecord.community_id == models.Community.id)
         .where(models.SurveyRecord.status == "SUBMITTED")
-        .order_by(models.SurveyRecord.submitted_at.desc(), models.SurveyRecord.created_at.desc())
+        .order_by(models.SurveyRecord.submitted_at.desc().nulls_last(), models.SurveyRecord.created_at.desc())
         .offset(skip)
         .limit(limit)
     )
@@ -277,7 +277,11 @@ async def get_all_surveys(skip: int = 0, limit: int = 100, db: AsyncSession = De
     for survey, user, comm in result.all():
         response.append({
             "id": str(survey.id),
+            "user_id": user.id,
+            "student_id": user.student_id,
+            "student_name": user.name,
             "student_email": user.email or "",
+            "community_id": comm.id,
             "community_name": comm.name,
             "group_number": comm.group_number,
             "submitted_at": survey.submitted_at or survey.created_at,
