@@ -18,7 +18,8 @@ import {
   Users, 
   ClipboardList,
   MoreHorizontal,
-  RefreshCw
+  RefreshCw,
+  WifiOff
 } from 'lucide-react';
 import { syncEngine } from '@/lib/sync';
 
@@ -28,6 +29,22 @@ function ProvisioningScreen({ user, token, logout }: { user: { id: number | null
   const status = useAuthStore((state) => state.provisionedUsers[user.id ?? -1]?.status) || 'UNPROVISIONED';
   const setStatus = useAuthStore((state) => state.setProvisioningStatus);
   const [retrying, setRetrying] = useState(false);
+  
+  // Reactively track offline status
+  const [isOffline, setIsOffline] = useState(
+    typeof navigator !== 'undefined' ? !navigator.onLine : false
+  );
+
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     // If the component mounts and the status is an "active" provisioning state, 
@@ -38,11 +55,16 @@ function ProvisioningScreen({ user, token, logout }: { user: { id: number | null
     }
 
     if (status === 'UNPROVISIONED' && !retrying) {
-      if (user.id) import('@/lib/provisioning').then(m => m.executeProvisioning(user.id as number, token));
+      if (isOffline) {
+        // Do not attempt provisioning if we are offline and unprovisioned
+        return;
+      }
+      if (user.id) import('@/lib/provisioning').then(m => m.executeProvisioning(user.id as number, token).finally(() => setRetrying(false)));
     }
-  }, [status, retrying, user.id, token, setStatus]);
+  }, [status, retrying, user.id, token, setStatus, isOffline]);
 
   const handleRetry = () => {
+    if (isOffline) return;
     setRetrying(true);
     if (user.id) import('@/lib/provisioning').then(m => m.executeProvisioning(user.id as number, token).finally(() => setRetrying(false)));
   };
@@ -63,7 +85,40 @@ function ProvisioningScreen({ user, token, logout }: { user: { id: number | null
   };
 
   const isFailed = status === 'PROVISIONING_FAILED';
-  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+  if (isOffline && (status === 'UNPROVISIONED' || isFailed)) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-page p-6 text-center">
+        <div className="bg-surface p-8 rounded-2xl shadow-sm border border-border max-w-md w-full">
+          <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <WifiOff size={32} />
+          </div>
+          <h2 className="text-xl font-bold text-primary mb-2">You&apos;re offline</h2>
+          <p className="text-secondary mb-6">
+            CFSS needs an internet connection to finish setting up this device.
+          </p>
+          <div className="mb-6 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 text-left">
+            Reconnect to the internet and try again.
+          </div>
+          <div className="flex flex-col gap-3">
+            <button 
+              onClick={handleRetry}
+              disabled={true}
+              className="w-full py-3 bg-gray-100 text-gray-400 rounded-xl font-medium cursor-not-allowed"
+            >
+              Retry
+            </button>
+            <button 
+              onClick={logout}
+              className="w-full py-3 bg-red-50 text-red-700 rounded-xl font-medium hover:bg-red-100 transition-colors"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-page p-6 text-center">
@@ -73,12 +128,6 @@ function ProvisioningScreen({ user, token, logout }: { user: { id: number | null
         </div>
         <h2 className="text-xl font-bold text-primary mb-2">Setting up your workspace</h2>
         <p className="text-secondary mb-8">{getStatusText()}</p>
-        
-        {isFailed && isOffline && (
-          <div className="mb-6 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 text-left">
-            <strong>You appear to be offline.</strong> Initial workspace setup requires an internet connection. Please connect to the internet and tap Retry.
-          </div>
-        )}
         
         {isFailed && (
           <div className="flex flex-col gap-3">

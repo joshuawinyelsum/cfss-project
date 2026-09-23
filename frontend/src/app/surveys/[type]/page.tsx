@@ -6,7 +6,8 @@ import { useRouter, useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import DashboardLayout from '@/app/dashboard/layout';
 import Link from 'next/link';
-import { Plus, ArrowLeft, Home, Building, Heart, Book, FileText, Clock, CheckCircle, LucideIcon } from 'lucide-react';
+import { Plus, ArrowLeft, Home, Building, Heart, Book, FileText, Clock, CheckCircle, Trash2, LucideIcon } from 'lucide-react';
+import { LocalSurvey } from '@/lib/db';
 
 
 const SURVEY_CONFIG: Record<string, { name: string, actionLabel: string, icon: LucideIcon, colorClass: string, submitColor: string }> = {
@@ -25,9 +26,22 @@ export default function SurveyWorkspace() {
   const surveyName = config.name;
   const SurveyIcon = config.icon;
   
-  const [records, setRecords] = useState<any[]>([]);
+  const [records, setRecords] = useState<LocalSurvey[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const handleDelete = async (id: string) => {
+    try {
+      const { syncEngine } = await import('@/lib/sync');
+      await syncEngine.queueOperation('DELETE', id, null, token || '');
+      setRecords(prev => prev.filter(r => r.id !== id));
+    } catch (err) {
+      console.error("Failed to delete draft:", err);
+    } finally {
+      setConfirmDeleteId(null);
+    }
+  };
 
   useEffect(() => {
     if (!token || user?.role !== 'student') {
@@ -39,20 +53,20 @@ export default function SurveyWorkspace() {
       try {
         const { db } = await import('@/lib/db');
         const localSurveys = await db.surveys.where('student_id').equals(user.id as number).toArray();
-        const typeLocal = localSurveys.filter(s => s.survey_type.toLowerCase() === typeStr.toLowerCase());
+        const typeLocal = localSurveys.filter(s => s.survey_type.toLowerCase() === typeStr.toLowerCase() && s.status !== 'DELETED');
 
-        let serverRecords: any[] = [];
+        let serverRecords: LocalSurvey[] = [];
         if (navigator.onLine) {
           try {
             const res = await api.get(`/api/student/surveys/${typeStr}`, { headers: { Authorization: `Bearer ${token}` } });
-            serverRecords = res.data;
+            serverRecords = res.data as LocalSurvey[];
           } catch(e) {
             console.warn("Could not fetch server records", e);
           }
         }
         
         // Merge records (local takes precedence if ID matches)
-        const mergedMap = new Map();
+        const mergedMap = new Map<string, LocalSurvey>();
         for (const sr of serverRecords) {
           mergedMap.set(sr.id, sr);
         }
@@ -173,16 +187,27 @@ export default function SurveyWorkspace() {
                       </div>
                     </div>
                     
-                    <Link 
-                      href={`/surveys/${typeStr}/${record.status === 'SUBMITTED' ? 'view' : 'fill'}?id=${record.id}`}
-                      className={`px-4 py-2 font-medium rounded-lg transition-colors text-sm text-center ${
-                        record.status === 'SUBMITTED' 
-                          ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' 
-                          : 'bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100'
-                      }`}
-                    >
-                      {record.status === 'SUBMITTED' ? 'View Details' : 'Continue Draft'}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      {record.status === 'DRAFT' && (
+                        <button
+                          onClick={() => setConfirmDeleteId(record.id)}
+                          className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          title="Delete draft"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                      <Link 
+                        href={`/surveys/${typeStr}/${record.status === 'SUBMITTED' ? 'view' : 'fill'}?id=${record.id}`}
+                        className={`px-4 py-2 font-medium rounded-lg transition-colors text-sm text-center ${
+                          record.status === 'SUBMITTED' 
+                            ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' 
+                            : 'bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100'
+                        }`}
+                      >
+                        {record.status === 'SUBMITTED' ? 'View Details' : 'Continue Draft'}
+                      </Link>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -191,9 +216,34 @@ export default function SurveyWorkspace() {
         </div>
 
       </div>
+
+      {/* Delete confirmation modal */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Delete this draft?</h2>
+            <p className="text-sm text-gray-600 mb-6">
+              This draft will be removed from your workspace. If it has already synchronized, the deletion will be queued and applied to the server when you&apos;re back online.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(confirmDeleteId)}
+                className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }
-
 
 

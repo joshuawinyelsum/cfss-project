@@ -15,7 +15,7 @@ export default function ExportsPage() {
     try {
       setExportingStudents(true);
       await downloadExport('/admin/export/students', 'students_export.csv', token!);
-    } catch (e) {
+    } catch {
       alert("Export failed. Check server.");
     } finally {
       setExportingStudents(false);
@@ -26,7 +26,7 @@ export default function ExportsPage() {
     try {
       setExportingSurveys(true);
       await downloadExport('/admin/export/surveys', 'surveys_export.csv', token!);
-    } catch (e) {
+    } catch {
       alert("Export failed. Check server.");
     } finally {
       setExportingSurveys(false);

@@ -11,6 +11,30 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+function NavSection({ title }: { title: string }) {
+  return (
+    <div className="px-4 py-2 mt-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+      {title}
+    </div>
+  );
+}
+
+function NavItem({ href, icon: Icon, label, active, pathname }: {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  active?: boolean;
+  pathname: string;
+}) {
+  const isActive = active || pathname === href;
+  return (
+    <Link href={href} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+      <Icon className="w-5 h-5" />
+      {label}
+    </Link>
+  );
+}
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, token, logout, theme } = useAdminAuthStore();
   const router = useRouter();
@@ -20,6 +44,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHydrated(true);
   }, []);
 
@@ -57,7 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         } else {
           setAuthLoading(false);
         }
-      } catch (err) {
+      } catch {
         // Invalid token
         logout();
         if (pathname !== '/admin/login') {
@@ -76,7 +101,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       await api.post('/api/admin/logout', {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-    } catch (e) {
+    } catch {
       // ignore
     }
     logout();
@@ -96,22 +121,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   if (!user || user.role !== 'admin') return null;
-
-  const NavItem = ({ href, icon: Icon, label, active }: { href: string, icon: any, label: string, active?: boolean }) => {
-    const isActive = active || pathname === href;
-    return (
-      <Link href={href} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
-        <Icon className="w-5 h-5" />
-        {label}
-      </Link>
-    );
-  };
-
-  const NavSection = ({ title }: { title: string }) => (
-    <div className="px-4 py-2 mt-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-      {title}
-    </div>
-  );
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 font-sans overflow-hidden">
@@ -133,20 +142,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1 custom-scrollbar">
           <NavSection title="MAIN" />
-          <NavItem href="/admin" icon={LayoutDashboard} label="Dashboard" active={pathname === '/admin'} />
-          <NavItem href="/admin/students" icon={Users} label="Students" />
-          <NavItem href="/admin/communities" icon={UsersRound} label="Communities & Groups" />
-          <NavItem href="/admin/surveys" icon={ClipboardList} label="Surveys" />
-          <NavItem href="/admin/reports" icon={BarChart3} label="Reports" />
+          <NavItem href="/admin" icon={LayoutDashboard} label="Dashboard" active={pathname === '/admin'} pathname={pathname} />
+          <NavItem href="/admin/students" icon={Users} label="Students" pathname={pathname} />
+          <NavItem href="/admin/communities" icon={UsersRound} label="Communities & Groups" pathname={pathname} />
+          <NavItem href="/admin/surveys" icon={ClipboardList} label="Surveys" pathname={pathname} />
+          <NavItem href="/admin/reports" icon={BarChart3} label="Reports" pathname={pathname} />
 
           <NavSection title="MANAGEMENT" />
-          <NavItem href="/admin/whitelist" icon={ShieldCheck} label="Whitelist" />
-          <NavItem href="/admin/registration" icon={Settings2} label="Registration Control" />
-          <NavItem href="/admin/exports" icon={Download} label="Exports" />
+          <NavItem href="/admin/whitelist" icon={ShieldCheck} label="Whitelist" pathname={pathname} />
+          <NavItem href="/admin/registration" icon={Settings2} label="Registration Control" pathname={pathname} />
+          <NavItem href="/admin/exports" icon={Download} label="Exports" pathname={pathname} />
 
           <NavSection title="SYSTEM" />
-          <NavItem href="/admin/settings" icon={Settings} label="Settings" />
-          <NavItem href="/admin/notifications" icon={Activity} label="Activity Logs" />
+          <NavItem href="/admin/settings" icon={Settings} label="Settings" pathname={pathname} />
+          <NavItem href="/admin/notifications" icon={Activity} label="Activity Logs" pathname={pathname} />
         </div>
 
         {/* User Profile */}
@@ -178,7 +187,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </button>
             <div>
               <h1 className="text-xl font-bold text-slate-900 dark:text-white">CFSS Admin Dashboard</h1>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Welcome back, Admin. Here's what's happening in your system.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Welcome back, Admin. Here&apos;s what&apos;s happening in your system.</p>
             </div>
           </div>
 

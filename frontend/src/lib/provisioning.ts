@@ -15,7 +15,7 @@ export async function executeProvisioning(userId: number, token: string): Promis
     // This minimizes the transaction lifespan and prevents Dexie transaction aborts
     // which occur if we await network calls inside the transaction.
     
-    const definitionsData: any[] = [];
+    const definitionsData: { type: string; questions: Record<string, unknown>[] }[] = [];
     for (const type of types) {
       const qRes = await api.get("/api/student/surveys/questions", { 
         params: { type },
@@ -82,15 +82,16 @@ export async function executeProvisioning(userId: number, token: string): Promis
     }, 1500);
     
     return true;
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Provisioning failed. Detailed Diagnostic Log:");
-    console.error("Error name:", err.name);
-    console.error("Error message:", err.message);
-    if (err.response) {
-      console.error("HTTP status:", err.response.status);
-      console.error("Response body:", err.response.data);
+    const e = err as { name?: string; message?: string; response?: { status?: number; data?: unknown }; stack?: string };
+    console.error("Error name:", e.name);
+    console.error("Error message:", e.message);
+    if (e.response) {
+      console.error("HTTP status:", e.response.status);
+      console.error("Response body:", e.response.data);
     }
-    console.error("Stack trace:", err.stack);
+    console.error("Stack trace:", e.stack);
     console.error("Original error:", err);
     setStatus(userId, "PROVISIONING_FAILED");
     return false;

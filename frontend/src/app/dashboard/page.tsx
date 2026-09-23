@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { db } from '@/lib/db';
 import Link from 'next/link';
 import { 
   Users, 
@@ -21,42 +22,136 @@ import {
   CheckCircle,
   Cloud,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  WifiOff
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+
+interface DashboardStats {
+  total_surveys: number;
+  draft_surveys: number;
+  submitted_surveys: number;
+  pending_sync: number;
+  synced_surveys?: number;
+  failed_sync?: number;
+  last_activity?: string | null;
+  recent_surveys?: { id: string; survey_type: string; entity_id: string | null; status: string; updated_at: string }[];
+  _isLocal?: boolean;
+}
+
+interface CommunityStats {
+  summary?: {
+    household?: { total?: number };
+    health?: { hospitals?: number };
+    water?: { boreholes?: number };
+  };
+}
 
 export default function StudentDashboard() {
   const { user, token, logout } = useAuthStore();
   const router = useRouter();
   
-  const [dashboardStats, setDashboardStats] = useState<any>(null);
-  const [communityStats, setCommunityStats] = useState<any>(null);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [communityStats, setCommunityStats] = useState<CommunityStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<'auth' | 'server' | 'no-local-data' | null>(null);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
+
+  const loadLocalStats = useCallback(async () => {
+    if (!user?.id) return null;
+    try {
+      const all = await db.surveys
+        .where('student_id').equals(user.id as number)
+        .filter(s => s.status !== 'DELETED')
+        .toArray();
+      if (all.length === 0) return null;
+      const drafts = all.filter(s => s.status === 'DRAFT');
+      const submitted = all.filter(s => s.status === 'SUBMITTED');
+      const pendingOps = await db.sync_operations
+        .where('student_id').equals(user.id as number)
+        .filter(op => op.status === 'PENDING' || op.status === 'FAILED')
+        .toArray();
+      const pendingCount = new Set(pendingOps.map(op => op.entity_id)).size;
+      const synced = all.filter(s => s.sync_status === 'synced');
+      const failed = all.filter(s => s.sync_status === 'failed');
+      const recent = [...all]
+        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+        .slice(0, 5);
+      const lastActivity = all.reduce<string | null>(
+        (latest, s) => (!latest || s.updated_at > latest ? s.updated_at : latest), null
+      );
+      return {
+        total_surveys: all.length,
+        draft_surveys: drafts.length,
+        submitted_surveys: submitted.length,
+        pending_sync: pendingCount,
+        synced_surveys: synced.length,
+        failed_sync: failed.length,
+        last_activity: lastActivity,
+        recent_surveys: recent,
+        _isLocal: true,
+      };
+    } catch (e) {
+      console.error("Failed to load local stats", e);
+      return null;
+    }
+  }, [user?.id]);
 
   const loadData = useCallback(async () => {
-    if (!token) return;
+    if (!token || !user?.id) return;
     try {
       setLoading(true);
-      setError(false);
+      setError(null);
+      setIsOfflineMode(false);
       const opts = { headers: { Authorization: `Bearer ${token}` } };
-      
+
       const [dashRes, commRes] = await Promise.all([
-        api.get('/api/student/surveys/dashboard/stats', opts).catch(() => null),
-        api.get('/api/student/community/stats', opts).catch(() => null)
+        api.get('/api/student/surveys/dashboard/stats', opts).catch((err: any) => ({ _err: err })),
+        api.get('/api/student/community/stats', opts).catch((err: any) => ({ _err: err }))
       ]);
-      
-      if (dashRes?.data) setDashboardStats(dashRes.data);
-      if (commRes?.data) setCommunityStats(commRes.data);
-      
-      if (!dashRes?.data) throw new Error("Failed to load dashboard stats");
-    } catch (e) {
-      console.error("Failed to fetch dashboard data", e);
-      setError(true);
+
+      const dashErr = (dashRes as any)?._err;
+      const commErr = (commRes as any)?._err;
+
+      // --- Handle dashboard stats ---
+      if (!dashErr && (dashRes as any)?.data) {
+        setDashboardStats((dashRes as any).data);
+      } else if (dashErr?.response?.status === 401) {
+        setError('auth');
+        logout();
+        router.push('/login');
+        return;
+      } else {
+        // Network failure or server error — fall back to IndexedDB
+        const localStats = await loadLocalStats();
+        if (localStats) {
+          setDashboardStats(localStats);
+          setIsOfflineMode(true);
+        } else {
+          setError('no-local-data');
+        }
+      }
+
+      // --- Handle community stats (best-effort, no fatal error) ---
+      if (!commErr && (commRes as any)?.data) {
+        setCommunityStats((commRes as any).data);
+      }
+      // Community stats are purely informational — silent fail offline is acceptable.
+
+    } catch (e: any) {
+      console.error("Unexpected dashboard load error", e);
+      // Last-resort: try IndexedDB
+      const localStats = await loadLocalStats();
+      if (localStats) {
+        setDashboardStats(localStats);
+        setIsOfflineMode(true);
+      } else {
+        setError('no-local-data');
+      }
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, user?.id, loadLocalStats, logout, router]);
 
   useEffect(() => {
     if (!token) {
@@ -86,9 +181,7 @@ export default function StudentDashboard() {
     const interval = setInterval(loadData, 30000);
     
     const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        loadData();
-      }
+      if (!document.hidden) loadData();
     };
     
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -112,10 +205,29 @@ export default function StudentDashboard() {
         {loading && <RefreshCw className="w-5 h-5 text-muted animate-spin" />}
       </div>
 
-      {error ? (
+      {/* Offline banner */}
+      {isOfflineMode && !loading && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          <WifiOff size={16} className="shrink-0 text-amber-600" />
+          <span>Offline — showing data saved on this device. Changes will sync when you&apos;re back online.</span>
+        </div>
+      )}
+
+      {/* Error states */}
+      {error === 'no-local-data' && !loading && (
+        <div className="bg-page p-10 rounded-xl border border-border-strong flex flex-col items-center justify-center text-center gap-3">
+          <WifiOff className="w-10 h-10 text-muted opacity-40" />
+          <h3 className="font-semibold text-primary">You&apos;re offline</h3>
+          <p className="text-sm text-muted max-w-xs">
+            No local data is available yet. Connect to the internet to load your workspace.
+          </p>
+        </div>
+      )}
+
+      {error === 'server' && !loading && (
         <div className="bg-red-50 p-6 rounded-lg border border-red-100 flex flex-col items-center justify-center text-center">
           <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
-          <h3 className="text-red-800 font-medium">Unable to load dashboard data</h3>
+          <h3 className="text-red-800 font-medium">Server error</h3>
           <button 
             onClick={loadData}
             className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
@@ -123,9 +235,12 @@ export default function StudentDashboard() {
             Retry
           </button>
         </div>
-      ) : (
+      )}
+
+      {/* Dashboard content — shown when we have any stats (server or local) */}
+      {dashboardStats && !error && (
         <>
-          {/* Fieldwork Summary - Flat UI (Level 3) */}
+          {/* Fieldwork Summary */}
           <section className="bg-surface rounded-xl border border-border-strong overflow-hidden">
             <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-border">
               <Link href="/surveys" className="p-4 hover:bg-page transition-colors">
@@ -159,8 +274,8 @@ export default function StudentDashboard() {
                 </Link>
               </div>
               <div className="divide-y divide-border">
-                {dashboardStats?.recent_surveys?.length > 0 ? (
-                  dashboardStats.recent_surveys.map((survey: any) => (
+                {(dashboardStats?.recent_surveys?.length ?? 0) > 0 ? (
+                  dashboardStats!.recent_surveys!.map((survey) => (
                     <Link 
                       href={`/surveys/${survey.survey_type.toLowerCase()}/${survey.status === 'SUBMITTED' ? 'view' : 'fill'}?id=${survey.id}`}
                       key={survey.id} 
@@ -209,7 +324,9 @@ export default function StudentDashboard() {
                     <Users size={18} className="text-muted" />
                     <span className="text-sm font-medium text-secondary">Households</span>
                   </div>
-                  <span className="font-bold text-primary">{communityStats?.summary?.household?.total || 0}</span>
+                  <span className="font-bold text-primary">
+                    {isOfflineMode ? <span className="text-xs font-medium text-muted italic">Unavailable offline</span> : (communityStats?.summary?.household?.total ?? '—')}
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between p-4">
@@ -217,7 +334,9 @@ export default function StudentDashboard() {
                     <PlusSquare size={18} className="text-muted" />
                     <span className="text-sm font-medium text-secondary">Health Facilities</span>
                   </div>
-                  <span className="font-bold text-primary">{communityStats?.summary?.health?.hospitals || 0}</span>
+                  <span className="font-bold text-primary">
+                    {isOfflineMode ? <span className="text-xs font-medium text-muted italic">Unavailable offline</span> : (communityStats?.summary?.health?.hospitals ?? '—')}
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between p-4">
@@ -225,7 +344,9 @@ export default function StudentDashboard() {
                     <Droplet size={18} className="text-muted" />
                     <span className="text-sm font-medium text-secondary">Water Points</span>
                   </div>
-                  <span className="font-bold text-primary">{communityStats?.summary?.water?.boreholes || 0}</span>
+                  <span className="font-bold text-primary">
+                    {isOfflineMode ? <span className="text-xs font-medium text-muted italic">Unavailable offline</span> : (communityStats?.summary?.water?.boreholes ?? '—')}
+                  </span>
                 </div>
               </div>
             </section>

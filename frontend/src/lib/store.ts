@@ -17,42 +17,44 @@ export interface ProvisioningRecord {
   provisionedAt: string | null;
 }
 
+export interface UserProfile {
+  id: number | null;
+  student_id: string;
+  full_name: string;
+  email: string | null;
+  faculty: string | null;
+  gender: string | null;
+  phone_number: string | null;
+  program: string;
+  community: string | null;
+  community_id: number | null;
+  group_number: number | null;
+  registered_at: string | null;
+  role: string;
+}
+
 interface AuthState {
   token: string | null;
-  user: {
-    id: number | null;
-    student_id: string;
-    full_name: string;
-    email: string | null;
-    faculty: string | null;
-    gender: string | null;
-    phone_number: string | null;
-    program: string;
-    community: string | null;
-    community_id: number | null;
-    group_number: number | null;
-    registered_at: string | null;
-    role: string;
-  } | null;
+  user: UserProfile | null;
   theme: string;
   provisionedUsers: Record<number, ProvisioningRecord>;
   currentProvisioningStatus: ProvisioningStatus;
   setProvisioningStatus: (userId: number, status: ProvisioningStatus) => void;
-  setAuth: (token: string, user: any) => void;
+  setAuth: (token: string, user: UserProfile) => void;
   logout: () => void;
   setTheme: (theme: string) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set: any): AuthState => ({
+    (set): AuthState => ({
       token: null,
       user: null,
       theme: 'light',
       provisionedUsers: {},
       currentProvisioningStatus: 'UNPROVISIONED',
       setProvisioningStatus: (userId: number, status: ProvisioningStatus) => 
-        set((state: any) => {
+        set((state: AuthState) => {
           const now = status === 'PROVISIONED' || status === 'READY' ? new Date().toISOString() : state.provisionedUsers[userId]?.provisionedAt || null;
           return {
             currentProvisioningStatus: status,
@@ -62,7 +64,7 @@ export const useAuthStore = create<AuthState>()(
             }
           };
         }),
-      setAuth: (token: string, user: any) => set({ token, user }),
+      setAuth: (token: string, user: UserProfile) => set({ token, user }),
       logout: () => {
         set({ token: null, user: null });
         // NOTE: We do NOT clear db.surveys here. 
@@ -79,14 +81,14 @@ export const useAuthStore = create<AuthState>()(
 
 export const useAdminAuthStore = create<AuthState>()(
   persist(
-    (set: any): AuthState => ({
+    (set): AuthState => ({
       token: null,
       user: null,
       theme: 'light',
       provisionedUsers: {},
       currentProvisioningStatus: 'UNPROVISIONED',
       setProvisioningStatus: (userId: number, status: ProvisioningStatus) => 
-        set((state: any) => {
+        set((state: AuthState) => {
           const now = status === 'PROVISIONED' || status === 'READY' ? new Date().toISOString() : state.provisionedUsers[userId]?.provisionedAt || null;
           return {
             currentProvisioningStatus: status,
@@ -96,7 +98,7 @@ export const useAdminAuthStore = create<AuthState>()(
             }
           };
         }),
-      setAuth: (token: string, user: any) => set({ token, user }),
+      setAuth: (token: string, user: UserProfile) => set({ token, user }),
       logout: () => {
         set({ token: null, user: null });
       },

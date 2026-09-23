@@ -6,7 +6,7 @@ export interface LocalSurvey {
   survey_type: string;
   community_id: number;
   entity_id: string | null;
-  answers: { question_id: string; answer: any }[];
+  answers: { question_id: string; answer: string | number | boolean | string[] | null }[];
   status: 'DRAFT' | 'SUBMITTED' | 'DELETED';
   sync_status: 'pending' | 'syncing' | 'synced' | 'failed';
   sync_error?: string;
@@ -17,7 +17,7 @@ export interface LocalSurvey {
 
 export interface LocalSurveyDefinition {
   type: string;
-  questions: any[];
+  questions: Record<string, unknown>[];
   updated_at: string;
 }
 
@@ -27,7 +27,7 @@ export interface SyncOperation {
   operation_type: 'CREATE' | 'UPDATE' | 'DELETE';
   entity_type: 'SURVEY';
   entity_id: string; // Survey UUID
-  payload?: any;
+  payload?: Record<string, unknown>;
   status: 'PENDING' | 'SYNCING' | 'FAILED';
   retry_count: number;
   last_error?: string;

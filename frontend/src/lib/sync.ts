@@ -1,5 +1,5 @@
 import { api } from './api';
-import { db, LocalSurvey, SyncOperation } from './db';
+import { db, SyncOperation } from './db';
 import { useAuthStore } from './store';
 
 export const syncEngine = {
@@ -96,10 +96,11 @@ export const syncEngine = {
           }
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Sync Engine Error:", error);
       
-      if (error.response?.status === 401) {
+      const axiosErr = error as { response?: { status?: number } };
+      if (axiosErr.response?.status === 401) {
         useAuthStore.getState().logout();
       }
 
@@ -108,7 +109,7 @@ export const syncEngine = {
       for (const item of syncingItems) {
         await db.sync_operations.update(item.id, {
           status: 'FAILED',
-          last_error: error.response?.status === 401 ? "Session expired." : "Network error"
+          last_error: axiosErr.response?.status === 401 ? "Session expired." : "Network error"
         });
         if (item.operation_type !== 'DELETE') {
            await db.surveys.update(item.entity_id, { sync_status: 'failed' });
@@ -128,7 +129,7 @@ export const syncEngine = {
     }
   },
 
-  async queueOperation(operationType: 'CREATE' | 'UPDATE' | 'DELETE', entityId: string, payload: any | null, token: string) {
+  async queueOperation(operationType: 'CREATE' | 'UPDATE' | 'DELETE', entityId: string, payload: Record<string, unknown> | null, token: string) {
     const userId = useAuthStore.getState().user?.id;
     if (!userId) return;
 
@@ -142,7 +143,7 @@ export const syncEngine = {
     if (operationType !== 'DELETE' && payload) {
         payload.sync_status = 'pending';
         payload.updated_at = new Date().toISOString();
-        await db.surveys.put(payload);
+        await db.surveys.put(payload as unknown as import('./db').LocalSurvey);
     }
 
     // Coalescing logic
@@ -168,7 +169,7 @@ export const syncEngine = {
        const hasCreate = pendingOps.find(o => o.operation_type === 'CREATE');
        if (hasCreate) {
            // Coalesce into the existing CREATE
-           await db.sync_operations.update(hasCreate.id, { payload, status: 'PENDING' });
+           await db.sync_operations.update(hasCreate.id, { payload: payload === null ? undefined : payload, status: 'PENDING' });
            for (const op of pendingOps) {
                if (op.id !== hasCreate.id) await db.sync_operations.delete(op.id);
            }
@@ -180,7 +181,7 @@ export const syncEngine = {
        const hasUpdate = pendingOps.find(o => o.operation_type === 'UPDATE');
        if (hasUpdate) {
            // Coalesce into existing UPDATE
-           await db.sync_operations.update(hasUpdate.id, { payload, status: 'PENDING' });
+           await db.sync_operations.update(hasUpdate.id, { payload: payload === null ? undefined : payload, status: 'PENDING' });
            window.dispatchEvent(new Event('sync-queued'));
            if (navigator.onLine) this.processQueue(token);
            return;
@@ -194,7 +195,7 @@ export const syncEngine = {
         operation_type: operationType,
         entity_type: 'SURVEY',
         entity_id: entityId,
-        payload: payload,
+        payload: payload === null ? undefined : payload,
         status: 'PENDING',
         retry_count: 0,
         created_at: new Date().toISOString()

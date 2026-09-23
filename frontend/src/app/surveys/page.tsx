@@ -33,11 +33,44 @@ export default function SurveysPage() {
     }
     
     const loadStats = async () => {
+      let localStats: any = {};
+      try {
+        const { db } = await import('@/lib/db');
+        const userSurveys = await db.surveys.where('student_id').equals(user.id as number).toArray();
+        const activeSurveys = userSurveys.filter(s => s.status !== 'DELETED');
+        
+        for (const type of SURVEY_TYPES) {
+          const typeSurveys = activeSurveys.filter(s => s.survey_type === type.id);
+          localStats[type.id] = {
+            submitted: typeSurveys.filter(s => s.status === 'SUBMITTED').length,
+            drafts: typeSurveys.filter(s => s.status === 'DRAFT').length
+          };
+        }
+      } catch (e) {
+        console.error("Failed to load local survey stats", e);
+      }
+
+      if (!navigator.onLine) {
+        setStats(localStats);
+        setLoading(false);
+        return;
+      }
+
       try {
         const res = await api.get('/api/student/surveys/stats', { headers: { Authorization: `Bearer ${token}` } });
-        setStats(res.data);
+        // Merge server stats with local drafts in case server doesn't know about them
+        const serverStats = res.data;
+        const mergedStats: any = {};
+        for (const type of SURVEY_TYPES) {
+          mergedStats[type.id] = {
+            submitted: Math.max(serverStats[type.id]?.submitted || 0, localStats[type.id]?.submitted || 0),
+            drafts: Math.max(serverStats[type.id]?.drafts || 0, localStats[type.id]?.drafts || 0)
+          };
+        }
+        setStats(mergedStats);
       } catch (e) {
         console.error("Failed to load survey stats", e);
+        setStats(localStats);
       } finally {
         setLoading(false);
       }

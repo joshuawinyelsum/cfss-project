@@ -2,34 +2,35 @@
 
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/lib/store';
-import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { db } from '@/lib/db';
+import { db, LocalSurvey } from '@/lib/db';
 import { syncEngine } from '@/lib/sync';
 import { getEntityLabel } from '@/lib/entityLabel';
 import Link from 'next/link';
-import { ArrowRight, Clock, Trash2, AlertCircle, FileEdit, RefreshCw, FileText } from 'lucide-react';
+import { ArrowRight, Clock, Trash2, AlertCircle, FileEdit, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function WorkWorkspacePage() {
   const { user, token } = useAuthStore();
-  const router = useRouter();
   
-  const [drafts, setDrafts] = useState<any[]>([]);
-  const [needAttention, setNeedAttention] = useState<any[]>([]);
-  const [recent, setRecent] = useState<any[]>([]);
+  const [drafts, setDrafts] = useState<(LocalSurvey & { progress?: number })[]>([]);
+  const [needAttention, setNeedAttention] = useState<(LocalSurvey & { progress?: number })[]>([]);
+  const [recent, setRecent] = useState<(LocalSurvey & { progress?: number })[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (confirm("Delete draft? This action cannot be undone.")) {
-      try {
-        await syncEngine.queueOperation('DELETE', id, null, token || '');
-        setDrafts(drafts.filter(r => r.id !== id));
-      } catch (err) {
-        console.error("Failed to delete draft:", err);
-      }
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    try {
+      await syncEngine.queueOperation('DELETE', id, null, token || '');
+      setDrafts(drafts.filter(r => r.id !== id));
+    } catch (err) {
+      console.error("Failed to delete draft:", err);
+    } finally {
+      setDeletingId(null);
+      setConfirmDeleteId(null);
     }
   };
 
@@ -49,14 +50,14 @@ export default function WorkWorkspacePage() {
         const localPending = localSurveys.filter(s => s.status !== 'DELETED' && (s.sync_status === 'pending' || s.sync_status === 'failed' || (s.status === 'SUBMITTED' && s.sync_status !== 'synced')));
         
         // 2. Try fetching server data for recent submitted records
-        let serverRecent = [];
+        let serverRecent: LocalSurvey[] = [];
         if (navigator.onLine) {
           try {
              const res = await api.get('/api/student/surveys/dashboard/stats', { 
                headers: { Authorization: `Bearer ${token}` }
              });
              if (res.data?.recent_surveys) {
-                serverRecent = res.data.recent_surveys;
+                serverRecent = res.data.recent_surveys as LocalSurvey[];
              }
           } catch(e) {
              console.warn("Could not fetch server workspace stats", e);
@@ -64,9 +65,9 @@ export default function WorkWorkspacePage() {
         }
         
         // Combine recent: local drafts + local pending + server recent
-        const allRecent = [...localDrafts, ...localPending];
-        serverRecent.forEach((sr: any) => {
-           if (!allRecent.find(r => r.id === sr.id)) {
+        const allRecent: (LocalSurvey & { progress?: number })[] = [...localDrafts, ...localPending];
+        serverRecent.forEach((sr) => {
+           if (sr.status !== 'DELETED' && !allRecent.find(r => r.id === sr.id)) {
                allRecent.push(sr);
            }
         });
@@ -150,9 +151,9 @@ export default function WorkWorkspacePage() {
              ) : (
                 <div className="bg-surface border border-border-strong rounded-xl overflow-hidden shadow-sm divide-y divide-border">
                   {drafts.map(record => (
-                    <Link key={record.id} href={`/surveys/${record.survey_type.toLowerCase()}/fill?id=${record.id}`} className="block p-4 sm:p-5 hover:bg-page transition-colors group">
+                    <div key={record.id} className="p-4 sm:p-5 hover:bg-page transition-colors">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex-1">
+                        <Link href={`/surveys/${record.survey_type.toLowerCase()}/fill?id=${record.id}`} className="flex-1 group">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-bold text-primary capitalize text-sm">{record.survey_type.toLowerCase()} Survey</span>
                             <span className="text-[10px] font-bold px-2 py-0.5 bg-page text-secondary rounded uppercase tracking-wide">Draft</span>
@@ -164,12 +165,28 @@ export default function WorkWorkspacePage() {
                             </div>
                             <span className="text-xs text-muted">{record.progress || 0}%</span>
                           </div>
-                        </div>
-                        <div className="shrink-0 flex items-center text-sm font-medium text-[#093C22] group-hover:underline">
-                          Continue <ArrowRight size={16} className="ml-1" />
+                        </Link>
+                        <div className="shrink-0 flex items-center gap-2">
+                          <button
+                            onClick={() => setConfirmDeleteId(record.id)}
+                            disabled={deletingId === record.id}
+                            className="p-2 rounded-lg text-muted hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                            title="Delete draft"
+                          >
+                            {deletingId === record.id
+                              ? <RefreshCw size={16} className="animate-spin" />
+                              : <Trash2 size={16} />
+                            }
+                          </button>
+                          <Link
+                            href={`/surveys/${record.survey_type.toLowerCase()}/fill?id=${record.id}`}
+                            className="text-sm font-medium text-[#093C22] flex items-center gap-1 hover:underline"
+                          >
+                            Continue <ArrowRight size={16} />
+                          </Link>
                         </div>
                       </div>
-                    </Link>
+                    </div>
                   ))}
                 </div>
              )}
@@ -218,6 +235,33 @@ export default function WorkWorkspacePage() {
              )}
           </section>
 
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+          <div className="bg-surface rounded-2xl w-full max-w-sm shadow-2xl p-6">
+            <h2 className="text-lg font-bold text-primary mb-2">Delete this draft?</h2>
+            <p className="text-sm text-muted mb-6">
+              This draft will be removed from your workspace. If it has already synchronized, the deletion will be queued and applied to the server when you&apos;re back online.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-secondary hover:bg-page transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(confirmDeleteId)}
+                disabled={!!deletingId}
+                className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

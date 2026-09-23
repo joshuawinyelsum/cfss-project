@@ -1,7 +1,5 @@
 import axios from "axios";
 
-const isBrowser = typeof window !== "undefined";
-
 /**
  * Base URL of the FastAPI backend.
  *
@@ -18,9 +16,10 @@ export const api = axios.create({
   withCredentials: true,
 });
 
-export const getErrorMessage = (err: any, fallback: string) => {
-  const detail = err.response?.data?.detail;
+export const getErrorMessage = (err: unknown, fallback: string) => {
+  const axiosErr = err as { response?: { data?: { detail?: unknown } } };
+  const detail = axiosErr.response?.data?.detail;
   if (typeof detail === 'string') return detail;
-  if (Array.isArray(detail)) return detail[0]?.msg || fallback;
+  if (Array.isArray(detail)) return (detail[0] as { msg?: string })?.msg || fallback;
   return fallback;
 };

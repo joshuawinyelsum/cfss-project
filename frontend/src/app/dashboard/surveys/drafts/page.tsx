@@ -16,19 +16,20 @@ export default function DraftsPage() {
   
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (confirm("Delete draft? This action cannot be undone.")) {
-      try {
-        await syncEngine.queueOperation('DELETE', id, null, token || '');
-        setRecords(records.filter(r => r.id !== id));
-        setTotal(total - 1);
-      } catch (err) {
-        console.error("Failed to delete draft:", err);
-      }
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    try {
+      await syncEngine.queueOperation('DELETE', id, null, token || '');
+      setRecords(records.filter(r => r.id !== id));
+      setTotal(total - 1);
+    } catch (err) {
+      console.error("Failed to delete draft:", err);
+    } finally {
+      setDeletingId(null);
+      setConfirmDeleteId(null);
     }
   };
 
@@ -127,7 +128,9 @@ export default function DraftsPage() {
       router.push('/login');
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadDrafts(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, token, router]);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -142,8 +145,10 @@ export default function DraftsPage() {
   // When type filter changes, we want to trigger reload
   useEffect(() => {
     if (token) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadDrafts(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typeFilter]);
 
   if (!user) return null;
@@ -196,12 +201,14 @@ export default function DraftsPage() {
           ) : (
             <div className="divide-y divide-border">
               {records.map(record => (
-                <Link 
+                <div
                   key={record.id}
-                  href={`/surveys/${record.survey_type.toLowerCase()}/fill?id=${record.id}`}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 hover:bg-page transition-colors group cursor-pointer gap-4"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 hover:bg-page transition-colors gap-4"
                 >
-                  <div className="flex-1">
+                  <Link
+                    href={`/surveys/${record.survey_type.toLowerCase()}/fill?id=${record.id}`}
+                    className="flex-1 group cursor-pointer"
+                  >
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="font-bold text-primary capitalize text-base">{record.survey_type.toLowerCase()} Survey</h3>
                       <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-700 rounded uppercase tracking-wide border border-amber-100">Draft</span>
@@ -224,14 +231,28 @@ export default function DraftsPage() {
                       </div>
                       <span className="text-xs font-medium text-secondary">{record.progress}%</span>
                     </div>
-                  </div>
+                  </Link>
                   
-                  <div className="shrink-0 flex items-center sm:justify-end">
-                    <div className="text-sm font-medium text-[#093C22] flex items-center gap-1 group-hover:underline">
+                  <div className="shrink-0 flex items-center gap-2 sm:justify-end">
+                    <button
+                      onClick={() => setConfirmDeleteId(record.id)}
+                      disabled={deletingId === record.id}
+                      className="p-2 rounded-lg text-muted hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                      title="Delete draft"
+                    >
+                      {deletingId === record.id
+                        ? <Loader2 size={16} className="animate-spin" />
+                        : <Trash2 size={16} />
+                      }
+                    </button>
+                    <Link
+                      href={`/surveys/${record.survey_type.toLowerCase()}/fill?id=${record.id}`}
+                      className="text-sm font-medium text-[#093C22] flex items-center gap-1 hover:underline"
+                    >
                       Continue <ArrowRight size={16} />
-                    </div>
+                    </Link>
                   </div>
-                </Link>
+                </div>
               ))}
             </div>
           )}
@@ -252,6 +273,33 @@ export default function DraftsPage() {
             </button>
           )}
       </div>
+
+      {/* Delete confirmation modal */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+          <div className="bg-surface rounded-2xl w-full max-w-sm shadow-2xl p-6">
+            <h2 className="text-lg font-bold text-primary mb-2">Delete this draft?</h2>
+            <p className="text-sm text-muted mb-6">
+              This draft will be removed from your workspace. If it has already synchronized, the deletion will be queued and applied to the server when you&apos;re back online.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-secondary hover:bg-page transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(confirmDeleteId)}
+                disabled={!!deletingId}
+                className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

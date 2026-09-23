@@ -41,20 +41,8 @@ export default function CommunitiesPage() {
   const [createError, setCreateError] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Delete state
-  const [deleteError, setDeleteError] = useState('');
-
   // Selected community state (for viewing students)
   const [selectedCommunity, setSelectedCommunity] = useState<Community | null>(null);
-
-  useEffect(() => {
-    if (!user || user.role !== 'admin') {
-      router.push('/admin/login');
-      return;
-    }
-    
-    fetchData();
-  }, [user, router, token]);
 
   const fetchData = async () => {
     if (!token) return;
@@ -74,6 +62,20 @@ export default function CommunitiesPage() {
     }
   };
 
+  useEffect(() => {
+    if (!user || user.role !== 'admin') {
+      router.push('/admin/login');
+      return;
+    }
+    
+    const timeoutId = window.setTimeout(() => {
+      void fetchData();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, router, token]);
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreating(true);
@@ -86,7 +88,7 @@ export default function CommunitiesPage() {
       setShowCreateModal(false);
       // Data reliability requirement: fetch after create
       await fetchData();
-    } catch (err: any) {
+    } catch (err: unknown) {
       setCreateError(getErrorMessage(err, "Failed to create community"));
     } finally {
       setCreating(false);
@@ -111,7 +113,7 @@ export default function CommunitiesPage() {
       if (selectedCommunity?.id === comm.id) {
         setSelectedCommunity(null);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       alert(getErrorMessage(err, "Failed to delete community"));
     }
   };
