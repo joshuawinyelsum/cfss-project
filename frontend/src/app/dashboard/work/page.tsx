@@ -28,7 +28,7 @@ export default function WorkWorkspacePage() {
         
         // Categorize local
         const localDrafts = localSurveys.filter(s => s.status === 'DRAFT');
-        const localPending = localSurveys.filter(s => s.status !== 'DELETED' && (s.sync_status === 'pending' || s.sync_status === 'failed' || (s.status === 'SUBMITTED' && s.sync_status !== 'synced')));
+        const localPending = localSurveys.filter(s => s.sync_status === 'failed');
         const localSubmitted = localSurveys.filter(s => s.status === 'SUBMITTED');
         
         // 2. Try fetching server data for recent submitted records
@@ -74,11 +74,8 @@ export default function WorkWorkspacePage() {
   if (!user) return null;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-12">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-primary">Work</h1>
-        <p className="text-sm text-muted mt-1">Your fieldwork in one place.</p>
-      </div>
+    <div>
+
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -90,7 +87,7 @@ export default function WorkWorkspacePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
           {/* Drafts Card */}
-          <Link href="/dashboard/surveys/drafts" className="group block bg-surface border border-border-strong rounded-xl p-6 hover:border-[#093C22] hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-[#093C22] focus:ring-offset-2">
+          <Link href="/dashboard/work/drafts" className="group block bg-surface border border-border-strong rounded-xl p-6 hover:border-[#093C22] hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-[#093C22] focus:ring-offset-2">
             <div className="flex items-start justify-between mb-4">
               <div className="w-10 h-10 rounded-lg bg-[#093C22]/10 flex items-center justify-center text-[#093C22]">
                 <FileEdit size={20} />
@@ -105,7 +102,7 @@ export default function WorkWorkspacePage() {
           </Link>
 
           {/* Submitted Card */}
-          <Link href="/dashboard/surveys/submitted" className="group block bg-surface border border-border-strong rounded-xl p-6 hover:border-[#093C22] hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-[#093C22] focus:ring-offset-2">
+          <Link href="/dashboard/work/submitted" className="group block bg-surface border border-border-strong rounded-xl p-6 hover:border-[#093C22] hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-[#093C22] focus:ring-offset-2">
             <div className="flex items-start justify-between mb-4">
               <div className="w-10 h-10 rounded-lg bg-[#093C22]/10 flex items-center justify-center text-[#093C22]">
                 <CheckSquare size={20} />
@@ -120,7 +117,7 @@ export default function WorkWorkspacePage() {
           </Link>
 
           {/* Need Attention Card */}
-          <Link href="/dashboard/sync" className="group block bg-surface border border-border-strong rounded-xl p-6 hover:border-amber-500 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2">
+          <Link href="/dashboard/work/attention" className="group block bg-surface border border-border-strong rounded-xl p-6 hover:border-amber-500 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2">
             <div className="flex items-start justify-between mb-4">
               <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
                 <AlertCircle size={20} />

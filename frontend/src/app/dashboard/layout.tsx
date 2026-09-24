@@ -330,7 +330,7 @@ export default function DashboardLayout({
 
   const secondaryNavItems = [
     { name: 'My Group', href: '/dashboard/group', icon: Users },
-    { name: 'Sync & Activity', href: '/dashboard/sync', icon: RefreshCw },
+    { name: 'Sync & Activity', href: '/dashboard/work/attention', icon: RefreshCw },
     { name: 'Profile', href: '/profile', icon: UserIcon },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];

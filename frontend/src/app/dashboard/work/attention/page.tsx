@@ -83,9 +83,10 @@ export default function SyncPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12">
       {/* Mobile Back Navigation */}
-      <div className="lg:hidden mb-4">
-        <Link href="/dashboard/more" className="inline-flex items-center text-sm font-medium text-muted hover:text-primary transition-colors">
-          <ArrowLeft size={16} className="mr-1" /> Back to More
+      
+      <div className="mb-4">
+        <Link href="/dashboard/work" className="inline-flex items-center text-sm font-medium text-muted hover:text-primary transition-colors">
+          <ArrowLeft size={16} className="mr-1" /> Back to Work overview
         </Link>
       </div>
 

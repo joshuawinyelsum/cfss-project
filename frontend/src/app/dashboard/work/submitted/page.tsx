@@ -109,6 +109,11 @@ export default function SubmittedSurveysPage() {
   return (
     <>
       <div className="space-y-6 max-w-3xl mx-auto pb-12">
+        <div className="mb-4">
+          <Link href="/dashboard/work" className="inline-flex items-center text-sm font-medium text-muted hover:text-primary transition-colors">
+            &larr; Back to Work overview
+          </Link>
+        </div>
         
         <div>
           <h1 className="text-2xl font-bold text-primary">Submitted Surveys</h1>
