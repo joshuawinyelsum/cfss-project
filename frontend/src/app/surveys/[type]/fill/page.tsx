@@ -57,11 +57,15 @@ function QuestionnaireContent() {
         if (recordId === 'new') {
           // Start a new survey draft locally
           try {
-            const qRes = await api.get('/api/student/surveys/questions', { params: { type: typeStr }, headers: { Authorization: `Bearer ${token}` } });
-            questionsData = qRes.data;
-            // Cache definition offline
             const { db } = await import('@/lib/db');
-            await db.definitions.put({ type: normalizedType, questions: questionsData, updated_at: new Date().toISOString() });
+            if (navigator.onLine) {
+              const qRes = await api.get('/api/student/surveys/questions', { params: { type: typeStr }, headers: { Authorization: `Bearer ${token}` } });
+              questionsData = qRes.data;
+              // Cache definition offline
+              await db.definitions.put({ type: normalizedType, questions: questionsData, updated_at: new Date().toISOString() });
+            } else {
+              throw new Error("Offline");
+            }
           } catch (e) {
             // Offline fallback
             const { db } = await import('@/lib/db');
@@ -94,9 +98,13 @@ function QuestionnaireContent() {
             }
             recordData = { ...localRecord, has_been_saved: true };
             try {
-              const qRes = await api.get('/api/student/surveys/questions', { params: { type: typeStr }, headers: { Authorization: `Bearer ${token}` } });
-              questionsData = qRes.data;
-              await db.definitions.put({ type: normalizedType, questions: questionsData, updated_at: new Date().toISOString() });
+              if (navigator.onLine) {
+                const qRes = await api.get('/api/student/surveys/questions', { params: { type: typeStr }, headers: { Authorization: `Bearer ${token}` } });
+                questionsData = qRes.data;
+                await db.definitions.put({ type: normalizedType, questions: questionsData, updated_at: new Date().toISOString() });
+              } else {
+                throw new Error("Offline");
+              }
             } catch (e) {
               const cachedDef = await db.definitions.get(normalizedType);
               if (cachedDef) {
@@ -108,6 +116,9 @@ function QuestionnaireContent() {
             answersData = localRecord.answers || [];
           } else {
             // Fallback to server if not found locally
+            if (!navigator.onLine) {
+              throw new Error("Record not found locally and you are offline.");
+            }
             const res = await api.get(`/api/student/surveys/record/${recordId}`, { headers: { Authorization: `Bearer ${token}` } });
             recordData = { ...res.data.record, has_been_saved: true };
             questionsData = res.data.questions;

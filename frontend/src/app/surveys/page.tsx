@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { syncEngine } from '@/lib/sync';
 import DashboardLayout from '@/app/dashboard/layout';
 import Link from 'next/link';
 import { Home, Book, Heart, Building, ArrowRight, ClipboardList, FileEdit } from 'lucide-react';
@@ -40,6 +41,9 @@ export default function SurveysPage() {
     }
     
     const loadStats = async () => {
+      if (token && navigator.onLine) {
+        syncEngine.prefetchTemplates(token).catch(console.error);
+      }
       let localStats: any = {};
       try {
         const { db } = await import('@/lib/db');

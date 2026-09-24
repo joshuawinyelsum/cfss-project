@@ -5,6 +5,34 @@ import { useAuthStore } from './store';
 export const syncEngine = {
   isSyncing: false,
 
+
+  async prefetchTemplates(token: string) {
+    if (!navigator.onLine) return;
+    try {
+      const types = ['HOUSEHOLD', 'EDUCATION', 'HEALTH', 'GOVERNANCE'];
+      for (const typeStr of types) {
+        try {
+          const res = await api.get('/api/student/surveys/questions', {
+            params: { type: typeStr },
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const questionsData = res.data;
+          const { normalizeSurveyType } = await import('@/lib/surveyType');
+          const normalizedType = normalizeSurveyType(typeStr);
+          await db.definitions.put({
+            type: normalizedType,
+            questions: questionsData,
+            updated_at: new Date().toISOString()
+          });
+        } catch (err) {
+          console.warn(`Failed to prefetch template ${typeStr}`, err);
+        }
+      }
+    } catch (e) {
+      console.error("Template prefetch error", e);
+    }
+  },
+
   async processQueue(token: string) {
     if (!navigator.onLine || this.isSyncing) return;
     this.isSyncing = true;

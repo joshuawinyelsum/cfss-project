@@ -5,6 +5,7 @@ import { useAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { db } from '@/lib/db';
+import { syncEngine } from '@/lib/sync';
 import Link from 'next/link';
 import { 
   Users, 
