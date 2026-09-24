@@ -1,9 +1,18 @@
-import React, { useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polygon, useMap } from 'react-leaflet';
+import React, { useEffect, useState } from 'react';
+import { 
+  MapContainer, 
+  TileLayer, 
+  Marker, 
+  Popup, 
+  Polygon, 
+  useMap, 
+  LayersControl,
+  useMapEvents
+} from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { LocalCommunity, LocalFeature, LocalSurvey } from '@/lib/db';
-import { FileEdit, CheckCircle, Clock } from 'lucide-react';
+import { CheckCircle, Clock, MapPin, Navigation } from 'lucide-react';
 
 // Fix default leaflet icons
 const iconUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
@@ -23,6 +32,34 @@ const defaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = defaultIcon;
 
+const myLocationIcon = L.divIcon({
+  className: 'my-location-icon',
+  html: `<div style="
+    background-color: #3b82f6; 
+    width: 16px; 
+    height: 16px; 
+    border-radius: 50%; 
+    border: 3px solid white; 
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);
+  "></div>`,
+  iconSize: [16, 16],
+  iconAnchor: [8, 8]
+});
+
+const selectedLocationIcon = L.divIcon({
+  className: 'selected-location-icon',
+  html: `<div style="
+    background-color: #ef4444; 
+    width: 16px; 
+    height: 16px; 
+    border-radius: 50%; 
+    border: 2px solid white; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  "></div>`,
+  iconSize: [16, 16],
+  iconAnchor: [8, 8]
+});
+
 interface StudentMapProps {
   community: LocalCommunity;
   features: LocalFeature[];
@@ -32,25 +69,22 @@ interface StudentMapProps {
 
 function createFeatureIcon(type: string, hasSurvey: boolean) {
   let color = '#093C22'; // CFSS Green
-  if (type === 'HOUSEHOLD') color = '#2563EB'; // Blue
-  else if (type === 'EDUCATION') color = '#D97706'; // Amber
-  else if (type === 'HEALTH') color = '#DC2626'; // Red
-  else if (type === 'GOVERNANCE') color = '#7C3AED'; // Purple
+  if (type === 'HOUSEHOLD') color = '#2563EB';
+  else if (type === 'EDUCATION') color = '#D97706';
+  else if (type === 'HEALTH') color = '#DC2626';
+  else if (type === 'GOVERNANCE') color = '#7C3AED';
 
   const bgColor = hasSurvey ? color : '#9CA3AF';
-  const borderColor = '#FFFFFF';
-
   const html = `
     <div style="
       background-color: ${bgColor}; 
       width: 16px; 
       height: 16px; 
       border-radius: 50%; 
-      border: 2px solid ${borderColor}; 
+      border: 2px solid #FFFFFF; 
       box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     "></div>
   `;
-
   return L.divIcon({
     className: 'custom-feature-icon',
     html,
@@ -60,26 +94,25 @@ function createFeatureIcon(type: string, hasSurvey: boolean) {
   });
 }
 
-function FitBounds({ community, features }: { community: LocalCommunity, features: LocalFeature[] }) {
-  const map = useMap();
-  useEffect(() => {
-    const latLngs: L.LatLngTuple[] = [];
-    if (community.latitude && community.longitude) {
-      latLngs.push([community.latitude, community.longitude]);
+function MapInteractions({ 
+  onMapClick 
+}: { 
+  onMapClick: (latlng: L.LatLng) => void 
+}) {
+  useMapEvents({
+    click(e) {
+      onMapClick(e.latlng);
     }
-    features.forEach(f => {
-      latLngs.push([f.latitude, f.longitude]);
-    });
-    
-    if (latLngs.length > 0) {
-      const bounds = L.latLngBounds(latLngs);
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
-    }
-  }, [community, features, map]);
+  });
   return null;
 }
 
 export default function StudentMap({ community, features, filterType, surveys = [] }: StudentMapProps) {
+  const [currentLocation, setCurrentLocation] = useState<L.LatLng | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<L.LatLng | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [mapRef, setMapRef] = useState<L.Map | null>(null);
+
   const defaultCenter: L.LatLngTuple = community.latitude && community.longitude 
     ? [community.latitude, community.longitude] 
     : [0, 0];
@@ -94,22 +127,89 @@ export default function StudentMap({ community, features, filterType, surveys = 
     return surveys.find(s => s.field_feature_id === featureId);
   };
 
+  const locateUser = () => {
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by your browser.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const latlng = L.latLng(position.coords.latitude, position.coords.longitude);
+        setCurrentLocation(latlng);
+        setLocationError(null);
+        if (mapRef) {
+          mapRef.flyTo(latlng, 17);
+        }
+      },
+      (error) => {
+        setLocationError("Location permission denied or unavailable.");
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  // Initial fit bounds
+  useEffect(() => {
+    if (mapRef && (features.length > 0 || (community.latitude && community.longitude))) {
+      const latLngs: L.LatLngTuple[] = [];
+      if (community.latitude && community.longitude) {
+        latLngs.push([community.latitude, community.longitude]);
+      }
+      features.forEach(f => {
+        latLngs.push([f.latitude, f.longitude]);
+      });
+      if (latLngs.length > 0) {
+        const bounds = L.latLngBounds(latLngs);
+        mapRef.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
+      }
+    }
+  }, [mapRef, community, features]);
+
   return (
-    <div className="w-full h-full relative z-0">
+    <div className="w-full h-full relative z-0 flex flex-col">
+      {/* Location Error Overlay */}
+      {locationError && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[1000] bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2 rounded shadow text-sm">
+          {locationError}
+          <button onClick={() => setLocationError(null)} className="ml-2 font-bold hover:text-amber-900">&times;</button>
+        </div>
+      )}
+
+      {/* Floating Controls */}
+      <div className="absolute bottom-6 right-4 z-[1000] flex flex-col gap-2">
+        <button 
+          onClick={locateUser}
+          className="bg-white p-3 rounded-full shadow-lg border border-gray-200 text-gray-700 hover:text-blue-600 hover:bg-gray-50 focus:outline-none transition-colors"
+          title="My Location"
+        >
+          <Navigation size={20} />
+        </button>
+      </div>
+
       <MapContainer 
         center={defaultCenter} 
         zoom={15} 
-        className="w-full h-full z-0"
-        zoomControl={false}
+        className="flex-1 w-full z-0"
+        zoomControl={true}
+        ref={setMapRef}
       >
-        <TileLayer
-          attribution='&copy; OpenStreetMap'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        
-        {/* Fit Bounds */}
-        <FitBounds community={community} features={visibleFeatures} />
+        <MapInteractions onMapClick={(latlng) => setSelectedLocation(latlng)} />
 
+        <LayersControl position="topright">
+          <LayersControl.BaseLayer checked name="Standard">
+            <TileLayer
+              attribution='&copy; OpenStreetMap'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Satellite">
+            <TileLayer
+              attribution='&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            />
+          </LayersControl.BaseLayer>
+        </LayersControl>
+        
         {/* Community Boundary */}
         {boundaryGeoJson && boundaryGeoJson.type === 'Polygon' && (
            <Polygon 
@@ -120,11 +220,36 @@ export default function StudentMap({ community, features, filterType, surveys = 
 
         {/* Community Center Marker */}
         {community.latitude && community.longitude && (
-          <Marker position={[community.latitude, community.longitude]} opacity={0.7} zIndexOffset={-100}>
+          <Marker position={[community.latitude, community.longitude]} opacity={0.6}>
             <Popup>
               <div className="font-bold text-gray-900">{community.name}</div>
               <div className="text-xs text-gray-500">Community Assignment Center</div>
-              
+            </Popup>
+          </Marker>
+        )}
+
+        {/* Current Location Marker */}
+        {currentLocation && (
+          <Marker position={currentLocation} icon={myLocationIcon}>
+            <Popup>
+              <div className="font-semibold text-sm">My Location</div>
+              <div className="text-xs text-gray-500 font-mono mt-1">
+                {currentLocation.lat.toFixed(5)}, {currentLocation.lng.toFixed(5)}
+              </div>
+            </Popup>
+          </Marker>
+        )}
+
+        {/* Selected Location Marker */}
+        {selectedLocation && (
+          <Marker position={selectedLocation} icon={selectedLocationIcon}>
+            <Popup>
+              <div className="font-semibold text-sm text-red-600 flex items-center gap-1">
+                <MapPin size={14} /> Selected Location
+              </div>
+              <div className="text-xs text-gray-500 font-mono mt-1">
+                {selectedLocation.lat.toFixed(5)}, {selectedLocation.lng.toFixed(5)}
+              </div>
             </Popup>
           </Marker>
         )}
@@ -183,6 +308,24 @@ export default function StudentMap({ community, features, filterType, surveys = 
           );
         })}
       </MapContainer>
+      
+      {/* Selected Location Bottom Panel */}
+      {selectedLocation && (
+        <div className="bg-white border-t p-3 text-sm flex justify-between items-center shadow-md z-10">
+          <div>
+            <div className="font-semibold text-gray-800">Selected Location</div>
+            <div className="text-gray-500 font-mono text-xs">
+              Lat: {selectedLocation.lat.toFixed(6)} | Lng: {selectedLocation.lng.toFixed(6)}
+            </div>
+          </div>
+          <button 
+            onClick={() => setSelectedLocation(null)}
+            className="text-gray-400 hover:text-gray-600 text-xs"
+          >
+            Clear
+          </button>
+        </div>
+      )}
     </div>
   );
 }

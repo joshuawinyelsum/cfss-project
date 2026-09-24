@@ -33,6 +33,7 @@ async def sync_operations(
 ):
     current_user, community = user_data
     curr_user_id = current_user.id
+    curr_user_name = current_user.name
     comm_id = community.id
     comm_name = community.name
     results = []
@@ -255,7 +256,7 @@ async def sync_operations(
                     notif = models.AdminNotification(
                         type="survey_submit",
                         title="Survey Submitted",
-                        message=f"{current_user.name} submitted {record.survey_type.capitalize()} Survey\nCommunity: {comm_name}\nEntity ID: {rec_entity_id}"
+                        message=f"{curr_user_name} submitted {record.survey_type.capitalize()} Survey\nCommunity: {comm_name}\nEntity ID: {rec_entity_id}"
                     )
                     db.add(notif)
                     await db.commit()

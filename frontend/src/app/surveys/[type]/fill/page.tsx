@@ -256,9 +256,9 @@ function QuestionnaireContent() {
       }
 
       if (isSubmit) {
-        router.push('/dashboard/surveys/submitted');
+        router.push('/dashboard/work');
       } else {
-        router.push('/dashboard/surveys/drafts');
+        router.push('/dashboard/work');
       }
     } catch (e: any) {
       setError(e.message || "An error occurred while saving locally.");
