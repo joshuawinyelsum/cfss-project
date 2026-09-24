@@ -1,6 +1,6 @@
 import re
 from sqlalchemy import event
-from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, DateTime, UniqueConstraint
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, DateTime, UniqueConstraint, Float
 from sqlalchemy.dialects.postgresql import JSONB
 import uuid
 from sqlalchemy.orm import relationship
@@ -40,6 +40,11 @@ class Community(Base):
     capacity = Column(Integer, nullable=False)
     current_count = Column(Integer, nullable=False, default=0)
     group_number = Column(Integer, unique=True, nullable=False)
+
+    # Spatial metadata
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    spatial_metadata = Column(JSONB, nullable=True) # boundary, area, centroid metadata
 
 class WhitelistV2(Base):
     __tablename__ = "whitelists"
@@ -142,6 +147,7 @@ class SurveyRecord(Base):
     created_by_student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     survey_type = Column(String, nullable=False, index=True) # HOUSEHOLD, EDUCATION, HEALTH, GOVERNANCE
     entity_id = Column(String, nullable=False, index=True)
+    field_feature_id = Column(String, ForeignKey("field_features.id", ondelete="SET NULL"), nullable=True, index=True)
     status = Column(String, nullable=False, default="DRAFT") # DRAFT, SUBMITTED, DELETED
     sync_status = Column(String, nullable=False, default="synced") # pending, syncing, synced, failed
     last_synced_at = Column(DateTime(timezone=True), nullable=True)
@@ -209,3 +215,18 @@ class PasswordResetToken(Base):
     token = Column(String, unique=True, index=True, nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class FieldFeature(Base):
+    __tablename__ = "field_features"
+
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    community_id = Column(Integer, ForeignKey("communities.id", ondelete="CASCADE"), nullable=False, index=True)
+    feature_type = Column(String, nullable=False, index=True)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    accuracy_meters = Column(Float, nullable=True)
+    captured_by_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    metadata_json = Column(JSONB, nullable=True)
+    captured_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())

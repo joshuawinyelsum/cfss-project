@@ -19,7 +19,8 @@ import {
   ClipboardList,
   MoreHorizontal,
   RefreshCw,
-  WifiOff
+  WifiOff,
+  Map as MapIcon
 } from 'lucide-react';
 import { syncEngine } from '@/lib/sync';
 
@@ -322,6 +323,7 @@ export default function DashboardLayout({
 
   const primaryNavItems = [
     { name: 'Home', href: '/dashboard', icon: Home },
+    { name: 'Map', href: '/dashboard/map', icon: MapIcon },
     { name: 'Work', href: '/dashboard/work', icon: FileEdit, badge: draftCount > 0 ? draftCount : undefined },
     { name: 'Collect', href: '/surveys', icon: ClipboardList, prominent: true },
     { name: 'Submitted', href: '/dashboard/surveys/submitted', icon: CheckSquare },
@@ -336,9 +338,9 @@ export default function DashboardLayout({
 
   const mobileNavItems = [
     { name: 'Home', href: '/dashboard', icon: Home },
-    { name: 'Work', href: '/dashboard/work', icon: FileEdit, badge: draftCount > 0 ? draftCount : undefined },
+    { name: 'Map', href: '/dashboard/map', icon: MapIcon },
     { name: 'Collect', href: '/surveys', icon: ClipboardList, prominent: true },
-    { name: 'Submitted', href: '/dashboard/surveys/submitted', icon: CheckSquare },
+    { name: 'Work', href: '/dashboard/work', icon: FileEdit, badge: draftCount > 0 ? draftCount : undefined },
     { name: 'More', href: '/dashboard/more', icon: MoreHorizontal },
   ];
 
@@ -481,8 +483,8 @@ export default function DashboardLayout({
         </header>
 
         {/* Scrollable Main Content */}
-        <main className="flex-1 overflow-y-auto bg-page p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-4 lg:p-8">
-          <div className="max-w-6xl mx-auto">
+        <main className={`flex-1 overflow-y-auto bg-page ${pathname.includes('/map') ? 'p-0 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0' : 'p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-4 lg:p-8'}`}>
+          <div className={pathname.includes('/map') ? "h-full w-full" : "max-w-6xl mx-auto"}>
             {children}
           </div>
         </main>

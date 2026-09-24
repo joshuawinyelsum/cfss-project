@@ -58,7 +58,8 @@ export const syncEngine = {
         await db.sync_operations.update(item.id, { status: 'SYNCING' });
         // Also reflect syncing state on survey if it exists
         if (item.operation_type !== 'DELETE') {
-            await db.surveys.update(item.entity_id, { sync_status: 'syncing' });
+            const store = item.entity_type === 'FEATURE' ? db.features : db.surveys;
+            await store.update(item.entity_id, { sync_status: 'syncing' });
         }
       }
 
@@ -84,20 +85,24 @@ export const syncEngine = {
           await db.sync_operations.delete(op.id);
 
           if (op.operation_type === 'DELETE') {
-            await db.surveys.delete(op.entity_id);
+            if (op.entity_type === 'FEATURE') {
+              await db.features.delete(op.entity_id);
+            } else {
+              await db.surveys.delete(op.entity_id);
+            }
           } else {
-            const survey = await db.surveys.get(op.entity_id);
-            if (survey) {
-              // If not overwritten by another pending op
-              if (survey.sync_status === 'syncing') {
-                await db.surveys.update(op.entity_id, {
+            const store = op.entity_type === 'FEATURE' ? db.features : db.surveys;
+            const record = await (store as any).get(op.entity_id);
+            if (record) {
+              if (record.sync_status === 'syncing') {
+                await (store as any).update(op.entity_id, {
                   sync_status: 'synced',
                   sync_error: undefined,
-                  entity_id: result.house_number || survey.entity_id
+                  entity_id: result.house_number || record.entity_id
                 });
               } else {
-                await db.surveys.update(op.entity_id, {
-                  entity_id: result.house_number || survey.entity_id
+                await (store as any).update(op.entity_id, {
+                  entity_id: result.house_number || record.entity_id
                 });
               }
             }
@@ -109,7 +114,8 @@ export const syncEngine = {
              // We drop the operation to avoid infinite retry loop
              await db.sync_operations.delete(op.id);
              if (op.operation_type !== 'DELETE') {
-                 await db.surveys.update(op.entity_id, { sync_status: 'failed', sync_error: "Fatal: " + result.error });
+                 const store = op.entity_type === 'FEATURE' ? db.features : db.surveys;
+                 await store.update(op.entity_id, { sync_status: 'failed', sync_error: "Fatal: " + result.error });
              }
           } else {
              // Recoverable (Network/500/timeout)
@@ -119,7 +125,8 @@ export const syncEngine = {
                retry_count: (op.retry_count || 0) + 1
              });
              if (op.operation_type !== 'DELETE') {
-                 await db.surveys.update(op.entity_id, { sync_status: 'failed', sync_error: result.error });
+                 const store = op.entity_type === 'FEATURE' ? db.features : db.surveys;
+                 await store.update(op.entity_id, { sync_status: 'failed', sync_error: result.error });
              }
           }
         }
@@ -140,7 +147,8 @@ export const syncEngine = {
           last_error: axiosErr.response?.status === 401 ? "Session expired." : "Network error"
         });
         if (item.operation_type !== 'DELETE') {
-           await db.surveys.update(item.entity_id, { sync_status: 'failed' });
+           const store = item.entity_type === 'FEATURE' ? db.features : db.surveys;
+           await store.update(item.entity_id, { sync_status: 'failed' });
         }
       }
     } finally {
@@ -157,7 +165,7 @@ export const syncEngine = {
     }
   },
 
-  async queueOperation(operationType: 'CREATE' | 'UPDATE' | 'DELETE', entityId: string, payload: Record<string, unknown> | null, token: string) {
+  async queueOperation(operationType: 'CREATE' | 'UPDATE' | 'DELETE', entityType: 'SURVEY' | 'FEATURE', entityId: string, payload: Record<string, unknown> | null, token: string) {
     const userId = useAuthStore.getState().user?.id;
     if (!userId) return;
 
@@ -171,7 +179,8 @@ export const syncEngine = {
     if (operationType !== 'DELETE' && payload) {
         payload.sync_status = 'pending';
         payload.updated_at = new Date().toISOString();
-        await db.surveys.put(payload as unknown as import('./db').LocalSurvey);
+        const store = entityType === 'FEATURE' ? db.features : db.surveys;
+        await (store as any).put(payload);
     }
 
     // Coalescing logic
@@ -186,12 +195,14 @@ export const syncEngine = {
        }
        
        if (hasCreate) {
-           await db.surveys.delete(entityId);
+           const store = entityType === 'FEATURE' ? db.features : db.surveys;
+           await (store as any).delete(entityId);
            window.dispatchEvent(new Event('sync-queued'));
            return; // Stop here, no need to tell the server
        } else {
            // Mark local survey as pending delete so UI can hide it
-           await db.surveys.update(entityId, { sync_status: 'pending', status: 'DELETED' });
+           const store = entityType === 'FEATURE' ? db.features : db.surveys;
+           await (store as any).update(entityId, { sync_status: 'pending', status: 'DELETED' });
        }
     } else if (operationType === 'UPDATE') {
        const hasCreate = pendingOps.find(o => o.operation_type === 'CREATE');
@@ -221,7 +232,7 @@ export const syncEngine = {
         id: crypto.randomUUID(),
         student_id: userId,
         operation_type: operationType,
-        entity_type: 'SURVEY',
+        entity_type: entityType,
         entity_id: entityId,
         payload: payload === null ? undefined : payload,
         status: 'PENDING',

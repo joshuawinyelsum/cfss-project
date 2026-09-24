@@ -70,6 +70,9 @@ class CommunityResponse(BaseModel):
     slots_remaining: int = 0
     group_number: int
     group_label: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    spatial_metadata: Optional[Dict[str, Any]] = None
     
     class Config:
         from_attributes = True
@@ -239,3 +242,25 @@ class SyncOperationItem(BaseModel):
 class SyncOperationsPayload(BaseModel):
     operations: List[SyncOperationItem]
 
+
+class FieldFeatureBase(BaseModel):
+    feature_type: str
+    latitude: float
+    longitude: float
+    accuracy_meters: Optional[float] = None
+    metadata_json: Optional[Dict[str, Any]] = None
+
+class FieldFeatureCreate(FieldFeatureBase):
+    id: str
+    captured_at: Optional[datetime] = None
+
+class FieldFeatureResponse(FieldFeatureBase):
+    id: str
+    community_id: int
+    captured_by_id: int
+    captured_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

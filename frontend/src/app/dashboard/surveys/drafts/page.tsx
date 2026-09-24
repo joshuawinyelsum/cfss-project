@@ -22,7 +22,7 @@ export default function DraftsPage() {
   const handleDelete = async (id: string) => {
     setDeletingId(id);
     try {
-      await syncEngine.queueOperation('DELETE', id, null, token || '');
+      await syncEngine.queueOperation('DELETE', 'SURVEY', id, null, token || '');
       setRecords(records.filter(r => r.id !== id));
       setTotal(total - 1);
     } catch (err) {

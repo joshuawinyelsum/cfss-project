@@ -39,7 +39,7 @@ export default function SurveyWorkspace() {
   const handleDelete = async (id: string) => {
     try {
       const { syncEngine } = await import('@/lib/sync');
-      await syncEngine.queueOperation('DELETE', id, null, token || '');
+      await syncEngine.queueOperation('DELETE', 'SURVEY', id, null, token || '');
       setRecords(prev => prev.filter(r => r.id !== id));
     } catch (err) {
       console.error("Failed to delete draft:", err);

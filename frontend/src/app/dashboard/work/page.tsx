@@ -24,7 +24,7 @@ export default function WorkWorkspacePage() {
   const handleDelete = async (id: string) => {
     setDeletingId(id);
     try {
-      await syncEngine.queueOperation('DELETE', id, null, token || '');
+      await syncEngine.queueOperation('DELETE', 'SURVEY', id, null, token || '');
       setDrafts(drafts.filter(r => r.id !== id));
     } catch (err) {
       console.error("Failed to delete draft:", err);

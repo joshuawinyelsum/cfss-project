@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { ArrowLeft, Save, CheckCircle, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 
 import { syncEngine } from '@/lib/sync';
+import GpsCapture from '@/components/GpsCapture';
 
 function QuestionnaireContent() {
   const { user, token } = useAuthStore();
@@ -18,16 +19,16 @@ function QuestionnaireContent() {
   const typeStr = params.type as string;
   const searchParams = useSearchParams();
   const recordId = searchParams.get('id') as string;
-  
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  
+
   const [record, setRecord] = useState<any>(null);
   const [questions, setQuestions] = useState<any[]>([]);
   const [answers, setAnswers] = useState<Record<string, any>>({});
-  
+
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -44,7 +45,7 @@ function QuestionnaireContent() {
 
   useEffect(() => {
     if (!token || !user) return;
-    
+
     const loadData = async () => {
       try {
         let recordData = null;
@@ -76,7 +77,7 @@ function QuestionnaireContent() {
               throw new Error("No internet and survey definition not cached.");
             }
           }
-          
+
           recordData = {
             id: crypto.randomUUID(), // New UUID for offline sync mapping
             survey_type: typeStr.toUpperCase(),
@@ -130,7 +131,7 @@ function QuestionnaireContent() {
         answersData.forEach((a: any) => {
           answersObj[a.question_id] = a.answer;
         });
-        
+
         setRecord(recordData);
         setQuestions(questionsData);
         setAnswers(answersObj);
@@ -140,7 +141,7 @@ function QuestionnaireContent() {
         setLoading(false);
       }
     };
-    
+
     loadData();
   }, [typeStr, recordId, token, user]);
 
@@ -149,7 +150,7 @@ function QuestionnaireContent() {
     questions.forEach(q => secs.add(q.section));
     return Array.from(secs);
   }, [questions]);
-  
+
   const currentSectionQuestions = useMemo(() => {
     if (sections.length === 0) return [];
     const currentSection = sections[currentSectionIndex];
@@ -158,7 +159,7 @@ function QuestionnaireContent() {
 
   const currentSection = sections[currentSectionIndex];
   const sectionQuestions = currentSectionQuestions;
-  
+
   // Progress calculation
   const progress = useMemo(() => {
     if (questions.length === 0) return 0;
@@ -168,11 +169,41 @@ function QuestionnaireContent() {
     }).length;
     return Math.round((answeredCount / questions.length) * 100);
   }, [questions, answers]);
-  
+
   const handleAnswerChange = (questionId: string, value: any) => {
     if (record?.status === 'SUBMITTED') return;
     setAnswers(prev => ({ ...prev, [questionId]: value }));
     setHasUnsavedChanges(true);
+  };
+
+  const handleGpsCapture = async (location: { latitude: number, longitude: number, accuracy: number, timestamp: string }) => {
+    if (!user?.community_id || !token) return;
+    try {
+      const { db } = await import('@/lib/db');
+      const featureId = crypto.randomUUID();
+      const feature = {
+        id: featureId,
+        student_id: user.id as number,
+        community_id: user.community_id,
+        feature_type: record.survey_type,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        accuracy_meters: location.accuracy,
+        sync_status: 'pending' as const,
+        captured_at: location.timestamp,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      await db.features.put(feature);
+      await syncEngine.queueOperation('CREATE', 'FEATURE', featureId, feature, token);
+
+      setRecord((prev: any) => ({ ...prev, field_feature_id: featureId }));
+      setHasUnsavedChanges(true);
+    } catch (e) {
+      console.error("Failed to capture location locally", e);
+      setError("Failed to save location data locally.");
+    }
   };
 
   const saveAnswers = async (isSubmit: boolean) => {
@@ -193,7 +224,7 @@ function QuestionnaireContent() {
       question_id: qid,
       answer: answers[qid]
     }));
-    
+
     try {
       if (isSubmit) {
         setSubmitting(true);
@@ -204,7 +235,7 @@ function QuestionnaireContent() {
       const opType = !record.has_been_saved ? 'CREATE' : 'UPDATE';
       const submittedAt = isSubmit ? (record.submitted_at || new Date().toISOString()) : record.submitted_at;
 
-      await syncEngine.queueOperation(opType, record.id, {
+      await syncEngine.queueOperation(opType, 'SURVEY', record.id, {
         id: record.id,
         survey_type: record.survey_type,
         community_id: user.community_id,
@@ -219,7 +250,7 @@ function QuestionnaireContent() {
       }, token);
 
       setHasUnsavedChanges(false);
-      
+
       if (!isSubmit && recordId === 'new') {
         setRecord((prev: any) => ({ ...prev, has_been_saved: true, submitted_at: submittedAt }));
       }
@@ -260,7 +291,7 @@ function QuestionnaireContent() {
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-4xl mx-auto pb-8">
-        
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
           <div className="flex items-center gap-4">
@@ -282,14 +313,14 @@ function QuestionnaireContent() {
               </p>
             </div>
           </div>
-          
+
           {isReadonly && (
             <div className="sm:ml-auto bg-emerald-50 text-emerald-600 px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-2 border border-emerald-200 self-start sm:self-auto">
               <CheckCircle size={16} /> Read Only
             </div>
           )}
         </div>
-        
+
         {error && (
           <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 text-sm font-medium flex items-center gap-2">
             <AlertCircle size={18} />
@@ -315,8 +346,8 @@ function QuestionnaireContent() {
               key={sec}
               onClick={() => setCurrentSectionIndex(idx)}
               className={`px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors border ${
-                idx === currentSectionIndex 
-                  ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                idx === currentSectionIndex
+                  ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
                   : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
               }`}
             >
@@ -330,7 +361,7 @@ function QuestionnaireContent() {
           <div className="bg-gray-50 border-b border-gray-200 p-5">
             <h2 className="text-lg font-bold text-gray-900">Section {currentSectionIndex + 1}: {currentSection}</h2>
           </div>
-          
+
           <div className="p-6 space-y-8">
             {sectionQuestions.map((q, index) => (
               <div key={q.id} className="space-y-3">
@@ -338,10 +369,10 @@ function QuestionnaireContent() {
                   {index + 1}. {q.question_text}
                   {q.required && <span className="text-red-500 ml-1">*</span>}
                 </label>
-                
+
                 {q.question_type === 'text' && (
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     disabled={isReadonly}
                     value={answers[q.id] || ''}
                     onChange={(e) => handleAnswerChange(q.id, e.target.value)}
@@ -349,10 +380,10 @@ function QuestionnaireContent() {
                     placeholder="Enter answer..."
                   />
                 )}
-                
+
                 {q.question_type === 'number' && (
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     disabled={isReadonly}
                     value={answers[q.id] || ''}
                     onChange={(e) => handleAnswerChange(q.id, e.target.value)}
@@ -360,15 +391,15 @@ function QuestionnaireContent() {
                     placeholder="0"
                   />
                 )}
-                
+
                 {q.question_type === 'radio' && q.options && (
                   <div className="space-y-2">
                     {(q.options as string[]).map(opt => (
                       <label key={opt} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
-                        <input 
-                          type="radio" 
+                        <input
+                          type="radio"
                           disabled={isReadonly}
-                          name={`q_${q.id}`} 
+                          name={`q_${q.id}`}
                           value={opt}
                           checked={answers[q.id] === opt}
                           onChange={() => handleAnswerChange(q.id, opt)}
@@ -379,9 +410,9 @@ function QuestionnaireContent() {
                     ))}
                   </div>
                 )}
-                
+
                 {q.question_type === 'select' && q.options && (
-                  <select 
+                  <select
                     disabled={isReadonly}
                     value={answers[q.id] || ''}
                     onChange={(e) => handleAnswerChange(q.id, e.target.value)}
@@ -393,23 +424,23 @@ function QuestionnaireContent() {
                     ))}
                   </select>
                 )}
-                
+
                 {/* Checkbox and Date can be added similarly if needed */}
               </div>
             ))}
           </div>
-          
+
           {/* Bottom Navigation */}
           <div className="border-t border-gray-200 p-5 bg-gray-50 flex items-center justify-between">
-            <button 
+            <button
               onClick={() => setCurrentSectionIndex(prev => Math.max(0, prev - 1))}
               disabled={currentSectionIndex === 0}
               className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               <ChevronLeft size={18} /> Previous
             </button>
-            
-            <button 
+
+            <button
               onClick={() => setCurrentSectionIndex(prev => Math.min(sections.length - 1, prev + 1))}
               disabled={currentSectionIndex === sections.length - 1}
               className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
@@ -422,7 +453,7 @@ function QuestionnaireContent() {
         {/* Action Bar (Normal Flow Footer) */}
         {!isReadonly && (
           <div className="bg-surface border border-border-strong p-4 sm:p-6 rounded-xl shadow-sm mt-8 flex flex-col-reverse sm:flex-row items-center justify-between gap-4">
-            <button 
+            <button
               onClick={() => saveAnswers(false)}
               disabled={saving || submitting}
               className="w-full sm:w-auto px-6 py-3 bg-page border border-border-strong text-primary font-medium rounded-xl hover:bg-border/50 transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
@@ -430,8 +461,8 @@ function QuestionnaireContent() {
               {saving ? <div className="w-5 h-5 border-2 border-muted border-t-transparent rounded-full animate-spin"></div> : <Save size={18} />}
               <span>Save Draft</span>
             </button>
-            
-            <button 
+
+            <button
               onClick={() => saveAnswers(true)}
               disabled={saving || submitting}
               className="w-full sm:w-auto px-6 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-70 shadow-sm"
