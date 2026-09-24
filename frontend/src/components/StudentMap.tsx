@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   MapContainer, 
   TileLayer, 
   Marker, 
   Popup, 
   Polygon, 
-  useMap, 
   LayersControl,
   useMapEvents
 } from 'react-leaflet';
@@ -14,7 +13,6 @@ import L from 'leaflet';
 import { LocalCommunity, LocalFeature, LocalSurvey } from '@/lib/db';
 import { CheckCircle, Clock, MapPin, Navigation } from 'lucide-react';
 
-// Fix default leaflet icons
 const iconUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
 const iconRetinaUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png';
 const shadowUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png';
@@ -29,7 +27,6 @@ const defaultIcon = L.icon({
   tooltipAnchor: [16, -28],
   shadowSize: [41, 41]
 });
-
 L.Marker.prototype.options.icon = defaultIcon;
 
 const myLocationIcon = L.divIcon({
@@ -68,7 +65,7 @@ interface StudentMapProps {
 }
 
 function createFeatureIcon(type: string, hasSurvey: boolean) {
-  let color = '#093C22'; // CFSS Green
+  let color = '#093C22';
   if (type === 'HOUSEHOLD') color = '#2563EB';
   else if (type === 'EDUCATION') color = '#D97706';
   else if (type === 'HEALTH') color = '#DC2626';
@@ -94,11 +91,7 @@ function createFeatureIcon(type: string, hasSurvey: boolean) {
   });
 }
 
-function MapInteractions({ 
-  onMapClick 
-}: { 
-  onMapClick: (latlng: L.LatLng) => void 
-}) {
+function MapInteractions({ onMapClick }: { onMapClick: (latlng: L.LatLng) => void }) {
   useMapEvents({
     click(e) {
       onMapClick(e.latlng);
@@ -111,7 +104,10 @@ export default function StudentMap({ community, features, filterType, surveys = 
   const [currentLocation, setCurrentLocation] = useState<L.LatLng | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<L.LatLng | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState(true);
   const [mapRef, setMapRef] = useState<L.Map | null>(null);
+  
+  const hasInitiallyLocated = useRef(false);
 
   const defaultCenter: L.LatLngTuple = community.latitude && community.longitude 
     ? [community.latitude, community.longitude] 
@@ -127,62 +123,68 @@ export default function StudentMap({ community, features, filterType, surveys = 
     return surveys.find(s => s.field_feature_id === featureId);
   };
 
-  const locateUser = () => {
+  const locateUser = (isInitial = false) => {
     if (!navigator.geolocation) {
       setLocationError("Geolocation is not supported by your browser.");
+      if (isInitial) setIsLocating(false);
       return;
     }
+    
+    if (!isInitial) setIsLocating(true);
+    
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const latlng = L.latLng(position.coords.latitude, position.coords.longitude);
         setCurrentLocation(latlng);
         setLocationError(null);
+        setIsLocating(false);
         if (mapRef) {
-          mapRef.flyTo(latlng, 17);
+          mapRef.flyTo(latlng, 17, { animate: !isInitial });
         }
       },
       (error) => {
-        setLocationError("Location permission denied or unavailable.");
+        setIsLocating(false);
+        setLocationError("Location permission denied or unavailable. Showing community area.");
+        // If initial locate fails, we just stay at defaultCenter (community)
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
-  // Initial fit bounds
   useEffect(() => {
-    if (mapRef && (features.length > 0 || (community.latitude && community.longitude))) {
-      const latLngs: L.LatLngTuple[] = [];
-      if (community.latitude && community.longitude) {
-        latLngs.push([community.latitude, community.longitude]);
-      }
-      features.forEach(f => {
-        latLngs.push([f.latitude, f.longitude]);
-      });
-      if (latLngs.length > 0) {
-        const bounds = L.latLngBounds(latLngs);
-        mapRef.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
-      }
+    if (!hasInitiallyLocated.current && mapRef) {
+      hasInitiallyLocated.current = true;
+      locateUser(true);
     }
-  }, [mapRef, community, features]);
+  }, [mapRef]);
 
   return (
     <div className="w-full h-full relative z-0 flex flex-col">
+      {/* Initial Loading Overlay */}
+      {isLocating && !currentLocation && (
+        <div className="absolute inset-0 bg-white/70 z-[2000] flex flex-col items-center justify-center backdrop-blur-sm">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+          <div className="text-sm font-medium text-gray-700">Obtaining current location...</div>
+        </div>
+      )}
+
       {/* Location Error Overlay */}
       {locationError && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[1000] bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2 rounded shadow text-sm">
-          {locationError}
-          <button onClick={() => setLocationError(null)} className="ml-2 font-bold hover:text-amber-900">&times;</button>
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[1000] bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2 rounded shadow text-sm flex items-center">
+          <span>{locationError}</span>
+          <button onClick={() => setLocationError(null)} className="ml-2 font-bold text-amber-900 hover:text-amber-950 text-lg">&times;</button>
         </div>
       )}
 
       {/* Floating Controls */}
-      <div className="absolute bottom-6 right-4 z-[1000] flex flex-col gap-2">
+      <div className="absolute bottom-24 right-4 z-[1000] flex flex-col gap-2">
         <button 
-          onClick={locateUser}
-          className="bg-white p-3 rounded-full shadow-lg border border-gray-200 text-gray-700 hover:text-blue-600 hover:bg-gray-50 focus:outline-none transition-colors"
+          onClick={() => locateUser(false)}
+          disabled={isLocating}
+          className="bg-white p-3 rounded-full shadow-lg border border-gray-200 text-gray-700 hover:text-blue-600 hover:bg-gray-50 focus:outline-none transition-colors disabled:opacity-50"
           title="My Location"
         >
-          <Navigation size={20} />
+          <Navigation size={20} className={isLocating && currentLocation ? 'animate-pulse' : ''} />
         </button>
       </div>
 
@@ -232,7 +234,7 @@ export default function StudentMap({ community, features, filterType, surveys = 
         {currentLocation && (
           <Marker position={currentLocation} icon={myLocationIcon}>
             <Popup>
-              <div className="font-semibold text-sm">My Location</div>
+              <div className="font-semibold text-sm text-blue-700">My Location</div>
               <div className="text-xs text-gray-500 font-mono mt-1">
                 {currentLocation.lat.toFixed(5)}, {currentLocation.lng.toFixed(5)}
               </div>
@@ -311,19 +313,30 @@ export default function StudentMap({ community, features, filterType, surveys = 
       
       {/* Selected Location Bottom Panel */}
       {selectedLocation && (
-        <div className="bg-white border-t p-3 text-sm flex justify-between items-center shadow-md z-10">
+        <div className="bg-white border-t p-3 text-sm flex justify-between items-center shadow-lg z-[1000] shrink-0">
           <div>
-            <div className="font-semibold text-gray-800">Selected Location</div>
-            <div className="text-gray-500 font-mono text-xs">
+            <div className="font-semibold text-gray-800 flex items-center gap-2">
+              <MapPin size={16} className="text-red-500" />
+              Selected Location
+            </div>
+            <div className="text-gray-500 font-mono text-xs mt-1">
               Lat: {selectedLocation.lat.toFixed(6)} | Lng: {selectedLocation.lng.toFixed(6)}
             </div>
           </div>
-          <button 
-            onClick={() => setSelectedLocation(null)}
-            className="text-gray-400 hover:text-gray-600 text-xs"
-          >
-            Clear
-          </button>
+          <div className="flex gap-2">
+            <button 
+              className="bg-cfss-green text-white px-4 py-2 rounded font-semibold text-xs hover:bg-green-700 transition-colors"
+              onClick={() => alert(`Use Location: ${selectedLocation.lat}, ${selectedLocation.lng}`)}
+            >
+              Use Location
+            </button>
+            <button 
+              onClick={() => setSelectedLocation(null)}
+              className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-3 py-2 rounded text-xs transition-colors"
+            >
+              Clear
+            </button>
+          </div>
         </div>
       )}
     </div>
