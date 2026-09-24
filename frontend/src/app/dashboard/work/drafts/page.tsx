@@ -156,14 +156,10 @@ export default function DraftsPage() {
   return (
     <>
       <div className="space-y-6 max-w-3xl mx-auto pb-12">
-        <div className="mb-4">
-          <Link href="/dashboard/work" className="inline-flex items-center text-sm font-medium text-muted hover:text-primary transition-colors">
-            &larr; Back to Work overview
-          </Link>
-        </div>
+        
         
         <div>
-          <h1 className="text-2xl font-bold text-primary">Draft Surveys</h1>
+          <h2 className="text-xl font-bold text-primary">Draft Surveys</h2>
           <p className="text-muted mt-1">Pick up where you left off. Only you can see and edit your drafts.</p>
         </div>
 
