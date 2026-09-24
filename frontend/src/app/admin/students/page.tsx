@@ -120,10 +120,10 @@ export default function AdminStudentsPage() {
     <div className="space-y-6 relative">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Students</h1>
-          <p className="text-sm text-slate-500 mt-1">Manage all assigned students</p>
+          <h1 className="text-2xl font-bold text-primary">Students</h1>
+          <p className="text-sm text-muted mt-1">Manage all assigned students</p>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
           {/* Search */}
           <div className="relative w-full sm:w-64">
@@ -144,7 +144,7 @@ export default function AdminStudentsPage() {
 
           {/* Filter */}
           <select
-            className="block w-full sm:w-48 pl-3 pr-10 py-2 border border-slate-300 bg-white rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm shadow-sm disabled:opacity-50"
+            className="block w-full sm:w-48 pl-3 pr-10 py-2 border border-slate-300 bg-surface rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm shadow-sm disabled:opacity-50"
             value={selectedCommunity}
             onChange={(e) => setSelectedCommunity(e.target.value)}
             disabled={loading}
@@ -173,62 +173,87 @@ export default function AdminStudentsPage() {
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
         </div>
       ) : filteredStudents.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
+        <div className="bg-surface rounded-xl shadow-sm border border-border-strong p-12 text-center">
           <svg className="mx-auto h-12 w-12 text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
           </svg>
-          <h3 className="text-lg font-medium text-slate-900 mb-1">No students found</h3>
-          <p className="text-slate-500">
-            {students.length === 0 
-              ? "There are no students assigned to any communities yet." 
+          <h3 className="text-lg font-medium text-primary mb-1">No students found</h3>
+          <p className="text-muted">
+            {students.length === 0
+              ? "There are no students assigned to any communities yet."
               : "No students match your current search and filter criteria."}
           </p>
           {(searchTerm || selectedCommunity !== 'All') && (
-            <button 
+            <button
               onClick={() => { setSearchTerm(''); setSelectedCommunity('All'); }}
-              className="mt-4 text-blue-600 hover:text-blue-800 font-medium text-sm"
+              className="mt-4 text-cfss-green hover:text-blue-800 font-medium text-sm"
             >
               Clear filters
             </button>
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-surface rounded-xl shadow-sm border border-border-strong overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200">
-              <thead className="bg-slate-50">
+            <div className="md:hidden flex flex-col divide-y divide-border">
+              {filteredStudents.map((student) => (
+                <div
+                  key={`mobile-${student.id}`}
+                  onClick={() => handleRowClick(student.id)}
+                  className="p-4 hover:bg-page cursor-pointer transition-colors space-y-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 flex-shrink-0 bg-cfss-green-soft rounded-full flex items-center justify-center text-cfss-green font-bold">
+                      {student.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-primary truncate">{student.name}</p>
+                      <p className="text-xs text-muted truncate">{student.email || "No email"}</p>
+                    </div>
+                    <span className="px-2.5 py-1 inline-flex text-[10px] leading-4 font-semibold rounded-full bg-cfss-green-soft text-cfss-green whitespace-nowrap shrink-0">
+                      {student.group_label || `Group ${student.group_number}`}
+                    </span>
+                  </div>
+                  <div className="text-sm text-secondary font-medium">
+                    {student.community_name}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <table className="hidden md:table min-w-full divide-y divide-border">
+              <thead className="bg-page">
                 <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">
                     Student / Email
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">
                     Community
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">
                     Group
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-slate-200">
+              <tbody className="bg-surface divide-y divide-border">
                 {filteredStudents.map((student) => (
-                  <tr 
-                    key={student.id} 
+                  <tr
+                    key={student.id}
                     onClick={() => handleRowClick(student.id)}
-                    className="hover:bg-slate-50 cursor-pointer transition-colors"
+                    className="hover:bg-page cursor-pointer transition-colors"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="h-10 w-10 flex-shrink-0 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold">
+                        <div className="h-10 w-10 flex-shrink-0 bg-cfss-green-soft rounded-full flex items-center justify-center text-cfss-green font-bold">
                           {student.name.charAt(0).toUpperCase()}
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-slate-900">{student.name}</div>
-                          <div className="text-sm text-slate-500">{student.email || "No email"}</div>
+                          <div className="text-sm font-medium text-primary">{student.name}</div>
+                          <div className="text-sm text-muted">{student.email || "No email"}</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-slate-900 font-medium">{student.community_name}</div>
+                      <div className="text-sm text-primary font-medium">{student.community_name}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800">
@@ -251,60 +276,60 @@ export default function AdminStudentsPage() {
 
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-            <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
+            <div className="inline-block align-bottom bg-surface rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
               {studentDetailsLoading ? (
                 <div className="p-8 flex justify-center items-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
               ) : selectedStudent ? (
                 <>
-                  <div className="bg-white px-6 pt-6 pb-4 sm:p-6 sm:pb-4">
+                  <div className="bg-surface px-6 pt-6 pb-4 sm:p-6 sm:pb-4">
                     <div className="sm:flex sm:items-start">
-                      <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
-                        <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-cfss-green-soft sm:mx-0 sm:h-10 sm:w-10">
+                        <svg className="h-6 w-6 text-cfss-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
                       </div>
                       <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                        <h3 className="text-xl leading-6 font-bold text-slate-900" id="modal-title">
+                        <h3 className="text-xl leading-6 font-bold text-primary" id="modal-title">
                           Student Details
                         </h3>
                         <div className="mt-4 space-y-4">
-                          <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 space-y-3">
+                          <div className="bg-page p-4 rounded-lg border border-slate-100 space-y-3">
                             <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-slate-500">Name:</span>
-                              <span className="text-sm font-semibold text-slate-900 col-span-2">{selectedStudent.name}</span>
+                              <span className="text-sm font-medium text-muted">Name:</span>
+                              <span className="text-sm font-semibold text-primary col-span-2">{selectedStudent.name}</span>
                             </div>
                             <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-slate-500">Index Number:</span>
-                              <span className="text-sm font-semibold text-slate-900 col-span-2">{selectedStudent.student_id}</span>
+                              <span className="text-sm font-medium text-muted">Index Number:</span>
+                              <span className="text-sm font-semibold text-primary col-span-2">{selectedStudent.student_id}</span>
                             </div>
                             <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-slate-500">Gender:</span>
-                              <span className="text-sm text-slate-900 col-span-2">{selectedStudent.gender || 'Not provided'}</span>
+                              <span className="text-sm font-medium text-muted">Gender:</span>
+                              <span className="text-sm text-primary col-span-2">{selectedStudent.gender || 'Not provided'}</span>
                             </div>
                             <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-slate-500">Phone:</span>
-                              <span className="text-sm text-slate-900 col-span-2">{selectedStudent.phone_number || 'Not provided'}</span>
+                              <span className="text-sm font-medium text-muted">Phone:</span>
+                              <span className="text-sm text-primary col-span-2">{selectedStudent.phone_number || 'Not provided'}</span>
                             </div>
                             <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-slate-500">Email:</span>
-                              <span className="text-sm text-slate-900 col-span-2">{selectedStudent.email || 'N/A'}</span>
+                              <span className="text-sm font-medium text-muted">Email:</span>
+                              <span className="text-sm text-primary col-span-2">{selectedStudent.email || 'N/A'}</span>
                             </div>
                             <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-slate-500">Faculty/School:</span>
-                              <span className="text-sm text-slate-900 col-span-2">{selectedStudent.faculty || 'Not provided'}</span>
+                              <span className="text-sm font-medium text-muted">Faculty/School:</span>
+                              <span className="text-sm text-primary col-span-2">{selectedStudent.faculty || 'Not provided'}</span>
                             </div>
                             <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-slate-500">Department:</span>
-                              <span className="text-sm text-slate-900 col-span-2">{selectedStudent.program || 'N/A'}</span>
+                              <span className="text-sm font-medium text-muted">Department:</span>
+                              <span className="text-sm text-primary col-span-2">{selectedStudent.program || 'N/A'}</span>
                             </div>
                             <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-slate-500">Level:</span>
-                              <span className="text-sm text-slate-900 col-span-2">{selectedStudent.level || 'N/A'}</span>
+                              <span className="text-sm font-medium text-muted">Level:</span>
+                              <span className="text-sm text-primary col-span-2">{selectedStudent.level || 'N/A'}</span>
                             </div>
                           </div>
-                          
+
                           <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100 space-y-3">
                             <h4 className="text-sm font-bold text-indigo-900 uppercase tracking-wider mb-2">Assignment</h4>
                             <div className="grid grid-cols-3 gap-2">
@@ -318,8 +343,8 @@ export default function AdminStudentsPage() {
                             <div className="grid grid-cols-3 gap-2">
                               <span className="text-sm font-medium text-indigo-700">Location:</span>
                               <span className="text-sm text-indigo-900 col-span-2">
-                                {selectedStudent.district && selectedStudent.region 
-                                  ? `${selectedStudent.district}, ${selectedStudent.region}` 
+                                {selectedStudent.district && selectedStudent.region
+                                  ? `${selectedStudent.district}, ${selectedStudent.region}`
                                   : "N/A"}
                               </span>
                             </div>
@@ -328,9 +353,9 @@ export default function AdminStudentsPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="bg-slate-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-slate-200">
-                    <button 
-                      type="button" 
+                  <div className="bg-page px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-border-strong">
+                    <button
+                      type="button"
                       className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-slate-900 text-base font-medium text-white hover:bg-slate-800 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm transition-colors"
                       onClick={() => setSelectedStudent(null)}
                     >

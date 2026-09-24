@@ -24,7 +24,7 @@ export default function AdminDashboard() {
       router.push('/admin/login');
       return;
     }
-    
+
     // Polling setup for live updates
     fetchData();
     const interval = setInterval(fetchData, 5000);
@@ -55,7 +55,7 @@ export default function AdminDashboard() {
   const handleToggleRegistration = async () => {
     try {
       const newVal = !settings.registration_open;
-      await api.put('/api/admin/settings', 
+      await api.put('/api/admin/settings',
         { registration_open: newVal },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -69,7 +69,7 @@ export default function AdminDashboard() {
   const handleCreateCommunity = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/api/admin/communities', 
+      await api.post('/api/admin/communities',
         { name: newCommName, capacity: newCommCap },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -108,7 +108,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-8">
-      
+
       {/* Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-surface p-6 rounded-xl shadow-sm border border-border-strong flex items-center gap-5">
@@ -124,7 +124,7 @@ export default function AdminDashboard() {
             </p>
           </div>
         </div>
-        
+
         <div className="bg-surface p-6 rounded-xl shadow-sm border border-border-strong flex items-center gap-5">
           <div className="p-4 bg-cfss-green-soft text-cfss-green rounded-xl">
              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
@@ -138,7 +138,7 @@ export default function AdminDashboard() {
             </p>
           </div>
         </div>
-        
+
         <div className="bg-surface p-6 rounded-xl shadow-sm border border-border-strong flex items-center gap-5">
           <div className="p-4 bg-cfss-green-soft text-cfss-green rounded-xl">
              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m3-4h1m-1 4h1m-5 8h5" /></svg>
@@ -151,7 +151,7 @@ export default function AdminDashboard() {
             </p>
           </div>
         </div>
-        
+
         <div className="bg-surface p-6 rounded-xl shadow-sm border border-border-strong flex items-center gap-5">
           <div className={`p-4 rounded-xl ${settings.registration_open ? 'bg-amber-50 text-amber-500' : 'bg-status-error/10 text-status-error'}`}>
              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
@@ -170,10 +170,10 @@ export default function AdminDashboard() {
 
       {/* Main Grid: 70% / 30% */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        
+
         {/* LEFT COLUMN (70%) */}
         <div className="xl:col-span-2 space-y-8">
-          
+
           {/* System Sync Overview */}
           <div className="bg-surface rounded-xl shadow-sm border border-border-strong overflow-hidden">
             <div className="px-6 py-5 border-b border-border-strong flex justify-between items-center bg-page/50">
@@ -217,7 +217,7 @@ export default function AdminDashboard() {
               </button>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
+              <table className="hidden md:table w-full text-sm text-left">
                 <thead className="text-muted border-b border-border-strong bg-page/50">
                   <tr>
                     <th className="py-4 px-6 font-semibold">Community Name</th>
@@ -273,7 +273,7 @@ export default function AdminDashboard() {
               </h2>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
+              <table className="hidden md:table w-full text-sm text-left">
                 <thead className="bg-page/50 text-muted border-b border-border-strong">
                   <tr>
                     <th className="py-4 px-6 font-semibold">Student Name</th>
@@ -329,7 +329,7 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
-          
+
           {/* Students Overview Table */}
           <div className="bg-surface rounded-xl shadow-sm border border-border-strong overflow-hidden">
             <div className="px-6 py-4 border-b border-border-strong flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
@@ -355,7 +355,7 @@ export default function AdminDashboard() {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
+              <table className="hidden md:table w-full text-sm text-left">
                 <thead className="bg-page/50 text-muted border-b border-border-strong">
                   <tr>
                     <th className="py-4 px-6 font-semibold">Name</th>
@@ -407,14 +407,14 @@ export default function AdminDashboard() {
 
         {/* RIGHT COLUMN (30%) */}
         <div className="space-y-8">
-          
+
           {/* Registration Control */}
           <div className="bg-surface rounded-xl shadow-sm border border-border-strong p-6">
             <h2 className="text-lg font-bold text-primary mb-6 flex items-center gap-2">
               <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
               Registration Control
             </h2>
-            
+
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                  <span className="text-sm font-semibold text-secondary">Current Status</span>
@@ -425,8 +425,8 @@ export default function AdminDashboard() {
 
               <div className="flex items-center justify-between">
                  <span className="text-sm text-secondary">Registration is currently open for students.</span>
-                 <button 
-                   onClick={handleToggleRegistration} 
+                 <button
+                   onClick={handleToggleRegistration}
                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none shrink-0 ${settings.registration_open ? 'bg-cfss-green' : 'bg-border-strong'}`}
                  >
                    <span className={`inline-block h-6 w-6 transform rounded-full bg-surface shadow-sm transition-transform ${settings.registration_open ? 'translate-x-7' : 'translate-x-1'}`} />
@@ -434,7 +434,7 @@ export default function AdminDashboard() {
               </div>
 
               <hr className="border-border" />
-              
+
               <div>
                  <span className="text-sm font-semibold text-primary">Registration Control</span>
                  <div className="flex items-start gap-3 border border-border-strong rounded-lg p-3 mt-3 shadow-sm bg-page">
@@ -466,7 +466,7 @@ export default function AdminDashboard() {
               <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
               Quick Actions
             </h2>
-            
+
             <div className="space-y-3">
               <button onClick={handleExportStudents} disabled={exporting} className="w-full flex items-center gap-3 bg-page hover:bg-page/80 text-primary font-bold py-3 px-4 rounded-xl transition-colors border border-border-strong shadow-sm text-sm">
                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>

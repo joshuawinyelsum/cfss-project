@@ -261,7 +261,7 @@ export default function AdminSurveysPage() {
       ) : (
         <div className="bg-surface rounded-xl shadow-sm border border-border-strong overflow-hidden">
           <div className="break-words">
-            <table className="w-full text-sm text-left divide-y divide-border">
+            <table className="hidden md:table w-full text-sm text-left divide-y divide-border">
               <thead className="bg-page">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">

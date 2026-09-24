@@ -126,7 +126,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="flex h-screen bg-page font-sans overflow-hidden">
 
       {/* Sidebar */}
-      <div className={`flex flex-col bg-cfss-green text-white transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-0 overflow-hidden'}`}>
+      <div className={`hidden lg:flex flex-col bg-cfss-green text-white transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-0 overflow-hidden'}`}>
 
         {/* Logo */}
         <div className="h-20 flex items-center px-6 gap-3 border-b border-cfss-green-hover shrink-0">
@@ -179,15 +179,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
 
         {/* Topbar */}
-        <header className="h-20 bg-white  border-b border-border  px-6 flex items-center justify-between shrink-0 shadow-sm z-10">
+        <header className="h-14 lg:h-20 bg-white border-b border-border px-4 lg:px-6 flex items-center justify-between shrink-0 shadow-sm z-10">
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 lg:gap-6">
             <button onClick={() => setSidebarOpen(!sidebarOpen)} className="hidden lg:block text-muted hover:text-slate-700 hover:bg-slate-100 p-2 rounded-lg transition-colors">
               <Menu className="w-5 h-5" />
             </button>
-            <div>
-              <h1 className="text-lg sm:text-xl font-bold text-primary truncate">Admin Dashboard</h1>
-              <p className="text-xs sm:text-sm text-muted hidden sm:block">Welcome back, Admin.</p>
+            <div className="flex items-center gap-2">
+              <div className="lg:hidden w-8 h-8 bg-cfss-green-soft rounded-lg flex items-center justify-center">
+                <ShieldCheck className="w-5 h-5 text-cfss-green" />
+              </div>
+              <div>
+                <h1 className="text-base lg:text-xl font-bold text-primary truncate">Admin Dashboard</h1>
+                <p className="text-xs text-muted hidden lg:block">Welcome back, Admin.</p>
+              </div>
             </div>
           </div>
 
@@ -229,7 +234,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-6 bg-page">
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-6 bg-page relative">
           {children}
         </main>
       </div>
