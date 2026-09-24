@@ -218,7 +218,7 @@ async def login(request: Request, response: Response, payload: SystemUserLogin, 
             logger.warning(f"Login failed: Account deactivated for student_id {payload.student_id}")
             raise HTTPException(status_code=403, detail="Account is deactivated")
             
-        access_token = create_access_token({"sub": str(user.id), "role": user.role})
+        access_token = create_access_token({"sub": str(user.id), "role": user.role, "pwd_ver": user.password_hash[-8:]})
         # Simulate refresh token storage via httpOnly cookie
         refresh_token = str(uuid.uuid4()) # A real impl would store hash in DB
         

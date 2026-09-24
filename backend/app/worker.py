@@ -41,7 +41,7 @@ def send_verification_email(self, user_id: str, email: str, token: str, trace_id
             from app.database import SessionLocal
             from app.models import AuditLog
             import asyncio
-            
+
             async def write_dlq():
                 async with SessionLocal() as db:
                     dlq_log = AuditLog(
@@ -52,14 +52,14 @@ def send_verification_email(self, user_id: str, email: str, token: str, trace_id
                     )
                     db.add(dlq_log)
                     await db.commit()
-            
+
             # Since celery workers are typically sync, we might need an event loop
             try:
                 loop = asyncio.get_event_loop()
                 loop.run_until_complete(write_dlq())
             except Exception as e:
                 logger.error(f"Failed to write to DLQ: {e}")
-                
+
             raise exc
         else:
             raise self.retry(exc=exc, countdown=2 ** self.request.retries)
@@ -68,11 +68,11 @@ def send_verification_email(self, user_id: str, email: str, token: str, trace_id
 def write_audit_log_async(self, action: str, user_id: str, ip_address: str, user_agent: str, metadata: dict, trace_id: str):
     trace_id_ctx_var.set(trace_id)
     logger.info(f"Writing async audit log for action: {action}")
-    
+
     from app.database import SessionLocal
     from app.models import AuditLog
     import asyncio
-    
+
     async def write_log():
         async with SessionLocal() as db:
             log_entry = AuditLog(
@@ -85,10 +85,37 @@ def write_audit_log_async(self, action: str, user_id: str, ip_address: str, user
             )
             db.add(log_entry)
             await db.commit()
-            
+
     try:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(write_log())
     except Exception as exc:
         logger.error(f"Failed to write audit log: {exc}")
         raise self.retry(exc=exc, countdown=2 ** self.request.retries)
+
+
+@celery_app.task(bind=True, max_retries=5)
+def send_password_reset_email(self, email: str, reset_url: str, trace_id: str):
+    trace_id_ctx_var.set(trace_id)
+    try:
+        logger.info(f"Preparing to send password reset email to {email}")
+        # ==========================================
+        # LOCAL DEVELOPMENT FALLBACK
+        # Currently, CFSS has no SMTP/email provider configured.
+        # This simply logs the recovery URL to the console for testing.
+        #
+        # REQUIRED FOR PRODUCTION:
+        # - SMTP_HOST
+        # - SMTP_PORT
+        # - SMTP_USERNAME
+        # - SMTP_PASSWORD
+        # - FROM_EMAIL
+        # ==========================================
+        logger.info(f"PASSWORD RECOVERY LINK (MOCK EMAIL): {reset_url}")
+
+        return True
+    except Exception as exc:
+        logger.error(f"Failed to send password reset email to {email}: {exc}")
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=exc, countdown=2 ** self.request.retries)
+        return False

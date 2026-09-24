@@ -104,7 +104,7 @@ async def test_cannot_edit_other_students_record(client: AsyncClient, student_wi
     db.add(student2)
     await db.commit()
     await db.refresh(student2)
-    student2_token = create_access_token({"sub": str(student2.id), "role": "student"})
+    student2_token = create_access_token({"sub": str(student2.id), "role": "student", "pwd_ver": student2.password_hash[-8:]})
     
     # Student 1 creates
     client_id = str(uuid.uuid4())

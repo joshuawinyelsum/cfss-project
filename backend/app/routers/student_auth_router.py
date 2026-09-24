@@ -135,7 +135,7 @@ async def login_student(request: Request, data: schemas.StudentLogin, db: AsyncS
 
         access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = auth.create_access_token(
-            data={"sub": str(user.id), "role": user.role}, expires_delta=access_token_expires
+            data={"sub": str(user.id), "role": user.role, "pwd_ver": user.password_hash[-8:]}, expires_delta=access_token_expires
         )
 
         logger.info(f"Login success: {student_id}")

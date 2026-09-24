@@ -103,7 +103,7 @@ async def admin_token(db):
     from datetime import timedelta
 
     token = auth.create_access_token(
-        data={"sub": str(admin.id), "role": "admin"},
+        data={"sub": str(admin.id), "role": "admin", "pwd_ver": admin.password_hash[-8:]},
         expires_delta=timedelta(hours=1),
     )
     return token
@@ -141,7 +141,7 @@ async def student_with_community(db):
     from datetime import timedelta
 
     token = auth.create_access_token(
-        data={"sub": str(student.id), "role": "student"},
+        data={"sub": str(student.id), "role": "student", "pwd_ver": student.password_hash[-8:]},
         expires_delta=timedelta(hours=1),
     )
     return student, community, token

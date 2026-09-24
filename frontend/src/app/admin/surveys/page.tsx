@@ -141,7 +141,7 @@ export default function AdminSurveysPage() {
   };
 
   if (!user || user.role !== 'admin') {
-    return null; 
+    return null;
   }
 
   return (
@@ -174,7 +174,7 @@ export default function AdminSurveysPage() {
           <h1 className="text-2xl font-bold text-primary">Surveys</h1>
           <p className="text-sm text-muted mt-1">Review all student submitted surveys</p>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto flex-wrap xl:flex-nowrap">
           {/* Search */}
           <div className="relative w-full sm:w-64 shrink-0">
@@ -245,12 +245,12 @@ export default function AdminSurveysPage() {
           </svg>
           <h3 className="text-lg font-medium text-primary mb-1">No surveys found</h3>
           <p className="text-muted">
-            {surveys.length === 0 
-              ? "No surveys have been submitted to the system yet." 
+            {surveys.length === 0
+              ? "No surveys have been submitted to the system yet."
               : "No surveys match your current search and filter criteria."}
           </p>
           {(searchTerm || selectedCommunity !== 'All' || selectedGroup !== 'All') && (
-            <button 
+            <button
               onClick={() => { setSearchTerm(''); setSelectedCommunity('All'); setSelectedGroup('All'); }}
               className="mt-4 text-cfss-green hover:text-cfss-green-hover font-medium text-sm"
             >
@@ -283,8 +283,8 @@ export default function AdminSurveysPage() {
               </thead>
               <tbody className="bg-surface divide-y divide-border">
                 {filteredSurveys.map((survey) => (
-                  <tr 
-                    key={survey.id} 
+                  <tr
+                    key={survey.id}
                     onClick={() => handleRowClick(survey.id)}
                     className="hover:bg-page cursor-pointer transition-colors"
                   >
@@ -308,8 +308,8 @@ export default function AdminSurveysPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 inline-flex whitespace-nowrap text-xs leading-5 font-semibold rounded-full ${
-                        survey.status === 'completed' || survey.status === 'submitted' 
-                          ? 'bg-status-success/10 text-status-success border border-status-success/20' 
+                        survey.status === 'completed' || survey.status === 'submitted'
+                          ? 'bg-status-success/10 text-status-success border border-status-success/20'
                           : 'bg-status-warning/10 text-status-warning border border-status-warning/20'
                       }`}>
                         {survey.status.charAt(0).toUpperCase() + survey.status.slice(1)}
@@ -318,8 +318,47 @@ export default function AdminSurveysPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+
+              </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden flex flex-col divide-y divide-border">
+              {filteredSurveys.map((survey) => (
+                <div
+                  key={`mobile-${survey.id}`}
+                  onClick={() => handleRowClick(survey.id)}
+                  className="p-4 hover:bg-page cursor-pointer transition-colors space-y-3"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="min-w-0 flex-1 pr-3">
+                      <p className="text-sm font-bold text-primary truncate">{survey.student_name || "Anonymous"}</p>
+                      <p className="text-xs text-muted truncate">{survey.student_id}</p>
+                    </div>
+                    <span className={`px-2.5 py-1 inline-flex whitespace-nowrap text-[10px] font-semibold rounded-full shrink-0 ${
+                          survey.status === "completed" || survey.status === "submitted"
+                            ? "bg-status-success/10 text-status-success border border-status-success/20"
+                            : "bg-status-warning/10 text-status-warning border border-status-warning/20"
+                        }`}>
+                      {survey.status.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="px-2 py-0.5 inline-flex whitespace-nowrap leading-5 font-semibold rounded bg-page text-secondary border border-border-strong capitalize shrink-0">
+                      {survey.type}
+                    </span>
+                    <span className="text-muted whitespace-nowrap">{formatDate(survey.submitted_at)}</span>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-primary font-medium">{survey.community_name}</p>
+                    <p className="text-xs text-muted">Group {survey.group_number}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
         </div>
       )}
 
@@ -331,7 +370,7 @@ export default function AdminSurveysPage() {
 
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-            <div className="inline-block align-bottom bg-surface rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-full">
+            <div className="inline-block align-bottom bg-surface rounded-t-xl sm:rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-full flex flex-col max-h-[90vh] sm:max-h-none">
               {surveyDetailsLoading ? (
                 <div className="p-12 flex flex-col justify-center items-center">
                   <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-cfss-green mb-4"></div>
@@ -355,7 +394,7 @@ export default function AdminSurveysPage() {
                       </svg>
                     </button>
                   </div>
-                  
+
                   <div className="px-6 py-4 bg-page border-b border-border-strong">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -378,9 +417,9 @@ export default function AdminSurveysPage() {
                     </div>
                   </div>
 
-                  <div className="px-6 py-5 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                  <div className="px-6 py-5 flex-1 overflow-y-auto custom-scrollbar sm:max-h-[60vh]">
                     <h4 className="text-sm font-bold text-primary mb-4">Responses</h4>
-                    
+
                     {selectedSurvey.responses && Object.keys(selectedSurvey.responses).length > 0 ? (
                       <div className="space-y-4">
                         {Object.entries(selectedSurvey.responses).map(([question, answer], idx) => {
@@ -424,10 +463,10 @@ export default function AdminSurveysPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="bg-page px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-border-strong">
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-cfss-green text-base font-medium text-white hover:bg-cfss-green-hover focus:outline-none sm:ml-3 sm:w-auto sm:text-sm transition-colors"
                       onClick={() => setSelectedSurvey(null)}
                     >

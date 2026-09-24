@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAdminAuthStore } from '@/lib/store';
 import { api } from '@/lib/api';
@@ -80,7 +81,10 @@ export default function AdminLoginPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Password</label>
+            <div className="flex justify-between items-center mb-2">
+                <label className="block text-sm font-medium text-primary">Password</label>
+                <Link href="/recover-password" className="text-sm font-medium text-cfss-green hover:underline">Forgot password?</Link>
+              </div>
             <input 
               type="password" 
               required 

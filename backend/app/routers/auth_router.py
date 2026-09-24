@@ -23,7 +23,7 @@ async def student_login(form_data: OAuth2PasswordRequestForm = Depends(), db: As
         
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
-        data={"sub": str(user.id), "role": "student"}, expires_delta=access_token_expires
+        data={"sub": str(user.id), "role": "student", "pwd_ver": user.password_hash[-8:]}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -43,7 +43,7 @@ async def admin_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Asyn
 
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
-        data={"sub": str(user.id), "role": "admin"}, expires_delta=access_token_expires
+        data={"sub": str(user.id), "role": "admin", "pwd_ver": user.password_hash[-8:]}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 

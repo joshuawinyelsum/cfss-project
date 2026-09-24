@@ -92,7 +92,7 @@ async def login(login_data: WhitelistLoginRequest, db: Session = Depends(get_db)
 
     # Return JWT token
     access_token = create_access_token(
-        data={"sub": str(user.id), "role": user.role, "email": user.email}
+        data={"sub": str(user.id), "role": user.role, "email": user.email, "pwd_ver": user.password_hash[-8:]}
     )
     return {
         "access_token": access_token,

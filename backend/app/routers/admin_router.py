@@ -310,7 +310,11 @@ async def get_survey(survey_id: str, db: AsyncSession = Depends(get_db_and_admin
     )
     return {
         "id": str(survey.id),
+        "user_id": user.id,
+        "student_id": user.student_id,
+        "student_name": user.name,
         "student_email": user.email or "",
+        "community_id": comm.id,
         "community_name": comm.name,
         "group_number": comm.group_number,
         "submitted_at": survey.submitted_at or survey.created_at,

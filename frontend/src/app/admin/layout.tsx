@@ -76,7 +76,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         await api.get('/api/auth/me', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
+
         if (pathname === '/admin/login') {
           router.push('/admin');
         } else {
@@ -124,10 +124,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="flex h-screen bg-page font-sans overflow-hidden">
-      
+
       {/* Sidebar */}
       <div className={`flex flex-col bg-cfss-green text-white transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-0 overflow-hidden'}`}>
-        
+
         {/* Logo */}
         <div className="h-20 flex items-center px-6 gap-3 border-b border-cfss-green-hover shrink-0">
           <div className="w-8 h-8 bg-surface rounded-lg flex items-center justify-center">
@@ -177,17 +177,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        
+
         {/* Topbar */}
         <header className="h-20 bg-white  border-b border-border  px-6 flex items-center justify-between shrink-0 shadow-sm z-10">
-          
+
           <div className="flex items-center gap-6">
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-muted hover:text-slate-700    hover:bg-slate-100 p-2 rounded-lg transition-colors">
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="hidden lg:block text-muted hover:text-slate-700 hover:bg-slate-100 p-2 rounded-lg transition-colors">
               <Menu className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-xl font-bold text-primary ">CFSS Admin Dashboard</h1>
-              <p className="text-sm text-muted ">Welcome back, Admin. Here&apos;s what&apos;s happening in your system.</p>
+              <h1 className="text-lg sm:text-xl font-bold text-primary truncate">Admin Dashboard</h1>
+              <p className="text-xs sm:text-sm text-muted hidden sm:block">Welcome back, Admin.</p>
             </div>
           </div>
 
@@ -197,9 +197,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Search className="w-4 h-4 text-muted" />
               </div>
-              <input 
-                type="text" 
-                placeholder="Search students, surveys..." 
+              <input
+                type="text"
+                placeholder="Search students, surveys..."
                 className="w-full bg-page border border-border  text-sm  rounded-lg pl-10 pr-12 py-2.5 focus:outline-none focus:ring-2 focus:ring-cfss-green focus:border-transparent transition-all"
               />
               <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
@@ -212,7 +212,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <Bell className="w-5 h-5" />
                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-cfss-green rounded-full flex items-center justify-center border-2 border-white"></span>
               </Link>
-              
+
               <div className="flex items-center gap-3">
                  <div className="w-9 h-9 bg-cfss-green-soft  text-cfss-green  rounded-full flex items-center justify-center font-bold">
                    A
@@ -227,12 +227,33 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         </header>
 
+
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-6 bg-page">
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-6 bg-page">
           {children}
         </main>
       </div>
-      
+
+                  {/* Mobile Bottom Navigation */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-border-strong flex items-center justify-around h-[calc(4rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] z-50">
+        <Link href="/admin" className={`flex flex-col items-center justify-center w-16 h-full relative ${pathname === "/admin" ? "text-cfss-green" : "text-muted"}`}>
+          <LayoutDashboard size={22} className="mb-1" />
+          <span className="text-[10px] font-medium">Home</span>
+        </Link>
+        <Link href="/admin/surveys" className={`flex flex-col items-center justify-center w-16 h-full relative ${pathname.startsWith("/admin/surveys") ? "text-cfss-green" : "text-muted"}`}>
+          <ClipboardList size={22} className="mb-1" />
+          <span className="text-[10px] font-medium">Surveys</span>
+        </Link>
+        <Link href="/admin/students" className={`flex flex-col items-center justify-center w-16 h-full relative ${pathname.startsWith("/admin/students") ? "text-cfss-green" : "text-muted"}`}>
+          <Users size={22} className="mb-1" />
+          <span className="text-[10px] font-medium">Students</span>
+        </Link>
+        <Link href="/admin/settings" className={`flex flex-col items-center justify-center w-16 h-full relative ${pathname.startsWith("/admin/settings") ? "text-cfss-green" : "text-muted"}`}>
+          <Settings size={22} className="mb-1" />
+          <span className="text-[10px] font-medium">Settings</span>
+        </Link>
+      </nav>
+
     </div>
   );
 }

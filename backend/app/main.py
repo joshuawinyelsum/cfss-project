@@ -4,6 +4,7 @@ import uvicorn
 from contextlib import asynccontextmanager
 
 from app.database import engine, Base
+from app.routers.recovery_router import router as recovery_router
 from app.routers import auth_router, admin_router, student_router, student_settings
 from app.models import User
 from app.auth import get_password_hash
@@ -64,6 +65,7 @@ app.add_middleware(
     expose_headers=["Content-Disposition", "X-Total-Count"],
 )
 
+from app.routers.recovery_router import router as recovery_router
 from app.routers import auth_router, admin_router, student_router, admin_whitelist, auth_router_v2, admin_export, student_auth_router, student_surveys, student_settings, sync_router
 
 app.include_router(auth_router.router)
@@ -76,6 +78,7 @@ app.include_router(admin_export.router)
 app.include_router(student_auth_router.router)
 app.include_router(student_surveys.router)
 app.include_router(sync_router.router)
+app.include_router(recovery_router)
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
  
