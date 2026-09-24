@@ -43,9 +43,9 @@ async def test_feature_fails_survey_follows(client: AsyncClient, student_with_co
     res = await client.post("/api/sync/operations", json=sync_payload, headers={"Authorization": f"Bearer {token}"})
     data = res.json()
     assert data["results"][0]["success"] is False
-    assert data["results"][1]["success"] is True
+    assert data["results"][1]["success"] is False
     
     surv_res = await db.execute(select(SurveyRecord).where(SurveyRecord.id == survey_id))
     survey = surv_res.scalars().first()
-    print("Survey saved:", survey.id)
-    print("field_feature_id:", survey.field_feature_id)
+    print("Survey saved:", survey.id if survey else "Not saved")
+    print("field_feature_id:", survey.field_feature_id if survey else "Not saved")

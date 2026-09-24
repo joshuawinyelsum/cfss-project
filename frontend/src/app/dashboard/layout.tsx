@@ -323,10 +323,9 @@ export default function DashboardLayout({
 
   const primaryNavItems = [
     { name: 'Home', href: '/dashboard', icon: Home },
-    { name: 'Map', href: '/dashboard/map', icon: MapIcon },
     { name: 'Work', href: '/dashboard/work', icon: FileEdit, badge: draftCount > 0 ? draftCount : undefined },
+    { name: 'Map', href: '/dashboard/map', icon: MapIcon },
     { name: 'Collect', href: '/surveys', icon: ClipboardList, prominent: true },
-    { name: 'Submitted', href: '/dashboard/surveys/submitted', icon: CheckSquare },
   ];
 
   const secondaryNavItems = [
@@ -338,9 +337,9 @@ export default function DashboardLayout({
 
   const mobileNavItems = [
     { name: 'Home', href: '/dashboard', icon: Home },
-    { name: 'Map', href: '/dashboard/map', icon: MapIcon },
-    { name: 'Collect', href: '/surveys', icon: ClipboardList, prominent: true },
     { name: 'Work', href: '/dashboard/work', icon: FileEdit, badge: draftCount > 0 ? draftCount : undefined },
+    { name: 'Collect', href: '/surveys', icon: ClipboardList, prominent: true },
+    { name: 'Map', href: '/dashboard/map', icon: MapIcon },
     { name: 'More', href: '/dashboard/more', icon: MoreHorizontal },
   ];
 

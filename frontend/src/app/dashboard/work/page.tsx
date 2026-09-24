@@ -7,13 +7,14 @@ import { db, LocalSurvey } from '@/lib/db';
 import { syncEngine } from '@/lib/sync';
 import { getEntityLabel } from '@/lib/entityLabel';
 import Link from 'next/link';
-import { ArrowRight, Clock, Trash2, AlertCircle, FileEdit, RefreshCw } from 'lucide-react';
+import { ArrowRight, Clock, Trash2, AlertCircle, FileEdit, RefreshCw, CheckSquare } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function WorkWorkspacePage() {
   const { user, token } = useAuthStore();
   
   const [drafts, setDrafts] = useState<(LocalSurvey & { progress?: number })[]>([]);
+  const [submitted, setSubmitted] = useState<(LocalSurvey & { progress?: number })[]>([]);
   const [needAttention, setNeedAttention] = useState<(LocalSurvey & { progress?: number })[]>([]);
   const [recent, setRecent] = useState<(LocalSurvey & { progress?: number })[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,6 +49,7 @@ export default function WorkWorkspacePage() {
         // Categorize local
         const localDrafts = localSurveys.filter(s => s.status === 'DRAFT').sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
         const localPending = localSurveys.filter(s => s.status !== 'DELETED' && (s.sync_status === 'pending' || s.sync_status === 'failed' || (s.status === 'SUBMITTED' && s.sync_status !== 'synced')));
+        const localSubmitted = localSurveys.filter(s => s.status === 'SUBMITTED').sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
         
         // 2. Try fetching server data for recent submitted records
         let serverRecent: LocalSurvey[] = [];
@@ -64,19 +66,30 @@ export default function WorkWorkspacePage() {
           }
         }
         
-        // Combine recent: local drafts + local pending + server recent
+        // Combine submitted: local submitted + server submitted
+        const allSubmitted: (LocalSurvey & { progress?: number })[] = [...localSubmitted];
+        serverRecent.forEach((sr) => {
+           if (sr.status === 'SUBMITTED' && !allSubmitted.find(r => r.id === sr.id)) {
+               allSubmitted.push(sr);
+           }
+        });
+        allSubmitted.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
+        // Combine recent: local drafts + local pending + server recent (Historical view)
         const allRecent: (LocalSurvey & { progress?: number })[] = [...localDrafts, ...localPending];
         serverRecent.forEach((sr) => {
            if (sr.status !== 'DELETED' && !allRecent.find(r => r.id === sr.id)) {
                allRecent.push(sr);
            }
         });
-        allRecent.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+        // Keep Recent History as a historical/activity view for non-submitted states
+        const filteredRecent = allRecent.filter(s => s.status !== 'SUBMITTED').sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
         if (isMounted) {
            setDrafts(localDrafts.slice(0, 5));
+           setSubmitted(allSubmitted.slice(0, 5));
            setNeedAttention(localPending);
-           setRecent(allRecent.slice(0, 10));
+           setRecent(filteredRecent.slice(0, 10));
         }
       } catch (e) {
         console.error("Workspace load error:", e);
@@ -187,6 +200,50 @@ export default function WorkWorkspacePage() {
                         </div>
                       </div>
                     </div>
+                  ))}
+                </div>
+             )}
+          </section>
+
+          {/* Submitted Work */}
+          <section>
+             <div className="flex items-center justify-between mb-3">
+               <h2 className="text-sm font-bold text-primary uppercase tracking-wider flex items-center gap-2">
+                 <CheckSquare size={16} className="text-[#093C22]" />
+                 Submitted Work
+               </h2>
+               <Link href="/dashboard/surveys/submitted" className="text-sm font-medium text-[#093C22] hover:underline">
+                 View all submitted
+               </Link>
+             </div>
+             
+             {submitted.length === 0 ? (
+                <div className="bg-surface border border-border-strong rounded-xl p-8 text-center shadow-sm">
+                  <p className="text-sm text-muted">No submitted surveys.</p>
+                </div>
+             ) : (
+                <div className="bg-surface border border-border-strong rounded-xl overflow-hidden shadow-sm divide-y divide-border">
+                  {submitted.map(record => (
+                    <Link 
+                      key={record.id} 
+                      href={`/surveys/${record.survey_type.toLowerCase()}/view?id=${record.id}`}
+                      className="block p-4 sm:p-5 hover:bg-page transition-colors group"
+                    >
+                      <div className="flex items-center justify-between">
+                         <div>
+                           <div className="flex items-center gap-2 mb-1">
+                             <span className="font-bold text-primary capitalize text-sm">{record.survey_type.toLowerCase()} Survey</span>
+                             <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide bg-emerald-50 text-emerald-700">
+                               SUBMITTED
+                             </span>
+                           </div>
+                           <p className="text-xs text-muted">
+                             Submitted {record.updated_at ? formatDistanceToNow(new Date(record.updated_at), { addSuffix: true }) : 'recently'}
+                           </p>
+                         </div>
+                         <ArrowRight size={16} className="text-gray-300 group-hover:text-secondary transition-colors" />
+                      </div>
+                    </Link>
                   ))}
                 </div>
              )}
