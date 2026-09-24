@@ -234,6 +234,8 @@ async def sync_operations(
                         if feat_obj.community_id != comm_id:
                             raise ValueError(f"FieldFeature {req_feature_id} belongs to a different community")
                         record.field_feature_id = req_feature_id
+                        
+                    await db.flush()
 
                 # Insert answers for both CREATE and UPDATE
                 for ans in survey_data.get("answers", []):

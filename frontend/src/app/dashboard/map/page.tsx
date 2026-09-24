@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useAuthStore } from '@/lib/store';
 import { api, getErrorMessage } from '@/lib/api';
-import { db, LocalCommunity, LocalFeature } from '@/lib/db';
+import { db, LocalCommunity, LocalFeature, LocalSurvey } from '@/lib/db';
 import dynamic from 'next/dynamic';
 import { MapPin, WifiOff, Loader2 } from 'lucide-react';
 
@@ -21,6 +21,7 @@ export default function MapPage() {
   const { user, token } = useAuthStore();
   const [community, setCommunity] = useState<LocalCommunity | null>(null);
   const [features, setFeatures] = useState<LocalFeature[]>([]);
+  const [surveys, setSurveys] = useState<LocalSurvey[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filterType, setFilterType] = useState('ALL');
@@ -82,17 +83,19 @@ export default function MapPage() {
         if (mounted) {
           const localComm = await db.communities.get(user.community_id!);
           const localFeats = await db.features.where('community_id').equals(user.community_id!).toArray();
+          const localSurveys = await db.surveys.where('student_id').equals(user.id as number).toArray();
           
           if (!localComm) {
             if (!navigator.onLine) {
               setError("Map data unavailable offline. Connect to the internet once to download this community's map data.");
             } else {
-              setError("No mapped data yet. Spatial information for this community hasn't been collected yet.");
+              setError("No mapped data yet. No field features collected yet. Go to Collect to start your fieldwork.");
             }
           } else {
             setCommunity(localComm);
             // Hide deleted items
             setFeatures(localFeats.filter(f => f.sync_status !== 'pending' || (f as unknown as { status: string }).status !== 'DELETED'));
+            setSurveys(localSurveys.filter(s => s.status !== 'DELETED'));
           }
         }
       } catch (e) {
@@ -180,10 +183,10 @@ export default function MapPage() {
               <MapPin size={32} className="text-gray-300" />
             </div>
             <h3 className="text-lg font-bold text-gray-900 mb-2">No mapped data yet</h3>
-            <p className="text-sm text-gray-500 max-w-md">Spatial information for this community hasn't been collected yet.</p>
+            <p className="text-sm text-gray-500 max-w-md">No field features collected yet. Go to Collect to start your fieldwork.</p>
           </div>
         ) : (
-          <StudentMap community={community} features={features} filterType={filterType} />
+          <StudentMap community={community} features={features} filterType={filterType} surveys={surveys} />
         )}
       </div>
     </div>
