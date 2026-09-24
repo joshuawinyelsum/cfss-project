@@ -81,7 +81,7 @@ export default function MapPage() {
         // Always load from local DB for display
         if (mounted) {
           const localComm = await db.communities.get(user.community_id!);
-          const localFeats = await db.features.filter(f => f.community_id === user.community_id).toArray();
+          const localFeats = await db.features.where('community_id').equals(user.community_id!).toArray();
           
           if (!localComm) {
             if (!navigator.onLine) {

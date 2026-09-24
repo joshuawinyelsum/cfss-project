@@ -16,7 +16,7 @@ export default function WorkWorkspacePage() {
   const [drafts, setDrafts] = useState<(LocalSurvey & { progress?: number })[]>([]);
   const [submitted, setSubmitted] = useState<(LocalSurvey & { progress?: number })[]>([]);
   const [needAttention, setNeedAttention] = useState<(LocalSurvey & { progress?: number })[]>([]);
-  const [recent, setRecent] = useState<(LocalSurvey & { progress?: number })[]>([]);
+  
   const [loading, setLoading] = useState(true);
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -75,21 +75,13 @@ export default function WorkWorkspacePage() {
         });
         allSubmitted.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
-        // Combine recent: local drafts + local pending + server recent (Historical view)
-        const allRecent: (LocalSurvey & { progress?: number })[] = [...localDrafts, ...localPending];
-        serverRecent.forEach((sr) => {
-           if (sr.status !== 'DELETED' && !allRecent.find(r => r.id === sr.id)) {
-               allRecent.push(sr);
-           }
-        });
-        // Keep Recent History as a historical/activity view for non-submitted states
-        const filteredRecent = allRecent.filter(s => s.status !== 'SUBMITTED').sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
 
         if (isMounted) {
            setDrafts(localDrafts.slice(0, 5));
            setSubmitted(allSubmitted.slice(0, 5));
            setNeedAttention(localPending);
-           setRecent(filteredRecent.slice(0, 10));
+           
         }
       } catch (e) {
         console.error("Workspace load error:", e);
@@ -249,48 +241,7 @@ export default function WorkWorkspacePage() {
              )}
           </section>
 
-          {/* Recent Work */}
-          <section>
-             <div className="flex items-center justify-between mb-3">
-               <h2 className="text-sm font-bold text-primary uppercase tracking-wider flex items-center gap-2">
-                 <Clock size={16} className="text-muted" />
-                 Recent History
-               </h2>
-             </div>
-             
-             {recent.length === 0 ? (
-                <div className="bg-surface border border-border-strong rounded-xl p-8 text-center shadow-sm">
-                  <p className="text-sm text-muted">No recent activity.</p>
-                </div>
-             ) : (
-                <div className="bg-surface border border-border-strong rounded-xl overflow-hidden shadow-sm divide-y divide-border">
-                  {recent.slice(0, 5).map(record => (
-                    <Link 
-                      key={record.id} 
-                      href={`/surveys/${record.survey_type.toLowerCase()}/${record.status === 'SUBMITTED' ? 'view' : 'fill'}?id=${record.id}`}
-                      className="block p-4 sm:p-5 hover:bg-page transition-colors group"
-                    >
-                      <div className="flex items-center justify-between">
-                         <div>
-                           <div className="flex items-center gap-2 mb-1">
-                             <span className="font-bold text-primary capitalize text-sm">{record.survey_type.toLowerCase()} Survey</span>
-                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide ${
-                               record.status === 'SUBMITTED' ? 'bg-emerald-50 text-emerald-700' : 'bg-page text-secondary'
-                             }`}>
-                               {record.status}
-                             </span>
-                           </div>
-                           <p className="text-xs text-muted">
-                             Updated {record.updated_at ? formatDistanceToNow(new Date(record.updated_at), { addSuffix: true }) : 'recently'}
-                           </p>
-                         </div>
-                         <ArrowRight size={16} className="text-gray-300 group-hover:text-secondary transition-colors" />
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-             )}
-          </section>
+          
 
         </div>
       )}
