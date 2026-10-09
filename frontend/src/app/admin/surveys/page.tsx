@@ -125,8 +125,14 @@ export default function AdminSurveysPage() {
       if (selectedGroup !== 'All' && survey.group_number.toString() !== selectedGroup) {
         return false;
       }
-      if (debouncedSearch && (!survey.student_email || !survey.student_email.toLowerCase().includes(debouncedSearch.toLowerCase()))) {
-        return false;
+      if (debouncedSearch) {
+        const term = debouncedSearch.toLowerCase();
+        const matchesName = survey.student_name?.toLowerCase().includes(term);
+        const matchesId = survey.student_id?.toLowerCase().includes(term);
+        const matchesEmail = survey.student_email?.toLowerCase().includes(term);
+        if (!matchesName && !matchesId && !matchesEmail) {
+          return false;
+        }
       }
       return true;
     });
@@ -190,7 +196,7 @@ export default function AdminSurveysPage() {
             <Input
               type="text"
               className="pl-10"
-              placeholder="Search by student email..."
+              placeholder="Search by name, ID, or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               disabled={loading}
@@ -306,7 +312,7 @@ export default function AdminSurveysPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 inline-flex whitespace-nowrap text-xs leading-5 font-semibold rounded-full ${
-                        survey.status === 'completed' || survey.status === 'submitted'
+                          survey.status.toLowerCase() === 'completed' || survey.status.toLowerCase() === 'submitted'
                           ? 'bg-status-success/10 text-status-success border border-status-success/20'
                           : 'bg-status-warning/10 text-status-warning border border-status-warning/20'
                       }`}>
@@ -334,7 +340,7 @@ export default function AdminSurveysPage() {
                       <p className="text-xs text-muted truncate">{survey.student_id}</p>
                     </div>
                     <span className={`px-2.5 py-1 inline-flex whitespace-nowrap text-[10px] font-semibold rounded-full shrink-0 ${
-                          survey.status === "completed" || survey.status === "submitted"
+                          survey.status.toLowerCase() === "completed" || survey.status.toLowerCase() === "submitted"
                             ? "bg-status-success/10 text-status-success border border-status-success/20"
                             : "bg-status-warning/10 text-status-warning border border-status-warning/20"
                         }`}>

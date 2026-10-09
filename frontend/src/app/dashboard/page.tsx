@@ -248,15 +248,15 @@ export default function StudentDashboard() {
                 <p className="text-xs font-medium text-muted uppercase tracking-wider mb-1">Total</p>
                 <p className="text-2xl font-bold text-primary">{dashboardStats?.total_surveys || 0}</p>
               </Link>
-              <Link href="/dashboard/surveys/drafts" className="p-4 hover:bg-page transition-colors">
+              <Link href="/dashboard/work/drafts" className="p-4 hover:bg-page transition-colors">
                 <p className="text-xs font-medium text-muted uppercase tracking-wider mb-1">Drafts</p>
                 <p className="text-2xl font-bold text-[#093C22]">{dashboardStats?.draft_surveys || 0}</p>
               </Link>
-              <Link href="/dashboard/surveys/submitted" className="p-4 hover:bg-page transition-colors">
+              <Link href="/dashboard/work/submitted" className="p-4 hover:bg-page transition-colors">
                 <p className="text-xs font-medium text-muted uppercase tracking-wider mb-1">Submitted</p>
                 <p className="text-2xl font-bold text-primary">{dashboardStats?.submitted_surveys || 0}</p>
               </Link>
-              <Link href="/dashboard/sync" className="p-4 hover:bg-page transition-colors">
+              <Link href="/dashboard/work/attention" className="p-4 hover:bg-page transition-colors">
                 <p className="text-xs font-medium text-muted uppercase tracking-wider mb-1">Pending Sync</p>
                 <p className="text-2xl font-bold text-amber-600">{dashboardStats?.pending_sync || 0}</p>
               </Link>
@@ -270,7 +270,7 @@ export default function StudentDashboard() {
             <section className="lg:col-span-2 bg-surface rounded-xl border border-border-strong flex flex-col overflow-hidden">
               <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-page/50">
                 <h2 className="text-base font-bold text-primary">Recent Activity</h2>
-                <Link href="/dashboard/surveys/drafts" className="text-sm font-medium text-[#093C22] hover:underline">
+                <Link href="/dashboard/work/drafts" className="text-sm font-medium text-[#093C22] hover:underline">
                   View Drafts
                 </Link>
               </div>

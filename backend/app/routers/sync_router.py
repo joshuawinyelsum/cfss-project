@@ -260,6 +260,11 @@ async def sync_operations(
                         
                     await db.flush()
 
+                # If UPDATE, clear old answers
+                if op.operation_type == "UPDATE":
+                    await db.execute(delete(models.SurveyAnswer).where(models.SurveyAnswer.survey_record_id == record.id))
+                    await db.flush()
+
                 # Insert answers for both CREATE and UPDATE
                 for ans in survey_data.get("answers", []):
                     db.add(models.SurveyAnswer(

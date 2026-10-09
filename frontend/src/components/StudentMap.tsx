@@ -158,6 +158,10 @@ function GeomanSetup({ featureGroupRef, onShapeChange, initialGeoJSON, editModeE
       const layer = e.layer;
       featureGroupRef.current?.addLayer(layer);
       layer.on('pm:edit', updateShape);
+      layer.on('pm:update', updateShape);
+      layer.on('pm:dragend', updateShape);
+      layer.on('pm:vertexadded', updateShape);
+      layer.on('pm:vertexremoved', updateShape);
       updateShape();
     });
 
@@ -166,7 +170,13 @@ function GeomanSetup({ featureGroupRef, onShapeChange, initialGeoJSON, editModeE
     if (initialGeoJSON && !initDone.current && featureGroupRef.current) {
       initDone.current = true;
       const layer = L.geoJSON(initialGeoJSON, {
-        onEachFeature: (_, l) => l.on('pm:edit', updateShape)
+        onEachFeature: (_, l: any) => {
+          l.on('pm:edit', updateShape);
+          l.on('pm:update', updateShape);
+          l.on('pm:dragend', updateShape);
+          l.on('pm:vertexadded', updateShape);
+          l.on('pm:vertexremoved', updateShape);
+        }
       });
       const layers = layer.getLayers();
       if (layers.length > 0) {
