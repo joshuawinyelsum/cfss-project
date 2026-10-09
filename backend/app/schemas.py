@@ -59,6 +59,9 @@ class CommunityCreate(BaseModel):
     district: str
     region: str
     capacity: int
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    spatial_metadata: Optional[Dict[str, Any]] = None
 
 class CommunityResponse(BaseModel):
     id: str

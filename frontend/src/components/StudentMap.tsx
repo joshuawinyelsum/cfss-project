@@ -117,7 +117,9 @@ export default function StudentMap({ community, features, filterType, surveys = 
     ? features 
     : features.filter(f => f.feature_type === filterType);
 
-  const boundaryGeoJson = community.spatial_metadata?.boundary as Record<string, unknown>;
+  const spatialMeta = community.spatial_metadata as any;
+  const boundaryFeature = spatialMeta?.type === 'Feature' ? spatialMeta : (spatialMeta?.features?.[0] || null);
+  const geometry = boundaryFeature?.geometry;
 
   const getAssociatedSurvey = (featureId: string) => {
     return surveys.find(s => s.field_feature_id === featureId);
@@ -213,9 +215,9 @@ export default function StudentMap({ community, features, filterType, surveys = 
         </LayersControl>
         
         {/* Community Boundary */}
-        {boundaryGeoJson && boundaryGeoJson.type === 'Polygon' && (
+        {geometry && geometry.type === 'Polygon' && (
            <Polygon 
-             positions={(boundaryGeoJson.coordinates as number[][][])[0].map((c: number[]) => [c[1], c[0]])} 
+             positions={(geometry.coordinates as number[][][])[0].map((c: number[]) => [c[1], c[0]])} 
              pathOptions={{ color: '#093C22', fillColor: '#093C22', fillOpacity: 0.1, weight: 2 }}
            />
         )}

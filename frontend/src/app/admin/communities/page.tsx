@@ -7,6 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert } from '@/components/ui/alert';
+import dynamic from 'next/dynamic';
+
+const AdminCommunityMap = dynamic(() => import('@/components/AdminCommunityMap'), {
+  ssr: false,
+  loading: () => <div className="h-[400px] flex items-center justify-center bg-page rounded-lg border border-border">Loading Map...</div>
+});
 
 interface Community {
   id: string;
@@ -19,6 +25,9 @@ interface Community {
   group_number: number;
   group_label: string;
   created_at: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  spatial_metadata?: any | null;
 }
 
 export default function AdminCommunitiesPage() {
@@ -35,6 +44,7 @@ export default function AdminCommunitiesPage() {
 
   const [selectedCommunity, setSelectedCommunity] = useState<Community | null>(null);
   const [communityStudents, setCommunityStudents] = useState<any[]>([]);
+  const [isEditingMap, setIsEditingMap] = useState(false);
 
   useEffect(() => {
     fetchCommunities();
@@ -78,12 +88,35 @@ export default function AdminCommunitiesPage() {
 
   const handleViewCommunity = async (comm: Community) => {
     setSelectedCommunity(comm);
+    setIsEditingMap(false);
     try {
       const res = await api.get('/api/admin/users/students');
       const students = res.data.filter((s: any) => s.community_id === comm.id);
       setCommunityStudents(students);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleSaveMap = async (spatialData: any, lat: number | null, lng: number | null) => {
+    if (!selectedCommunity) return;
+    try {
+      const res = await api.put(`/api/admin/communities/${selectedCommunity.id}`, {
+        name: selectedCommunity.name,
+        district: selectedCommunity.district,
+        region: selectedCommunity.region,
+        capacity: selectedCommunity.capacity,
+        latitude: lat,
+        longitude: lng,
+        spatial_metadata: spatialData
+      });
+      // update local state
+      setCommunities(prev => prev.map(c => c.id === selectedCommunity.id ? res.data : c));
+      setSelectedCommunity(res.data);
+      setIsEditingMap(false);
+    } catch (err: any) {
+      console.error("Failed to save map", err);
+      throw new Error(err.response?.data?.detail || "Failed to save community boundary");
     }
   };
 
@@ -260,8 +293,8 @@ export default function AdminCommunitiesPage() {
 
       {/* VIEW COMMUNITY DETAILS MODAL */}
       {selectedCommunity && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-gray-900/50">
-          <div className="bg-surface h-full w-full max-w-md shadow-2xl flex flex-col">
+        <div className="fixed inset-0 z-50 flex justify-end bg-gray-900/50 p-4 sm:p-0">
+          <div className={`bg-surface h-full shadow-2xl flex flex-col transition-all ${isEditingMap ? 'w-full max-w-4xl' : 'w-full max-w-md'}`}>
             <div className="px-6 py-5 border-b border-border flex justify-between items-start bg-page">
               <div>
                 <h2 className="text-xl font-bold text-primary">{selectedCommunity.name}</h2>
@@ -279,45 +312,74 @@ export default function AdminCommunitiesPage() {
               </Button>
             </div>
             
-            <div className="p-6 border-b border-border">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="font-bold text-primary">Capacity Status</h3>
-                <span className="text-sm font-bold text-primary">{selectedCommunity.student_count} / {selectedCommunity.capacity}</span>
-              </div>
-              <div className="w-full bg-border-strong rounded-full h-2 overflow-hidden mb-2">
-                <div 
-                  className={`h-full rounded-full transition-all ${selectedCommunity.student_count >= selectedCommunity.capacity ? 'bg-red-500' : 'bg-cfss-green'}`}
-                  style={{ width: `${Math.min(100, (selectedCommunity.student_count / selectedCommunity.capacity) * 100)}%` }}
+            {isEditingMap ? (
+              <div className="flex-1 p-6 overflow-hidden flex flex-col">
+                <AdminCommunityMap 
+                  community={selectedCommunity} 
+                  onSave={handleSaveMap} 
+                  onCancel={() => setIsEditingMap(false)} 
                 />
               </div>
-              <p className="text-xs font-medium text-secondary">{selectedCommunity.slots_remaining} slots remaining</p>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-6 bg-page">
-              <h3 className="font-bold text-primary mb-4 flex items-center gap-2">
-                Assigned Students ({communityStudents.length})
-              </h3>
-              
-              {communityStudents.length === 0 ? (
-                <div className="text-center py-8 text-secondary text-sm">
-                  No students assigned to this community yet.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {communityStudents.map(student => (
-                    <div key={student.id} className="bg-surface p-4 rounded border border-border shadow-sm flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-page border border-border text-primary flex items-center justify-center font-bold text-xs shrink-0">
-                        {student.name.substring(0,2).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-sm text-primary truncate">{student.name}</p>
-                        <p className="text-xs text-secondary truncate">{student.student_id} • {student.program}</p>
-                      </div>
+            ) : (
+              <>
+                <div className="p-6 border-b border-border">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-bold text-primary">Capacity Status</h3>
+                    <span className="text-sm font-bold text-primary">{selectedCommunity.student_count} / {selectedCommunity.capacity}</span>
+                  </div>
+                  <div className="w-full bg-border-strong rounded-full h-2 overflow-hidden mb-2">
+                    <div 
+                      className={`h-full rounded-full transition-all ${selectedCommunity.student_count >= selectedCommunity.capacity ? 'bg-red-500' : 'bg-cfss-green'}`}
+                      style={{ width: `${Math.min(100, (selectedCommunity.student_count / selectedCommunity.capacity) * 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs font-medium text-secondary">{selectedCommunity.slots_remaining} slots remaining</p>
+                  
+                  <div className="mt-6 pt-6 border-t border-border">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="font-bold text-primary">Geographic Boundary</h3>
+                      <Button variant="outline" size="sm" onClick={() => setIsEditingMap(true)}>
+                        {(selectedCommunity as any).spatial_metadata ? 'Edit Map' : 'Set Map'}
+                      </Button>
                     </div>
-                  ))}
+                    {(selectedCommunity as any).spatial_metadata ? (
+                       <div className="text-xs text-secondary mt-1 flex gap-4">
+                         <span><span className="font-semibold">Area:</span> {((selectedCommunity as any).spatial_metadata?.properties?.area_sqm / 10000).toFixed(2)} ha</span>
+                         {selectedCommunity.latitude && <span><span className="font-semibold">Center:</span> {selectedCommunity.latitude.toFixed(4)}, {selectedCommunity.longitude?.toFixed(4)}</span>}
+                       </div>
+                    ) : (
+                      <p className="text-xs text-muted mt-1">No spatial boundary defined for this community.</p>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
+                
+                <div className="flex-1 overflow-y-auto p-6 bg-page">
+                  <h3 className="font-bold text-primary mb-4 flex items-center gap-2">
+                    Assigned Students ({communityStudents.length})
+                  </h3>
+                  
+                  {communityStudents.length === 0 ? (
+                    <div className="text-center py-8 text-secondary text-sm">
+                      No students assigned to this community yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {communityStudents.map(student => (
+                        <div key={student.id} className="bg-surface p-4 rounded border border-border shadow-sm flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-page border border-border text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                            {student.name.substring(0,2).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm text-primary truncate">{student.name}</p>
+                            <p className="text-xs text-secondary truncate">{student.student_id} • {student.program}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

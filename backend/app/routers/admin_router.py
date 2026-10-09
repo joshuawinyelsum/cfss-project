@@ -47,7 +47,10 @@ async def create_community(comm: schemas.CommunityCreate, db: AsyncSession = Dep
                 region=comm.region,
                 capacity=comm.capacity,
                 current_count=0,
-                group_number=next_group
+                group_number=next_group,
+                latitude=comm.latitude,
+                longitude=comm.longitude,
+                spatial_metadata=comm.spatial_metadata
             )
             db.add(new_community)
             await db.flush()
@@ -61,7 +64,10 @@ async def create_community(comm: schemas.CommunityCreate, db: AsyncSession = Dep
                 "student_count": new_community.current_count,
                 "slots_remaining": new_community.capacity - new_community.current_count,
                 "group_number": new_community.group_number,
-                "group_label": f"Group {new_community.group_number}"
+                "group_label": f"Group {new_community.group_number}",
+                "latitude": new_community.latitude,
+                "longitude": new_community.longitude,
+                "spatial_metadata": new_community.spatial_metadata
             }
             
             group_created = True
@@ -113,7 +119,10 @@ async def get_communities(db: AsyncSession = Depends(get_db_and_admin)):
             "student_count": comm.current_count,
             "slots_remaining": comm.capacity - comm.current_count,
             "group_number": comm.group_number,
-            "group_label": f"Group {comm.group_number}"
+            "group_label": f"Group {comm.group_number}",
+            "latitude": comm.latitude,
+            "longitude": comm.longitude,
+            "spatial_metadata": comm.spatial_metadata
         })
     return response
 
@@ -132,8 +141,15 @@ async def update_community(community_id: str, comm_update: schemas.CommunityCrea
     community.district = comm_update.district
     community.region = comm_update.region
     community.capacity = comm_update.capacity
+    if comm_update.latitude is not None:
+        community.latitude = comm_update.latitude
+    if comm_update.longitude is not None:
+        community.longitude = comm_update.longitude
+    if comm_update.spatial_metadata is not None:
+        community.spatial_metadata = comm_update.spatial_metadata
     
     await db.commit()
+    await db.refresh(community)
     
     return {
         "id": str(community.id),
@@ -144,7 +160,10 @@ async def update_community(community_id: str, comm_update: schemas.CommunityCrea
         "student_count": community.current_count,
         "slots_remaining": community.capacity - community.current_count,
         "group_number": community.group_number,
-        "group_label": f"Group {community.group_number}"
+        "group_label": f"Group {community.group_number}",
+        "latitude": community.latitude,
+        "longitude": community.longitude,
+        "spatial_metadata": community.spatial_metadata
     }
 
 
