@@ -209,9 +209,14 @@ export default function AdminCommunityMap({ community, onSave, onCancel }: Admin
       {error && <Alert variant="destructive">{error}</Alert>}
       
       {areaStats && (
-        <div className="flex gap-4 p-3 bg-cfss-green-soft text-cfss-green rounded-md text-sm font-medium">
-          <div><span className="opacity-70 text-xs block uppercase">Area (Hectares)</span> {areaStats.hectares} ha</div>
-          <div><span className="opacity-70 text-xs block uppercase">Area (Sq. km)</span> {areaStats.sqKm} km²</div>
+        <div className="flex flex-col gap-2 p-3 bg-cfss-green-soft text-cfss-green rounded-md text-sm font-medium">
+          <div className="flex gap-4">
+            <div><span className="opacity-70 text-xs block uppercase">Area (Hectares)</span> {areaStats.hectares} ha</div>
+            <div><span className="opacity-70 text-xs block uppercase">Area (Sq. km)</span> {areaStats.sqKm} km²</div>
+          </div>
+          <div className="text-xs opacity-80 mt-1">
+            * Note: This is a geographic area estimate derived from the drawn boundary. It is not a cadastral or legally surveyed measurement.
+          </div>
         </div>
       )}
 

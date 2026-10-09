@@ -1,3 +1,7 @@
+
+// Helper for typesafe store access
+const getStore = (type: string) => type === 'COMMUNITY' ? db.communities : (type === 'FEATURE' ? db.features : db.surveys);
+const getId = (type: string, id: string) => type === 'COMMUNITY' ? parseInt(id) : id;
 import { api } from './api';
 import { db, SyncOperation } from './db';
 import { useAuthStore } from './store';
@@ -58,8 +62,8 @@ export const syncEngine = {
         await db.sync_operations.update(item.id, { status: 'SYNCING' });
         // Also reflect syncing state on survey if it exists
         if (item.operation_type !== 'DELETE') {
-            const store = item.entity_type === 'FEATURE' ? db.features : db.surveys;
-            await store.update(item.entity_id, { sync_status: 'syncing' });
+            const store = getStore(item.entity_type);
+            await (store as any).update(getId(item.entity_type, item.entity_id), { sync_status: 'syncing' });
         }
       }
 
@@ -91,8 +95,8 @@ export const syncEngine = {
               await db.surveys.delete(op.entity_id);
             }
           } else {
-            const store = op.entity_type === 'FEATURE' ? db.features : db.surveys;
-            const record = await (store as any).get(op.entity_id);
+            const store = getStore(op.entity_type);
+            const record = await (store as any).get(getId(op.entity_type, op.entity_id));
             if (record) {
               if (record.sync_status === 'syncing') {
                 await (store as any).update(op.entity_id, {
@@ -114,8 +118,8 @@ export const syncEngine = {
              // We drop the operation to avoid infinite retry loop
              await db.sync_operations.delete(op.id);
              if (op.operation_type !== 'DELETE') {
-                 const store = op.entity_type === 'FEATURE' ? db.features : db.surveys;
-                 await store.update(op.entity_id, { sync_status: 'failed', sync_error: "Fatal: " + result.error });
+                 const store = getStore(op.entity_type);
+                 await (store as any).update(getId(op.entity_type, op.entity_id), { sync_status: 'failed', sync_error: "Fatal: " + result.error });
              }
           } else {
              // Recoverable (Network/500/timeout)
@@ -125,8 +129,8 @@ export const syncEngine = {
                retry_count: (op.retry_count || 0) + 1
              });
              if (op.operation_type !== 'DELETE') {
-                 const store = op.entity_type === 'FEATURE' ? db.features : db.surveys;
-                 await store.update(op.entity_id, { sync_status: 'failed', sync_error: result.error });
+                 const store = getStore(op.entity_type);
+                 await (store as any).update(getId(op.entity_type, op.entity_id), { sync_status: 'failed', sync_error: result.error });
              }
           }
         }
@@ -147,8 +151,8 @@ export const syncEngine = {
           last_error: axiosErr.response?.status === 401 ? "Session expired." : "Network error"
         });
         if (item.operation_type !== 'DELETE') {
-           const store = item.entity_type === 'FEATURE' ? db.features : db.surveys;
-           await store.update(item.entity_id, { sync_status: 'failed' });
+           const store = getStore(item.entity_type);
+           await (store as any).update(getId(item.entity_type, item.entity_id), { sync_status: 'failed' });
         }
       }
     } finally {
@@ -165,7 +169,7 @@ export const syncEngine = {
     }
   },
 
-  async queueOperation(operationType: 'CREATE' | 'UPDATE' | 'DELETE', entityType: 'SURVEY' | 'FEATURE', entityId: string, payload: Record<string, unknown> | null, token: string) {
+  async queueOperation(operationType: 'CREATE' | 'UPDATE' | 'DELETE', entityType: 'SURVEY' | 'FEATURE' | 'COMMUNITY', entityId: string, payload: Record<string, unknown> | null, token: string) {
     const userId = useAuthStore.getState().user?.id;
     if (!userId) return;
 
@@ -179,7 +183,7 @@ export const syncEngine = {
     if (operationType !== 'DELETE' && payload) {
         payload.sync_status = 'pending';
         payload.updated_at = new Date().toISOString();
-        const store = entityType === 'FEATURE' ? db.features : db.surveys;
+        const store = getStore(entityType);
         await (store as any).put(payload);
     }
 
@@ -195,14 +199,14 @@ export const syncEngine = {
        }
        
        if (hasCreate) {
-           const store = entityType === 'FEATURE' ? db.features : db.surveys;
-           await (store as any).delete(entityId);
+           const store = getStore(entityType);
+           await (store as any).delete(getId(entityType, entityId));
            window.dispatchEvent(new Event('sync-queued'));
            return; // Stop here, no need to tell the server
        } else {
            // Mark local survey as pending delete so UI can hide it
-           const store = entityType === 'FEATURE' ? db.features : db.surveys;
-           await (store as any).update(entityId, { sync_status: 'pending', status: 'DELETED' });
+           const store = getStore(entityType);
+           await (store as any).update(getId(entityType, entityId), { sync_status: 'pending', status: 'DELETED' });
        }
     } else if (operationType === 'UPDATE') {
        const hasCreate = pendingOps.find(o => o.operation_type === 'CREATE');

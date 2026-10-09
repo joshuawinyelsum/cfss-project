@@ -63,6 +63,50 @@ class CommunityCreate(BaseModel):
     longitude: Optional[float] = None
     spatial_metadata: Optional[Dict[str, Any]] = None
 
+    @field_validator('spatial_metadata')
+    @classmethod
+    def validate_spatial_metadata(cls, v: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if not v:
+            return v
+            
+        if not isinstance(v, dict):
+            raise ValueError("spatial_metadata must be a JSON object")
+            
+        if v.get("type") != "Feature":
+            raise ValueError("spatial_metadata must be a GeoJSON Feature")
+            
+        geometry = v.get("geometry")
+        if not geometry or not isinstance(geometry, dict):
+            raise ValueError("GeoJSON Feature must contain a geometry object")
+            
+        geom_type = geometry.get("type")
+        if geom_type not in ("Polygon", "MultiPolygon"):
+            raise ValueError(f"Geometry type must be Polygon or MultiPolygon, got {geom_type}")
+            
+        coords = geometry.get("coordinates")
+        if not coords or not isinstance(coords, list) or len(coords) == 0:
+            raise ValueError("Geometry coordinates must be a non-empty array")
+            
+        # Basic validation for Polygon rings
+        if geom_type == "Polygon":
+            for ring in coords:
+                if not isinstance(ring, list) or len(ring) < 4:
+                    raise ValueError("Each LinearRing in a Polygon must have at least 4 positions")
+                first_pos = ring[0]
+                last_pos = ring[-1]
+                if first_pos != last_pos:
+                    raise ValueError("LinearRing is not closed (first and last positions do not match)")
+                for pos in ring:
+                    if not isinstance(pos, list) or len(pos) < 2:
+                        raise ValueError("Positions must be arrays of [longitude, latitude]")
+                    lng, lat = pos[0], pos[1]
+                    if not (isinstance(lng, (int, float)) and -180 <= lng <= 180):
+                        raise ValueError(f"Invalid longitude: {lng}")
+                    if not (isinstance(lat, (int, float)) and -90 <= lat <= 90):
+                        raise ValueError(f"Invalid latitude: {lat}")
+
+        return v
+
 class CommunityResponse(BaseModel):
     id: str
     name: str

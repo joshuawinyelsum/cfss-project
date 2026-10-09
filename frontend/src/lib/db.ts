@@ -51,7 +51,7 @@ export interface SyncOperation {
   id: string; // uuid for the operation
   student_id: number;
   operation_type: 'CREATE' | 'UPDATE' | 'DELETE';
-  entity_type: 'SURVEY' | 'FEATURE';
+  entity_type: 'SURVEY' | 'FEATURE' | 'COMMUNITY';
   entity_id: string; // Entity UUID
   payload?: Record<string, unknown>;
   status: 'PENDING' | 'SYNCING' | 'FAILED';

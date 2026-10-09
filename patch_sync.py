@@ -1,40 +1,8 @@
-import re
-
-with open('backend/app/routers/sync_router.py', 'r', encoding='utf-8') as f:
-    content = f.read()
-
-# For CREATE block: add flush after record is configured
-target = """
-                    req_feature_id = survey_data.get("field_feature_id")
-                    if req_feature_id:
-                        feat_check = await db.execute(select(models.FieldFeature).where(models.FieldFeature.id == req_feature_id))
-                        feat_obj = feat_check.scalars().first()
-                        if not feat_obj:
-                            raise ValueError(f"FieldFeature {req_feature_id} not found")
-                        if feat_obj.community_id != comm_id:
-                            raise ValueError(f"FieldFeature {req_feature_id} belongs to a different community")
-                        record.field_feature_id = req_feature_id
-
-                # Insert answers for both CREATE and UPDATE
-"""
-
-replacement = """
-                    req_feature_id = survey_data.get("field_feature_id")
-                    if req_feature_id:
-                        feat_check = await db.execute(select(models.FieldFeature).where(models.FieldFeature.id == req_feature_id))
-                        feat_obj = feat_check.scalars().first()
-                        if not feat_obj:
-                            raise ValueError(f"FieldFeature {req_feature_id} not found")
-                        if feat_obj.community_id != comm_id:
-                            raise ValueError(f"FieldFeature {req_feature_id} belongs to a different community")
-                        record.field_feature_id = req_feature_id
-                        
-                    await db.flush()
-
-                # Insert answers for both CREATE and UPDATE
-"""
-content = content.replace(target, replacement)
-
-with open('backend/app/routers/sync_router.py', 'w', encoding='utf-8') as f:
-    f.write(content)
-print("Added await db.flush() to sync_router.py")
+import sys
+content = open('frontend/src/lib/sync.ts', 'r').read()
+content = content.replace("entityType: 'SURVEY' | 'FEATURE'", "entityType: 'SURVEY' | 'FEATURE' | 'COMMUNITY'")
+content = content.replace("item.entity_type === 'FEATURE' ? db.features : db.surveys", "item.entity_type === 'COMMUNITY' ? db.communities : (item.entity_type === 'FEATURE' ? db.features : db.surveys)")
+content = content.replace("op.entity_type === 'FEATURE' ? db.features : db.surveys", "op.entity_type === 'COMMUNITY' ? db.communities : (op.entity_type === 'FEATURE' ? db.features : db.surveys)")
+content = content.replace("entityType === 'FEATURE' ? db.features : db.surveys", "entityType === 'COMMUNITY' ? db.communities : (entityType === 'FEATURE' ? db.features : db.surveys)")
+content = content.replace("if (op.entity_type === 'FEATURE') {\n            await db.features.delete(op.entity_id);\n          } else {\n            await db.surveys.delete(op.entity_id);\n          }", "if (op.entity_type === 'COMMUNITY') { await db.communities.delete(parseInt(op.entity_id)); } else if (op.entity_type === 'FEATURE') { await db.features.delete(op.entity_id); } else { await db.surveys.delete(op.entity_id); }")
+open('frontend/src/lib/sync.ts', 'w').write(content)

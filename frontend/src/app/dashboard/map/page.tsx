@@ -4,8 +4,10 @@ import { useEffect, useState, useMemo } from 'react';
 import { useAuthStore } from '@/lib/store';
 import { api, getErrorMessage } from '@/lib/api';
 import { db, LocalCommunity, LocalFeature, LocalSurvey } from '@/lib/db';
+import { syncEngine } from '@/lib/sync';
 import dynamic from 'next/dynamic';
-import { MapPin, WifiOff, Loader2 } from 'lucide-react';
+import { MapPin, WifiOff, Loader2, Edit3, Save } from 'lucide-react';
+import * as turf from '@turf/turf';
 
 const StudentMap = dynamic(() => import('@/components/StudentMap'), {
   ssr: false,
@@ -26,6 +28,7 @@ export default function MapPage() {
   const [error, setError] = useState('');
   const [filterType, setFilterType] = useState('ALL');
   const [isOffline, setIsOffline] = useState(false);
+  const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
     if (!token || !user?.community_id) return;
@@ -48,7 +51,6 @@ export default function MapPage() {
             const serverFeatures = res.data.features;
             
             if (mounted) {
-              // Cache community
               const localComm: LocalCommunity = {
                 id: parseInt(serverCommunity.id),
                 name: serverCommunity.name,
@@ -59,7 +61,6 @@ export default function MapPage() {
               };
               await db.communities.put(localComm);
               
-              // Cache features (only those not modified locally)
               for (const sf of serverFeatures) {
                 const existing = await db.features.get(sf.id);
                 if (!existing || existing.sync_status === 'synced') {
@@ -79,7 +80,6 @@ export default function MapPage() {
           }
         }
         
-        // Always load from local DB for display
         if (mounted) {
           const localComm = await db.communities.get(user.community_id!);
           const localFeats = await db.features.where('community_id').equals(user.community_id!).toArray();
@@ -93,7 +93,6 @@ export default function MapPage() {
             }
           } else {
             setCommunity(localComm);
-            // Hide deleted items
             setFeatures(localFeats.filter(f => f.sync_status !== 'pending' || (f as unknown as { status: string }).status !== 'DELETED'));
             setSurveys(localSurveys.filter(s => s.status !== 'DELETED'));
           }
@@ -114,6 +113,47 @@ export default function MapPage() {
     const types = new Set(features.map(f => f.feature_type));
     return ['ALL', ...Array.from(types).sort()];
   }, [features]);
+
+  const handleSaveBoundary = async (geojson: any) => {
+    if (!community || !token) return;
+    try {
+      let lat = community.latitude;
+      let lng = community.longitude;
+      
+      if (geojson) {
+        if (geojson.type !== 'Feature' || !geojson.geometry || !['Polygon', 'MultiPolygon'].includes(geojson.geometry.type)) {
+          alert('Boundary must be a valid Polygon.');
+          return;
+        }
+        try {
+          const centroid = turf.centroid(geojson);
+          lng = centroid.geometry.coordinates[0];
+          lat = centroid.geometry.coordinates[1];
+        } catch (e) {
+          console.warn("Failed to calculate centroid", e);
+        }
+      }
+
+      const payload = {
+        spatial_metadata: geojson,
+        latitude: lat,
+        longitude: lng
+      };
+      
+      const updatedCommunity = {
+          ...community,
+          ...payload
+      };
+      setCommunity(updatedCommunity);
+      await db.communities.put(updatedCommunity);
+
+      await syncEngine.queueOperation('UPDATE', 'COMMUNITY', community.id.toString(), payload, token);
+      
+      setEditMode(false);
+    } catch (e) {
+      alert("Failed to save boundary locally: " + getErrorMessage(e, "Error"));
+    }
+  };
 
   if (loading) {
     return (
@@ -144,10 +184,9 @@ export default function MapPage() {
 
   return (
     <div className="flex flex-col h-full bg-page relative">
-      {/* Map Header */}
       <div className="bg-surface border-b border-border-strong px-4 py-3 shrink-0 flex items-center justify-between z-10 relative shadow-sm">
         <div>
-          <h1 className="font-bold text-gray-900">Map</h1>
+          <h1 className="font-bold text-gray-900">Community Map</h1>
           <p className="text-xs text-gray-500 flex items-center gap-1">
             {community.name}
             {isOffline && (
@@ -159,34 +198,48 @@ export default function MapPage() {
           </p>
         </div>
         
-        {/* Simple Filter */}
-        {features.length > 0 && (
-          <select 
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            className="text-xs border-gray-300 rounded-md shadow-sm focus:border-[#093C22] focus:ring-[#093C22] py-1.5 pl-2 pr-6"
+        <div className="flex items-center gap-3">
+          <button 
+             onClick={() => setEditMode(!editMode)}
+             className={`text-xs px-3 py-1.5 rounded-md shadow-sm font-medium flex items-center gap-1 transition-colors ${editMode ? 'bg-amber-100 text-amber-800 hover:bg-amber-200' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}
           >
-            {featureTypes.map(ft => (
-              <option key={ft} value={ft}>
-                {ft === 'ALL' ? 'All Features' : ft.charAt(0) + ft.slice(1).toLowerCase()}
-              </option>
-            ))}
-          </select>
-        )}
+            {editMode ? <><MapPin size={14} /> Exit Editing</> : <><Edit3 size={14} /> Edit Boundary</>}
+          </button>
+
+          {features.length > 0 && (
+            <select 
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="text-xs border-gray-300 rounded-md shadow-sm focus:border-[#093C22] focus:ring-[#093C22] py-1.5 pl-2 pr-6"
+            >
+              {featureTypes.map(ft => (
+                <option key={ft} value={ft}>
+                  {ft === 'ALL' ? 'All Features' : ft.charAt(0) + ft.slice(1).toLowerCase()}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
       </div>
 
-      {/* Map Content */}
       <div className="flex-1 relative z-0">
-        {!hasLocation && features.length === 0 ? (
+        {!hasLocation && features.length === 0 && !editMode ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-surface">
             <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4 border border-gray-100">
               <MapPin size={32} className="text-gray-300" />
             </div>
             <h3 className="text-lg font-bold text-gray-900 mb-2">No mapped data yet</h3>
-            <p className="text-sm text-gray-500 max-w-md">No field features collected yet. Go to Collect to start your fieldwork.</p>
+            <p className="text-sm text-gray-500 max-w-md">No field features collected yet. Go to Collect to start your fieldwork, or click Edit Boundary to draw the community extent.</p>
           </div>
         ) : (
-          <StudentMap community={community} features={features} filterType={filterType} surveys={surveys} />
+          <StudentMap 
+            community={community} 
+            features={features} 
+            filterType={filterType} 
+            surveys={surveys} 
+            onSaveBoundary={handleSaveBoundary}
+            editModeEnabled={editMode}
+          />
         )}
       </div>
     </div>

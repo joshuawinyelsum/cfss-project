@@ -105,6 +105,28 @@ async def sync_operations(
 
                 continue
 
+            if op.entity_type == "COMMUNITY":
+                comm_id_val = int(op.entity_id)
+                comm_check = await db.execute(select(models.Community).where(models.Community.id == comm_id_val))
+                comm = comm_check.scalars().first()
+                if not comm:
+                    raise ValueError("Community not found")
+                if comm.id != comm_id:
+                    raise ValueError("Cannot update another community")
+                if op.payload:
+                    if "spatial_metadata" in op.payload:
+                        sm = op.payload["spatial_metadata"]
+                        if sm:
+                            schemas.CommunityCreate.validate_spatial_metadata(sm)
+                        comm.spatial_metadata = sm
+                    if "latitude" in op.payload and op.payload["latitude"] is not None:
+                        comm.latitude = float(op.payload["latitude"])
+                    if "longitude" in op.payload and op.payload["longitude"] is not None:
+                        comm.longitude = float(op.payload["longitude"])
+                await db.commit()
+                results.append({"operation_id": op.operation_id, "success": True, "action": "updated"})
+                continue
+
             if op.entity_type != "SURVEY":
                 raise ValueError(f"Unsupported entity type {op.entity_type}")
 
