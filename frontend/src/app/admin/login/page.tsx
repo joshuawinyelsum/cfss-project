@@ -5,6 +5,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAdminAuthStore } from '@/lib/store';
 import { api } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert } from '@/components/ui/alert';
 
 export default function AdminLoginPage() {
   const [username, setUsername] = useState('');
@@ -45,12 +50,15 @@ export default function AdminLoginPage() {
       router.push('/admin');
     } catch (err: any) {
       let msg = 'Admin login failed';
-      if (err.response?.data?.detail) {
-        msg = typeof err.response.data.detail === 'string' 
-          ? err.response.data.detail 
-          : err.response.data.detail[0]?.msg || msg;
-      } else if (err.message) {
+      if (err instanceof Error) {
         msg = err.message;
+      } else if (typeof err === 'object' && err !== null && 'response' in err) {
+        const errorResponse = err.response;
+        if (errorResponse?.data?.detail) {
+          msg = typeof errorResponse.data.detail === 'string'
+            ? errorResponse.data.detail
+            : errorResponse.data.detail[0]?.msg || msg;
+        }
       }
       setError(msg);
       setIsLoading(false);
@@ -58,51 +66,61 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900">
-      <div className="max-w-md w-full bg-white p-8 border border-gray-200 rounded shadow-lg">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-page p-4">
+      <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold text-gray-900">CFSS Admin Portal</h1>
-          <p className="text-sm text-gray-500 mt-2">Administrator Access Only</p>
+          <h1 className="text-2xl font-bold text-gray-900">CFSS Fieldwork</h1>
         </div>
         
-        {error && <div className="mb-4 p-3 bg-red-50 text-red-700 text-sm border border-red-200 rounded">{error}</div>}
-        
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Username</label>
-            <input 
-              type="text" 
-              required 
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              disabled={isLoading}
-              className="mt-1 block w-full border border-gray-300 rounded-md p-2 text-sm text-gray-900 bg-white placeholder-gray-400 disabled:opacity-60 disabled:cursor-not-allowed"
-              placeholder="Admin Username"
-            />
-          </div>
-          <div>
-            <div className="flex justify-between items-center mb-2">
-                <label className="block text-sm font-medium text-primary">Password</label>
-                <Link href="/recover-password" className="text-sm font-medium text-cfss-green hover:underline">Forgot password?</Link>
+        <Card>
+          <CardHeader>
+            <CardTitle>Admin Portal</CardTitle>
+            <CardDescription>Administrator Access Only</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {error && (
+              <Alert variant="destructive" className="mb-4">
+                {error}
+              </Alert>
+            )}
+            
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <Label htmlFor="username">Username</Label>
+                <Input 
+                  id="username"
+                  type="text" 
+                  required 
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  disabled={isLoading}
+                  placeholder="Enter username"
+                />
               </div>
-            <input 
-              type="password" 
-              required 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
-              className="mt-1 block w-full border border-gray-300 rounded-md p-2 text-sm text-gray-900 bg-white placeholder-gray-400 disabled:opacity-60 disabled:cursor-not-allowed"
-            />
-          </div>
-          <button 
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 text-sm font-medium disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {isLoading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-            {isLoading ? 'Signing In...' : 'Sign In to Admin Portal'}
-          </button>
-        </form>
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <Label htmlFor="password" className="mb-0">Password</Label>
+                </div>
+                <Input 
+                  id="password"
+                  type="password" 
+                  required 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isLoading}
+                  placeholder="••••••••"
+                />
+              </div>
+              <Button 
+                type="submit"
+                disabled={isLoading}
+                className="w-full mt-2"
+              >
+                {isLoading ? 'Signing In...' : 'Sign In'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -5,6 +5,10 @@ import { useAdminAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { downloadExport } from '@/lib/export';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Alert } from '@/components/ui/alert';
 
 export default function AdminDashboard() {
   const { user, token, logout } = useAdminAuthStore();
@@ -111,21 +115,21 @@ export default function AdminDashboard() {
 
       {/* Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-surface p-6 rounded-xl shadow-sm border border-border-strong flex items-center gap-5">
+        <Card className="p-6 flex items-center gap-5">
           <div className="p-4 bg-cfss-green-soft text-cfss-green rounded-xl">
              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
           </div>
           <div>
             <p className="text-sm font-semibold text-muted mb-1">Total Students</p>
             <p className="text-3xl font-bold text-primary">{students.length}</p>
-            <p className="text-xs text-green-600 font-medium flex items-center gap-1 mt-1">
+            <p className="text-xs text-status-success font-medium flex items-center gap-1 mt-1">
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
               12 this week
             </p>
           </div>
-        </div>
+        </Card>
 
-        <div className="bg-surface p-6 rounded-xl shadow-sm border border-border-strong flex items-center gap-5">
+        <Card className="p-6 flex items-center gap-5">
           <div className="p-4 bg-cfss-green-soft text-cfss-green rounded-xl">
              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
           </div>
@@ -137,9 +141,9 @@ export default function AdminDashboard() {
               28 this week
             </p>
           </div>
-        </div>
+        </Card>
 
-        <div className="bg-surface p-6 rounded-xl shadow-sm border border-border-strong flex items-center gap-5">
+        <Card className="p-6 flex items-center gap-5">
           <div className="p-4 bg-cfss-green-soft text-cfss-green rounded-xl">
              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m3-4h1m-1 4h1m-5 8h5" /></svg>
           </div>
@@ -150,22 +154,22 @@ export default function AdminDashboard() {
               0 change this week
             </p>
           </div>
-        </div>
+        </Card>
 
-        <div className="bg-surface p-6 rounded-xl shadow-sm border border-border-strong flex items-center gap-5">
-          <div className={`p-4 rounded-xl ${settings.registration_open ? 'bg-amber-50 text-amber-500' : 'bg-status-error/10 text-status-error'}`}>
+        <Card className="p-6 flex items-center gap-5">
+          <div className={`p-4 rounded-xl ${settings.registration_open ? 'bg-status-warning/10 text-status-warning' : 'bg-status-error/10 text-status-error'}`}>
              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
           </div>
           <div>
             <p className="text-sm font-semibold text-muted mb-1">Registration Status</p>
-            <p className={`text-2xl font-bold ${settings.registration_open ? 'text-green-600' : 'text-red-600'}`}>
+            <p className={`text-2xl font-bold ${settings.registration_open ? 'text-status-success' : 'text-status-error'}`}>
               {settings.registration_open ? 'OPEN' : 'CLOSED'}
             </p>
             <p className="text-xs text-muted font-medium flex items-center gap-1 mt-1">
               Since May 10, 2024
             </p>
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* Main Grid: 70% / 30% */}
@@ -175,8 +179,8 @@ export default function AdminDashboard() {
         <div className="xl:col-span-2 space-y-8">
 
           {/* System Sync Overview */}
-          <div className="bg-surface rounded-xl shadow-sm border border-border-strong overflow-hidden">
-            <div className="px-6 py-5 border-b border-border-strong flex justify-between items-center bg-page/50">
+          <Card className="overflow-hidden">
+            <div className="px-6 py-5 border-b border-border flex justify-between items-center bg-page">
               <h2 className="text-lg font-bold text-primary flex items-center gap-2">
                 <svg className="w-5 h-5 text-cfss-green" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 System Sync Overview
@@ -184,41 +188,41 @@ export default function AdminDashboard() {
             </div>
             <div className="p-6">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-4 bg-page rounded-lg border border-border-strong">
+                <div className="p-4 bg-page rounded-lg border border-border">
                   <p className="text-sm font-medium text-muted mb-1">Total Surveys</p>
                   <p className="text-2xl font-bold text-primary">{syncStats.total}</p>
                 </div>
-                <div className="p-4 bg-page rounded-lg border border-border-strong">
+                <div className="p-4 bg-page rounded-lg border border-border">
                   <p className="text-sm font-medium text-muted mb-1">Synced</p>
                   <p className="text-2xl font-bold text-primary">{syncStats.synced}</p>
                 </div>
-                <div className="p-4 bg-page rounded-lg border border-border-strong">
+                <div className="p-4 bg-page rounded-lg border border-border">
                   <p className="text-sm font-medium text-muted mb-1">Pending Sync</p>
                   <p className="text-2xl font-bold text-primary">{syncStats.pending}</p>
                 </div>
-                <div className="p-4 bg-page rounded-lg border border-border-strong">
+                <div className="p-4 bg-page rounded-lg border border-border">
                   <p className="text-sm font-medium text-muted mb-1">Failed Syncs</p>
                   <p className="text-2xl font-bold text-primary">{syncStats.failed}</p>
                 </div>
               </div>
             </div>
-          </div>
+          </Card>
 
           {/* Communities Section */}
-          <div className="bg-surface rounded-xl shadow-sm border border-border-strong overflow-hidden">
-            <div className="px-6 py-5 border-b border-border-strong flex justify-between items-center">
+          <Card className="overflow-hidden">
+            <div className="px-6 py-5 border-b border-border flex justify-between items-center">
               <h2 className="text-lg font-bold text-primary flex items-center gap-2">
                 <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                 Communities & Groups
               </h2>
-              <button onClick={() => {}} className="bg-cfss-green hover:bg-cfss-green-hover text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap">
+              <Button variant="default" className="flex items-center gap-2 whitespace-nowrap">
                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                  Create Community
-              </button>
+              </Button>
             </div>
             <div className="overflow-x-auto">
               <table className="hidden md:table w-full text-sm text-left">
-                <thead className="text-muted border-b border-border-strong bg-page/50">
+                <thead className="text-muted border-b border-border bg-page">
                   <tr>
                     <th className="py-4 px-6 font-semibold">Community Name</th>
                     <th className="py-4 px-6 font-semibold">Group</th>
@@ -240,7 +244,7 @@ export default function AdminDashboard() {
                         <td className="py-4 px-6 text-center font-medium text-secondary">{c.current_count}</td>
                         <td className="py-4 px-6">
                           <div className="flex items-center gap-3">
-                            <div className="w-full bg-border-strong rounded-full h-2 overflow-hidden">
+                            <div className="w-full bg-border rounded-full h-2 overflow-hidden">
                               <div className={`${barColor} h-2 rounded-full`} style={{width: `${progress}%`}}></div>
                             </div>
                             <span className="text-xs font-medium text-muted w-9">{progress}%</span>
@@ -262,11 +266,11 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </div>
-          </div>
+          </Card>
 
           {/* Recent Surveys Table */}
-          <div className="bg-surface rounded-xl shadow-sm border border-border-strong overflow-hidden">
-            <div className="px-6 py-5 border-b border-border-strong flex justify-between items-center">
+          <Card className="overflow-hidden">
+            <div className="px-6 py-5 border-b border-border flex justify-between items-center">
               <h2 className="text-lg font-bold text-primary flex items-center gap-2">
                 <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
                 Recent Surveys
@@ -274,7 +278,7 @@ export default function AdminDashboard() {
             </div>
             <div className="overflow-x-auto">
               <table className="hidden md:table w-full text-sm text-left">
-                <thead className="bg-page/50 text-muted border-b border-border-strong">
+                <thead className="bg-page text-muted border-b border-border">
                   <tr>
                     <th className="py-4 px-6 font-semibold">Student Name</th>
                     <th className="py-4 px-6 font-semibold">Community</th>
@@ -287,7 +291,7 @@ export default function AdminDashboard() {
                   {surveys.slice(0, 5).map(s => {
                     const student = students.find(st => st.id === s.user_id);
                     const community = communities.find(c => c.id === s.community_id);
-                    const isSubmitted = s.status?.toLowerCase() === 'submitted';
+                    const isSubmitted = s.status?.toLowerCase() === 'submitted' || s.status?.toLowerCase() === 'completed';
                     return (
                       <tr key={s.id} className="hover:bg-page transition-colors">
                         <td className="py-4 px-6">
@@ -328,11 +332,11 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </div>
-          </div>
+          </Card>
 
           {/* Students Overview Table */}
-          <div className="bg-surface rounded-xl shadow-sm border border-border-strong overflow-hidden">
-            <div className="px-6 py-4 border-b border-border-strong flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          <Card className="overflow-hidden">
+            <div className="px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
               <h2 className="text-lg font-bold text-primary flex items-center gap-2">
                 <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                 Students Overview
@@ -340,23 +344,23 @@ export default function AdminDashboard() {
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <svg className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                  <input type="text" placeholder="Search by name or student ID..." className="pl-9 pr-4 py-2 border border-border-strong rounded-lg text-sm w-64 focus:outline-none focus:ring-2 focus:ring-cfss-green" />
+                  <Input type="text" placeholder="Search by name or ID..." className="pl-9 w-64" />
                 </div>
-                <select className="border border-border-strong rounded-lg text-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-cfss-green bg-surface">
+                <select className="border border-border rounded-lg text-sm py-2 px-3 focus:outline-none focus:ring-1 focus:ring-cfss-green bg-surface text-primary">
                   <option>All Programs</option>
                   <option>Computer Science</option>
                   <option>Information Technology</option>
                   <option>Engineering</option>
                 </select>
-                <button onClick={handleExportStudents} disabled={exporting} className="text-cfss-green border border-cfss-green-soft bg-cfss-green-soft hover:bg-surface py-2 px-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                <Button variant="outline" onClick={handleExportStudents} disabled={exporting} className="whitespace-nowrap">
+                  <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                   {exporting ? "Exporting..." : "Export CSV"}
-                </button>
+                </Button>
               </div>
             </div>
             <div className="overflow-x-auto">
               <table className="hidden md:table w-full text-sm text-left">
-                <thead className="bg-page/50 text-muted border-b border-border-strong">
+                <thead className="bg-page text-muted border-b border-border">
                   <tr>
                     <th className="py-4 px-6 font-semibold">Name</th>
                     <th className="py-4 px-6 font-semibold">Student ID</th>
@@ -381,7 +385,7 @@ export default function AdminDashboard() {
                         <td className="py-4 px-6 text-secondary">{community?.group_label || 'N/A'}</td>
                         <td className="py-4 px-6 text-muted text-xs whitespace-nowrap">May 10, 2024</td>
                         <td className="py-4 px-6">
-                          <span className="px-2 py-1 rounded text-xs font-semibold text-cfss-green">Active</span>
+                          <span className="px-2 py-1 rounded text-xs font-semibold text-cfss-green bg-status-success/10 border border-status-success/20">Active</span>
                         </td>
                       </tr>
                     )
@@ -391,17 +395,17 @@ export default function AdminDashboard() {
               <div className="py-4 px-6 flex justify-between items-center border-t border-border text-sm text-muted">
                 <span>Showing 1 to {Math.min(5, students.length)} of {students.length} students</span>
                 <div className="flex gap-1 items-center">
-                  <button className="w-8 h-8 flex items-center justify-center border border-border-strong rounded text-muted hover:bg-page">&lt;</button>
+                  <button className="w-8 h-8 flex items-center justify-center border border-border rounded text-muted hover:bg-page">&lt;</button>
                   <button className="w-8 h-8 flex items-center justify-center border border-cfss-green bg-cfss-green text-white rounded">1</button>
-                  <button className="w-8 h-8 flex items-center justify-center border border-border-strong rounded hover:bg-page">2</button>
-                  <button className="w-8 h-8 flex items-center justify-center border border-border-strong rounded hover:bg-page">3</button>
+                  <button className="w-8 h-8 flex items-center justify-center border border-border rounded hover:bg-page">2</button>
+                  <button className="w-8 h-8 flex items-center justify-center border border-border rounded hover:bg-page">3</button>
                   <span className="px-1">...</span>
-                  <button className="w-8 h-8 flex items-center justify-center border border-border-strong rounded hover:bg-page">26</button>
-                  <button className="w-8 h-8 flex items-center justify-center border border-border-strong rounded text-secondary hover:bg-page">&gt;</button>
+                  <button className="w-8 h-8 flex items-center justify-center border border-border rounded hover:bg-page">26</button>
+                  <button className="w-8 h-8 flex items-center justify-center border border-border rounded text-secondary hover:bg-page">&gt;</button>
                 </div>
               </div>
             </div>
-          </div>
+          </Card>
 
         </div>
 
@@ -409,7 +413,7 @@ export default function AdminDashboard() {
         <div className="space-y-8">
 
           {/* Registration Control */}
-          <div className="bg-surface rounded-xl shadow-sm border border-border-strong p-6">
+          <Card className="p-6">
             <h2 className="text-lg font-bold text-primary mb-6 flex items-center gap-2">
               <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
               Registration Control
@@ -418,7 +422,7 @@ export default function AdminDashboard() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                  <span className="text-sm font-semibold text-secondary">Current Status</span>
-                 <div className={`px-4 py-1.5 rounded-lg text-center font-bold text-sm ${settings.registration_open ? 'bg-status-success/10 text-status-success border border-status-success/20' : 'bg-page text-muted border border-border-strong'}`}>
+                 <div className={`px-4 py-1.5 rounded-lg text-center font-bold text-sm ${settings.registration_open ? 'bg-status-success/10 text-status-success border border-status-success/20' : 'bg-page text-muted border border-border'}`}>
                    {settings.registration_open ? 'OPEN' : 'CLOSED'}
                  </div>
               </div>
@@ -437,7 +441,7 @@ export default function AdminDashboard() {
 
               <div>
                  <span className="text-sm font-semibold text-primary">Registration Control</span>
-                 <div className="flex items-start gap-3 border border-border-strong rounded-lg p-3 mt-3 shadow-sm bg-page">
+                 <div className="flex items-start gap-3 border border-border rounded-lg p-3 mt-3 shadow-sm bg-page">
                     <svg className="w-5 h-5 text-cfss-green shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                     <div>
                       <p className="text-xs font-semibold text-primary">Open Registration</p>
@@ -446,42 +450,42 @@ export default function AdminDashboard() {
                  </div>
               </div>
             </div>
-          </div>
+          </Card>
 
           {/* Whitelist Management */}
-          <div className="bg-surface rounded-xl shadow-sm border border-border-strong p-6">
+          <Card className="p-6">
             <h2 className="text-lg font-bold text-primary mb-6 flex items-center gap-2">
               <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               Whitelist Management
             </h2>
             <p className="text-sm text-secondary mb-4">Go to the detailed whitelist management page to upload new whitelists and view history.</p>
-            <a href="/admin/whitelist" className="w-full inline-flex justify-center items-center gap-2 bg-cfss-green hover:bg-cfss-green-hover text-white text-sm font-bold py-2.5 rounded-lg shadow-sm transition-colors">
+            <Button variant="default" className="w-full" onClick={() => router.push('/admin/whitelist')}>
               Manage Whitelists
-            </a>
-          </div>
+            </Button>
+          </Card>
 
           {/* Quick Actions */}
-          <div className="bg-surface rounded-xl shadow-sm border border-border-strong p-6">
+          <Card className="p-6">
             <h2 className="text-lg font-bold text-primary mb-6 flex items-center gap-2">
               <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
               Quick Actions
             </h2>
 
             <div className="space-y-3">
-              <button onClick={handleExportStudents} disabled={exporting} className="w-full flex items-center gap-3 bg-page hover:bg-page/80 text-primary font-bold py-3 px-4 rounded-xl transition-colors border border-border-strong shadow-sm text-sm">
-                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+              <Button variant="outline" onClick={handleExportStudents} disabled={exporting} className="w-full justify-start text-primary">
+                 <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                  Export Students (CSV)
-              </button>
-              <button onClick={handleExportSurveys} disabled={exporting} className="w-full flex items-center gap-3 bg-page hover:bg-page/80 text-primary font-bold py-3 px-4 rounded-xl transition-colors border border-border-strong shadow-sm text-sm">
-                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              </Button>
+              <Button variant="outline" onClick={handleExportSurveys} disabled={exporting} className="w-full justify-start text-primary">
+                 <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                  Export Surveys (CSV)
-              </button>
-              <button className="w-full flex items-center gap-3 bg-page hover:bg-page/80 text-primary font-bold py-3 px-4 rounded-xl transition-colors border border-border-strong shadow-sm text-sm">
-                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              </Button>
+              <Button variant="outline" className="w-full justify-start text-primary">
+                 <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                  Export Reports (PDF)
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
 
         </div>
 
@@ -489,3 +493,4 @@ export default function AdminDashboard() {
     </div>
   );
 }
+

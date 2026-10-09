@@ -4,6 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { ShieldCheck, ShieldAlert, Settings, Loader2, KeyRound } from 'lucide-react';
 import { useAdminAuthStore } from '@/lib/store';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert } from '@/components/ui/alert';
 
 export default function RegistrationControlPage() {
   const { token } = useAdminAuthStore();
@@ -100,58 +105,57 @@ export default function RegistrationControlPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400" />
+      <div className="min-h-screen flex items-center justify-center bg-page">
+        <Loader2 className="w-8 h-8 animate-spin text-cfss-green" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen p-8 max-w-4xl mx-auto space-y-8 animate-fade-in relative text-slate-900 dark:text-white">
+    <div className="min-h-screen p-8 max-w-4xl mx-auto space-y-8 bg-page text-primary animate-fade-in relative">
       
       {/* Password Confirmation Modal */}
       {showPasswordModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-md w-full overflow-hidden border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in duration-200">
-            <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Confirm Action</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <Card className="max-w-md w-full animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-border">
+              <h3 className="text-lg font-bold text-primary">Confirm Action</h3>
+              <p className="text-sm text-secondary mt-1">
                 Enter your admin password to confirm {pendingState ? 'opening' : 'closing'} the registration window.
               </p>
             </div>
             
-            <div className="p-6">
+            <div className="p-6 space-y-4">
               {modalError && (
-                <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-sm border border-red-200 dark:border-red-800 rounded">
-                  {modalError}
-                </div>
+                <Alert variant="destructive" title={modalError} />
               )}
               
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Admin Password</label>
-              <input
-                type="password"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-900 dark:text-white"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && adminPassword && !saving && handleConfirm()}
-                autoFocus
-              />
+              <div className="space-y-2">
+                <Label htmlFor="adminPassword">Admin Password</Label>
+                <Input
+                  id="adminPassword"
+                  type="password"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && adminPassword && !saving && handleConfirm()}
+                  autoFocus
+                />
+              </div>
             </div>
             
-            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3">
-              <button
-                type="button"
-                className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            <div className="px-6 py-4 bg-surface-alt border-t border-border flex justify-end gap-3 rounded-b-xl">
+              <Button
+                variant="outline"
                 onClick={handleCancel}
                 disabled={saving}
               >
                 Cancel
-              </button>
-              <button
-                type="button"
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2"
+              </Button>
+              <Button
+                variant="default"
                 onClick={handleConfirm}
                 disabled={saving || !adminPassword}
+                className="flex items-center gap-2"
               >
                 {saving ? (
                   <>
@@ -159,92 +163,90 @@ export default function RegistrationControlPage() {
                     Confirming...
                   </>
                 ) : 'Confirm'}
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
       {/* Toast Notification */}
       {toast && (
-        <div className={`fixed top-4 right-4 p-4 rounded shadow-lg text-white font-medium transition-opacity z-50 ${toast.type === 'success' ? 'bg-green-600 dark:bg-green-500' : 'bg-red-600 dark:bg-red-500'}`}>
+        <div className={`fixed top-4 right-4 p-4 rounded shadow-lg text-white font-medium transition-opacity z-50 ${toast.type === 'success' ? 'bg-status-success' : 'bg-status-error'}`}>
           {toast.message}
         </div>
       )}
 
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-          <Settings className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+        <h1 className="text-3xl font-bold text-primary flex items-center gap-3">
+          <Settings className="w-8 h-8 text-cfss-green" />
           Registration Control
         </h1>
-        <p className="text-slate-500 dark:text-slate-400 mt-2">Manage global system access and registration windows.</p>
+        <p className="text-secondary mt-2">Manage global system access and registration windows.</p>
       </div>
 
       {/* Main Control Card */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-start justify-between">
+      <Card className="overflow-hidden">
+        <div className="p-6 border-b border-border flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <KeyRound className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+            <h2 className="text-lg font-bold text-primary flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-secondary" />
               Student Registration Window
             </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-sm text-secondary mt-1">
               Controls whether new students can create accounts on the platform. Whitelisted IDs are still required even when open.
             </p>
           </div>
           
           {/* Status Badge */}
-          <div className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${registrationEnabled ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
-            <span className={`w-2 h-2 rounded-full ${registrationEnabled ? 'bg-emerald-500' : 'bg-red-500 animate-pulse'}`}></span>
+          <div className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${registrationEnabled ? 'bg-status-success/20 text-status-success' : 'bg-status-error/20 text-status-error'}`}>
+            <span className={`w-2 h-2 rounded-full ${registrationEnabled ? 'bg-status-success' : 'bg-status-error animate-pulse'}`}></span>
             {registrationEnabled ? 'SYSTEM OPEN' : 'SYSTEM LOCKED'}
           </div>
         </div>
 
-        <div className="p-6 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-between">
+        <div className="p-6 bg-surface-alt flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={() => onToggleClick(!registrationEnabled)}
-              className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${registrationEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+              className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-cfss-green focus:ring-offset-2 ${registrationEnabled ? 'bg-status-success' : 'bg-slate-300 dark:bg-slate-600'}`}
             >
               <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${registrationEnabled ? 'translate-x-8' : 'translate-x-1'}`} />
             </button>
             <div>
-              <span className="font-semibold text-slate-700 dark:text-slate-200 block">
+              <span className="font-semibold text-primary block">
                 {registrationEnabled ? 'Allow New Registrations' : 'Block New Registrations'}
               </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">
+              <span className="text-xs text-secondary">
                 Toggle to instantly lock or unlock the registration endpoint.
               </span>
             </div>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Warning Alert */}
       {!registrationEnabled && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-start gap-3">
-          <ShieldAlert className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-bold text-amber-800 dark:text-amber-400">Registration is currently locked</h3>
-            <p className="text-sm text-amber-700 dark:text-amber-500 mt-1">
-              Any requests to the <code className="bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 rounded text-amber-900 dark:text-amber-300">/register</code> endpoint will be rejected with a 403 Forbidden status. Ensure you notify students before closing the registration window to prevent confusion.
-            </p>
-          </div>
-        </div>
+        <Alert 
+          variant="warning" 
+          title="Registration is currently locked"
+        >
+          <p className="text-sm mt-1">
+            Any requests to the <code className="bg-status-warning/20 px-1.5 py-0.5 rounded text-status-warning">/register</code> endpoint will be rejected with a 403 Forbidden status. Ensure you notify students before closing the registration window to prevent confusion.
+          </p>
+        </Alert>
       )}
 
       {/* Success Alert */}
       {registrationEnabled && (
-        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4 flex items-start gap-3">
-          <ShieldCheck className="w-6 h-6 text-emerald-500 shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-bold text-emerald-800 dark:text-emerald-400">Registration is currently open</h3>
-            <p className="text-sm text-emerald-700 dark:text-emerald-500 mt-1">
-              Students whose IDs are present in the whitelist can successfully register. All requests are processed using the strict Zenith idempotency flow.
-            </p>
-          </div>
-        </div>
+        <Alert 
+          variant="success" 
+          title="Registration is currently open"
+        >
+          <p className="text-sm mt-1">
+            Students whose IDs are present in the whitelist can successfully register. All requests are processed using the strict Zenith idempotency flow.
+          </p>
+        </Alert>
       )}
 
     </div>

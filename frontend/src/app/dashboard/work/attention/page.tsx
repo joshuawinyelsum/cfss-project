@@ -6,6 +6,9 @@ import { useAuthStore } from '@/lib/store';
 import { syncEngine } from '@/lib/sync';
 import { db } from '@/lib/db';
 import { RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, Search, ArrowRight, X , ArrowLeft } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Alert } from '@/components/ui/alert';
 
 export default function SyncPage() {
   const { user, token } = useAuthStore();
@@ -83,14 +86,13 @@ export default function SyncPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12">
       
-
       <div className="space-y-6 mt-8">
         {failedItems.length > 0 && (
           <section>
              <h2 className="text-sm font-bold text-status-error uppercase tracking-wider mb-3 flex items-center gap-2"><XCircle size={16}/> Failed Synchronization</h2>
-             <div className="bg-surface border border-status-error/30 rounded-xl overflow-hidden shadow-sm divide-y divide-border">
+             <Card className="overflow-hidden divide-y divide-border">
                {failedItems.map((item) => (
-                 <div key={item.id} onClick={() => setSelectedItem(item)} className="p-4 flex items-center justify-between hover:bg-red-50/50 cursor-pointer transition-colors">
+                 <div key={item.id} onClick={() => setSelectedItem(item)} className="p-4 flex items-center justify-between hover:bg-page cursor-pointer transition-colors">
                    <div>
                      <h3 className="text-sm font-bold text-primary capitalize">{item.survey_type.toLowerCase()} Survey</h3>
                      <p className="text-xs text-secondary mt-1">ID: <span className="font-mono">{item.id.slice(0,8)}</span></p>
@@ -101,7 +103,7 @@ export default function SyncPage() {
                    </div>
                  </div>
                ))}
-             </div>
+             </Card>
           </section>
         )}
 
@@ -115,11 +117,11 @@ export default function SyncPage() {
       
       {/* Detail Modal */}
       {selectedItem && (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
-          <div className="bg-surface rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col">
-            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-page/50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <Card className="w-full max-w-md overflow-hidden flex flex-col border-0">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-page">
               <h2 className="font-bold text-primary">Record Details</h2>
-              <button onClick={() => setSelectedItem(null)} className="p-2 -mr-2 text-muted hover:text-secondary rounded-full hover:bg-gray-200 transition-colors">
+              <button onClick={() => setSelectedItem(null)} className="p-2 -mr-2 text-muted hover:text-primary transition-colors">
                 <X size={20} />
               </button>
             </div>
@@ -139,7 +141,7 @@ export default function SyncPage() {
                   ) : selectedItem.sync_status === 'pending' ? (
                      <span className="text-xs font-bold px-2 py-1 bg-status-warning/10 text-status-warning rounded-md border border-status-warning/20">Pending Sync</span>
                   ) : (
-                     <span className="text-xs font-bold px-2 py-1 bg-cfss-green-soft text-cfss-green rounded-md border border-cfss-green/20">Synced</span>
+                     <span className="text-xs font-bold px-2 py-1 bg-status-success/10 text-status-success rounded-md border border-status-success/20">Synced</span>
                   )}
                 </div>
                 
@@ -148,35 +150,36 @@ export default function SyncPage() {
               </div>
 
               {selectedItem.sync_error && (
-                <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-lg">
-                  <h4 className="text-xs font-bold text-red-800 uppercase tracking-wide mb-1">Error Information</h4>
-                  <p className="text-sm text-red-700 font-mono break-all">{selectedItem.sync_error}</p>
-                </div>
+                <Alert variant="destructive" title="Error Information">
+                  <p className="text-sm font-mono break-all mt-1">{selectedItem.sync_error}</p>
+                </Alert>
               )}
             </div>
             
             <div className="px-6 py-4 border-t border-border bg-page flex justify-end gap-3">
-              <button 
+              <Button 
+                variant="outline"
                 onClick={() => setSelectedItem(null)}
-                className="px-4 py-2 font-medium text-secondary hover:text-primary hover:bg-gray-200 rounded-lg transition-colors text-sm"
               >
                 Close
-              </button>
+              </Button>
               
               {(selectedItem.sync_status === 'pending' || selectedItem.sync_status === 'failed') && (
-                <button 
+                <Button 
+                  variant="default"
                   onClick={() => handleSyncSingle(selectedItem)}
                   disabled={isSyncing}
-                  className="flex items-center gap-2 px-5 py-2 font-bold text-white bg-cfss-green hover:bg-cfss-green-hover rounded-lg transition-colors text-sm disabled:opacity-50"
+                  className="flex items-center gap-2"
                 >
                   <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
                   {isSyncing ? "Syncing..." : (selectedItem.sync_status === 'failed' ? "Retry Sync" : "Sync Now")}
-                </button>
+                </Button>
               )}
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </div>
   );
 }
+

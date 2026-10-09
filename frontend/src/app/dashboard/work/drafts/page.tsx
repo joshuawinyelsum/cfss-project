@@ -9,6 +9,9 @@ import { syncEngine } from '@/lib/sync';
 import { getEntityLabel } from '@/lib/entityLabel';
 import Link from 'next/link';
 import { Search, Filter, Loader2, ArrowRight, Trash2 } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export default function DraftsPage() {
   const { user, token } = useAuthStore();
@@ -33,7 +36,6 @@ export default function DraftsPage() {
     }
   };
 
-  
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [skip, setSkip] = useState(0);
@@ -157,7 +159,6 @@ export default function DraftsPage() {
     <>
       <div className="space-y-6 max-w-3xl mx-auto pb-12">
         
-        
         <div>
           <h2 className="text-xl font-bold text-primary">Draft Surveys</h2>
           <p className="text-muted mt-1">Pick up where you left off. Only you can see and edit your drafts.</p>
@@ -167,12 +168,12 @@ export default function DraftsPage() {
         <div className="flex flex-col sm:flex-row gap-4">
           <form onSubmit={handleSearch} className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
-            <input 
+            <Input 
               type="text"
               placeholder="Search house number..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-border-strong rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm text-primary"
+              className="pl-10"
             />
           </form>
           
@@ -181,7 +182,7 @@ export default function DraftsPage() {
             <select
               value={typeFilter}
               onChange={handleTypeChange}
-              className="w-full pl-10 pr-8 py-2 border border-border-strong rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm appearance-none bg-surface text-primary"
+              className="w-full pl-10 pr-8 py-2 border border-border rounded-lg focus:ring-1 focus:ring-cfss-green focus:border-cfss-green text-sm appearance-none bg-surface text-primary outline-none"
             >
               <option value="">All Types</option>
               <option value="HOUSEHOLD">Household</option>
@@ -193,11 +194,11 @@ export default function DraftsPage() {
         </div>
 
         {/* Flat List UI */}
-        <div className="bg-surface rounded-xl border border-border-strong overflow-hidden shadow-sm">
+        <Card className="overflow-hidden">
           {records.length === 0 && !loading ? (
             <div className="py-12 text-center bg-page">
               <p className="text-muted mb-2">No drafts found.</p>
-              <Link href="/surveys" className="text-[#093C22] hover:underline text-sm font-medium">Start a new survey</Link>
+              <Link href="/surveys" className="text-cfss-green hover:underline text-sm font-medium">Start a new survey</Link>
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -212,7 +213,7 @@ export default function DraftsPage() {
                   >
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="font-bold text-primary capitalize text-base">{record.survey_type.toLowerCase()} Survey</h3>
-                      <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-700 rounded uppercase tracking-wide border border-amber-100">Draft</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-status-warning/10 text-status-warning rounded-full uppercase tracking-wide border border-status-warning/20">Draft</span>
                     </div>
                     
                     <div className="flex items-center gap-4 text-sm text-muted">
@@ -220,7 +221,7 @@ export default function DraftsPage() {
                         <span className="font-medium text-primary">{getEntityLabel(record.survey_type)}: </span>
                         <span className="font-mono text-secondary">{record.entity_id}</span>
                       </div>
-                      <span className="hidden sm:inline text-gray-300">•</span>
+                      <span className="hidden sm:inline opacity-50">•</span>
                       <div className="hidden sm:block">
                         Updated: {new Date(record.updated_at).toLocaleDateString()}
                       </div>
@@ -228,7 +229,7 @@ export default function DraftsPage() {
                     
                     <div className="mt-3 flex items-center gap-3">
                       <div className="w-full sm:w-48 bg-page rounded-full h-1.5 overflow-hidden">
-                        <div className="bg-[#093C22] h-1.5 rounded-full transition-all" style={{ width: `${record.progress}%` }}></div>
+                        <div className="bg-cfss-green h-1.5 rounded-full transition-all" style={{ width: `${record.progress}%` }}></div>
                       </div>
                       <span className="text-xs font-medium text-secondary">{record.progress}%</span>
                     </div>
@@ -238,7 +239,7 @@ export default function DraftsPage() {
                     <button
                       onClick={() => setConfirmDeleteId(record.id)}
                       disabled={deletingId === record.id}
-                      className="p-2 rounded-lg text-muted hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                      className="p-2 rounded-lg text-muted hover:text-status-error hover:bg-status-error/10 transition-colors disabled:opacity-50"
                       title="Delete draft"
                     >
                       {deletingId === record.id
@@ -248,7 +249,7 @@ export default function DraftsPage() {
                     </button>
                     <Link
                       href={`/surveys/${record.survey_type.toLowerCase()}/fill?id=${record.id}`}
-                      className="text-sm font-medium text-[#093C22] flex items-center gap-1 hover:underline"
+                      className="text-sm font-medium text-cfss-green flex items-center gap-1 hover:underline"
                     >
                       Continue <ArrowRight size={16} />
                     </Link>
@@ -257,48 +258,49 @@ export default function DraftsPage() {
               ))}
             </div>
           )}
-        </div>
+        </Card>
           {loading && (
             <div className="flex justify-center py-6">
-              <Loader2 className="animate-spin text-emerald-600" size={24} />
+              <Loader2 className="animate-spin text-cfss-green" size={24} />
             </div>
           )}
           
           {records.length > 0 && records.length < total && (
-            <button 
+            <Button 
+              variant="outline"
               onClick={() => loadDrafts(false)}
               disabled={loading}
-              className="w-full py-3 bg-surface border border-border-strong rounded-lg font-medium text-secondary hover:bg-page transition-colors mt-4"
+              className="w-full mt-4"
             >
               Load More
-            </button>
+            </Button>
           )}
       </div>
 
       {/* Delete confirmation modal */}
       {confirmDeleteId && (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
-          <div className="bg-surface rounded-2xl w-full max-w-sm shadow-2xl p-6">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <Card className="w-full max-w-sm p-6 border-0">
             <h2 className="text-lg font-bold text-primary mb-2">Delete this draft?</h2>
             <p className="text-sm text-muted mb-6">
-              This draft will be removed from your workspace. If it has already synchronized, the deletion will be queued and applied to the server when you&apos;re back online.
+              This draft will be removed from your workspace. If it has already synchronized, the deletion will be queued and applied to the server when you're back online.
             </p>
             <div className="flex justify-end gap-3">
-              <button
+              <Button
+                variant="outline"
                 onClick={() => setConfirmDeleteId(null)}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-secondary hover:bg-page transition-colors"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="destructive"
                 onClick={() => handleDelete(confirmDeleteId)}
                 disabled={!!deletingId}
-                className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50"
               >
                 Delete
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </>

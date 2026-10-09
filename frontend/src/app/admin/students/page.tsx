@@ -1,366 +1,271 @@
 "use client";
 
 import { useEffect, useState, useMemo } from 'react';
-import { useAdminAuthStore } from '@/lib/store';
-import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Alert } from '@/components/ui/alert';
 
 interface Student {
   id: string;
-  student_id: string;
   name: string;
+  student_id: string;
   email: string;
-  faculty: string | null;
+  faculty: string;
   program: string;
-  gender: string | null;
-  phone_number: string | null;
   level: number;
-  role: string;
+  gender: string;
+  phone_number: string;
   community_id: string;
   community_name: string;
-  group_label: string;
   group_number: number;
+  group_label: string;
   district: string;
   region: string;
 }
 
 export default function AdminStudentsPage() {
-  const { user, token } = useAdminAuthStore();
-  const router = useRouter();
-
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // Filtering & Search
+  
   const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [selectedCommunity, setSelectedCommunity] = useState<string>('All');
+  const [communityFilter, setCommunityFilter] = useState('');
 
-  // Modal state
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [studentDetailsLoading, setStudentDetailsLoading] = useState(false);
 
   useEffect(() => {
-    if (!user || user.role !== 'admin') {
-      router.push('/admin/login');
-      return;
-    }
     fetchStudents();
-  }, [user, router, token]);
-
-  // Debounce search term
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+  }, []);
 
   const fetchStudents = async () => {
-    if (!token) return;
-    setLoading(true);
-    setError('');
     try {
-      const res = await api.get('/api/admin/students', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await api.get('/api/admin/users/students');
       setStudents(res.data);
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      setError('Failed to fetch students. Please try again later.');
+      setError('Failed to load students');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRowClick = async (studentId: string) => {
+  const communities = useMemo(() => {
+    const comms = new Set(students.map(s => s.community_name).filter(Boolean));
+    return Array.from(comms).sort();
+  }, [students]);
+
+  const filteredStudents = useMemo(() => {
+    return students.filter(student => {
+      const matchesSearch = 
+        student.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        student.student_id?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCommunity = communityFilter === '' || student.community_name === communityFilter;
+      return matchesSearch && matchesCommunity;
+    });
+  }, [students, searchTerm, communityFilter]);
+
+  const handleStudentClick = async (studentId: string) => {
     setStudentDetailsLoading(true);
-    setSelectedStudent(null);
+    setError('');
     try {
-      // Fetch full details if needed, or just use the existing row data
-      // The requirement states to fetch from GET /admin/students/{id}
-      const res = await api.get(`/api/admin/students/${studentId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await api.get(`/api/admin/users/students/${studentId}`);
       setSelectedStudent(res.data);
-    } catch (err: any) {
-      alert("Failed to fetch student details.");
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load student details');
     } finally {
       setStudentDetailsLoading(false);
     }
   };
 
-  // Extract unique communities for the filter dropdown
-  const uniqueCommunities = useMemo(() => {
-    const comms = new Set(students.map(s => s.community_name).filter(Boolean));
-    return Array.from(comms).sort();
-  }, [students]);
-
-  // Filter students
-  const filteredStudents = useMemo(() => {
-    return students.filter(student => {
-      // Community filter
-      if (selectedCommunity !== 'All' && student.community_name !== selectedCommunity) {
-        return false;
-      }
-      // Search by email
-      if (debouncedSearch && (!student.email || !student.email.toLowerCase().includes(debouncedSearch.toLowerCase()))) {
-        return false;
-      }
-      return true;
-    });
-  }, [students, selectedCommunity, debouncedSearch]);
-
-  if (!user || user.role !== 'admin') {
-    return null; // Will redirect
+  if (loading) {
+    return <div className="p-8 text-center text-secondary">Loading students...</div>;
   }
 
   return (
-    <div className="space-y-6 relative">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-primary">Students</h1>
-          <p className="text-sm text-muted mt-1">Manage all assigned students</p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          {/* Search */}
-          <div className="relative w-full sm:w-64">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            <input
-              type="text"
-              className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm shadow-sm disabled:opacity-50"
-              placeholder="Search by email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-
-          {/* Filter */}
-          <select
-            className="block w-full sm:w-48 pl-3 pr-10 py-2 border border-slate-300 bg-surface rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm shadow-sm disabled:opacity-50"
-            value={selectedCommunity}
-            onChange={(e) => setSelectedCommunity(e.target.value)}
-            disabled={loading}
-          >
-            <option value="All">All Communities</option>
-            {uniqueCommunities.map(name => (
-              <option key={name} value={name}>{name}</option>
-            ))}
-          </select>
+          <p className="text-secondary mt-1 text-sm">Manage enrolled students and community assignments.</p>
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md">
-          <div className="flex items-center">
-            <svg className="w-5 h-5 text-red-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <p className="text-red-700 font-medium text-sm">{error}</p>
-          </div>
-        </div>
+        <Alert variant="destructive">
+          {error}
+        </Alert>
       )}
 
-      {loading ? (
-        <div className="flex justify-center items-center py-20">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
-        </div>
-      ) : filteredStudents.length === 0 ? (
-        <div className="bg-surface rounded-xl shadow-sm border border-border-strong p-12 text-center">
-          <svg className="mx-auto h-12 w-12 text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-          </svg>
-          <h3 className="text-lg font-medium text-primary mb-1">No students found</h3>
-          <p className="text-muted">
-            {students.length === 0
-              ? "There are no students assigned to any communities yet."
-              : "No students match your current search and filter criteria."}
-          </p>
-          {(searchTerm || selectedCommunity !== 'All') && (
-            <button
-              onClick={() => { setSearchTerm(''); setSelectedCommunity('All'); }}
-              className="mt-4 text-cfss-green hover:text-blue-800 font-medium text-sm"
-            >
-              Clear filters
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="bg-surface rounded-xl shadow-sm border border-border-strong overflow-hidden">
-          <div className="overflow-x-auto">
-            <div className="md:hidden flex flex-col divide-y divide-border">
-              {filteredStudents.map((student) => (
-                <div
-                  key={`mobile-${student.id}`}
-                  onClick={() => handleRowClick(student.id)}
-                  className="p-4 hover:bg-page cursor-pointer transition-colors space-y-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 flex-shrink-0 bg-cfss-green-soft rounded-full flex items-center justify-center text-cfss-green font-bold">
-                      {student.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold text-primary truncate">{student.name}</p>
-                      <p className="text-xs text-muted truncate">{student.email || "No email"}</p>
-                    </div>
-                    <span className="px-2.5 py-1 inline-flex text-[10px] leading-4 font-semibold rounded-full bg-cfss-green-soft text-cfss-green whitespace-nowrap shrink-0">
-                      {student.group_label || `Group ${student.group_number}`}
-                    </span>
-                  </div>
-                  <div className="text-sm text-secondary font-medium">
-                    {student.community_name}
-                  </div>
-                </div>
-              ))}
+      <Card>
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="flex-1">
+              <Input
+                type="text"
+                placeholder="Search by name or index number..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-            <table className="hidden md:table min-w-full divide-y divide-border">
-              <thead className="bg-page">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">
-                    Student / Email
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">
-                    Community
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">
-                    Group
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-surface divide-y divide-border">
-                {filteredStudents.map((student) => (
-                  <tr
-                    key={student.id}
-                    onClick={() => handleRowClick(student.id)}
-                    className="hover:bg-page cursor-pointer transition-colors"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 flex-shrink-0 bg-cfss-green-soft rounded-full flex items-center justify-center text-cfss-green font-bold">
-                          {student.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="ml-4">
+            <div className="sm:w-64">
+              <select
+                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-cfss-green"
+                value={communityFilter}
+                onChange={(e) => setCommunityFilter(e.target.value)}
+              >
+                <option value="">All Communities</option>
+                {communities.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="text-sm text-secondary mb-4">
+            Showing {filteredStudents.length} of {students.length} students
+          </div>
+
+          {filteredStudents.length === 0 ? (
+            <div className="text-center py-12 border-2 border-dashed border-border rounded-lg bg-page">
+              <p className="text-secondary">No students found matching your filters.</p>
+              <Button 
+                variant="outline" 
+                className="mt-4"
+                onClick={() => { setSearchTerm(''); setCommunityFilter(''); }}
+              >
+                Clear Filters
+              </Button>
+            </div>
+          ) : (
+            <div className="border border-border rounded-lg overflow-x-auto bg-surface">
+              <table className="min-w-full divide-y divide-border">
+                <thead className="bg-page">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">
+                      Student
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">
+                      Community Assignment
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">
+                      Group
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border bg-surface">
+                  {filteredStudents.map((student) => (
+                    <tr 
+                      key={student.id} 
+                      className="hover:bg-page cursor-pointer transition-colors"
+                      onClick={() => handleStudentClick(student.id)}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex flex-col">
                           <div className="text-sm font-medium text-primary">{student.name}</div>
+                          <div className="text-sm text-secondary">{student.student_id}</div>
                           <div className="text-sm text-muted">{student.email || "No email"}</div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-primary font-medium">{student.community_name}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800">
-                        {student.group_label || `Group ${student.group_number}`}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-primary font-medium">{student.community_name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-cfss-green-soft text-cfss-green">
+                          {student.group_label || `Group ${student.group_number}`}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Student Details Modal */}
       {(selectedStudent || studentDetailsLoading) && (
         <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-slate-900 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setSelectedStudent(null)}></div>
-
+            <div className="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setSelectedStudent(null)}></div>
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-            <div className="inline-block align-bottom bg-surface rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
+            <div className="inline-block align-bottom bg-surface rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
               {studentDetailsLoading ? (
                 <div className="p-8 flex justify-center items-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cfss-green"></div>
                 </div>
               ) : selectedStudent ? (
                 <>
-                  <div className="bg-surface px-6 pt-6 pb-4 sm:p-6 sm:pb-4">
-                    <div className="sm:flex sm:items-start">
-                      <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-cfss-green-soft sm:mx-0 sm:h-10 sm:w-10">
-                        <svg className="h-6 w-6 text-cfss-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                      </div>
-                      <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                        <h3 className="text-xl leading-6 font-bold text-primary" id="modal-title">
-                          Student Details
-                        </h3>
-                        <div className="mt-4 space-y-4">
-                          <div className="bg-page p-4 rounded-lg border border-slate-100 space-y-3">
-                            <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-muted">Name:</span>
-                              <span className="text-sm font-semibold text-primary col-span-2">{selectedStudent.name}</span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-muted">Index Number:</span>
-                              <span className="text-sm font-semibold text-primary col-span-2">{selectedStudent.student_id}</span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-muted">Gender:</span>
-                              <span className="text-sm text-primary col-span-2">{selectedStudent.gender || 'Not provided'}</span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-muted">Phone:</span>
-                              <span className="text-sm text-primary col-span-2">{selectedStudent.phone_number || 'Not provided'}</span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-muted">Email:</span>
-                              <span className="text-sm text-primary col-span-2">{selectedStudent.email || 'N/A'}</span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-muted">Faculty/School:</span>
-                              <span className="text-sm text-primary col-span-2">{selectedStudent.faculty || 'Not provided'}</span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-muted">Department:</span>
-                              <span className="text-sm text-primary col-span-2">{selectedStudent.program || 'N/A'}</span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-muted">Level:</span>
-                              <span className="text-sm text-primary col-span-2">{selectedStudent.level || 'N/A'}</span>
-                            </div>
+                  <div className="bg-surface px-6 pt-6 pb-4 sm:p-6 sm:pb-4 border-b border-border">
+                    <h3 className="text-lg leading-6 font-bold text-primary mb-4" id="modal-title">
+                      Student Details
+                    </h3>
+                    
+                    <div className="space-y-6">
+                      <div>
+                        <h4 className="text-sm font-semibold text-secondary uppercase tracking-wider mb-3">Profile</h4>
+                        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+                          <div>
+                            <dt className="text-sm font-medium text-muted">Name</dt>
+                            <dd className="text-sm text-primary font-medium">{selectedStudent.name}</dd>
                           </div>
+                          <div>
+                            <dt className="text-sm font-medium text-muted">Index Number</dt>
+                            <dd className="text-sm text-primary font-medium">{selectedStudent.student_id}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-sm font-medium text-muted">Gender</dt>
+                            <dd className="text-sm text-primary">{selectedStudent.gender || 'Not provided'}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-sm font-medium text-muted">Phone</dt>
+                            <dd className="text-sm text-primary">{selectedStudent.phone_number || 'Not provided'}</dd>
+                          </div>
+                          <div className="sm:col-span-2">
+                            <dt className="text-sm font-medium text-muted">Email</dt>
+                            <dd className="text-sm text-primary">{selectedStudent.email || 'N/A'}</dd>
+                          </div>
+                          <div className="sm:col-span-2">
+                            <dt className="text-sm font-medium text-muted">Department</dt>
+                            <dd className="text-sm text-primary">{selectedStudent.program || 'N/A'}</dd>
+                          </div>
+                        </dl>
+                      </div>
 
-                          <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100 space-y-3">
-                            <h4 className="text-sm font-bold text-indigo-900 uppercase tracking-wider mb-2">Assignment</h4>
-                            <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-indigo-700">Community:</span>
-                              <span className="text-sm font-bold text-indigo-900 col-span-2">{selectedStudent.community_name}</span>
+                      <div>
+                        <h4 className="text-sm font-semibold text-secondary uppercase tracking-wider mb-3">Assignment</h4>
+                        <div className="bg-page border border-border rounded p-4">
+                          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+                            <div className="sm:col-span-2">
+                              <dt className="text-sm font-medium text-muted">Community</dt>
+                              <dd className="text-sm text-primary font-semibold">{selectedStudent.community_name}</dd>
                             </div>
-                            <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-indigo-700">Group:</span>
-                              <span className="text-sm font-bold text-indigo-900 col-span-2">{selectedStudent.group_label || `Group ${selectedStudent.group_number}`}</span>
+                            <div>
+                              <dt className="text-sm font-medium text-muted">Group</dt>
+                              <dd className="text-sm text-primary">{selectedStudent.group_label || `Group ${selectedStudent.group_number}`}</dd>
                             </div>
-                            <div className="grid grid-cols-3 gap-2">
-                              <span className="text-sm font-medium text-indigo-700">Location:</span>
-                              <span className="text-sm text-indigo-900 col-span-2">
+                            <div>
+                              <dt className="text-sm font-medium text-muted">Location</dt>
+                              <dd className="text-sm text-primary">
                                 {selectedStudent.district && selectedStudent.region
                                   ? `${selectedStudent.district}, ${selectedStudent.region}`
                                   : "N/A"}
-                              </span>
+                              </dd>
                             </div>
-                          </div>
+                          </dl>
                         </div>
                       </div>
                     </div>
                   </div>
-                  <div className="bg-page px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-border-strong">
-                    <button
-                      type="button"
-                      className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-slate-900 text-base font-medium text-white hover:bg-slate-800 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm transition-colors"
-                      onClick={() => setSelectedStudent(null)}
-                    >
+                  <div className="bg-page px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <Button onClick={() => setSelectedStudent(null)} variant="outline">
                       Close
-                    </button>
+                    </Button>
                   </div>
                 </>
               ) : null}

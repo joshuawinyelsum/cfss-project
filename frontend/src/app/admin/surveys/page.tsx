@@ -4,6 +4,10 @@ import { useEffect, useState, useMemo } from 'react';
 import { useAdminAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Alert } from '@/components/ui/alert';
 
 interface SurveyStats {
   total_surveys: number;
@@ -149,13 +153,13 @@ export default function AdminSurveysPage() {
       {/* Stats Cards */}
       {!loading && stats && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
-          <div className="bg-surface p-5 rounded-xl border border-border-strong shadow-sm flex flex-col">
+          <Card className="p-5 flex flex-col">
             <h3 className="text-sm font-medium text-muted mb-1">Total Surveys</h3>
             <p className="text-3xl font-bold text-primary">{stats.total_surveys}</p>
-          </div>
+          </Card>
           {/* We only show top 3 community counts to save space */}
           {stats.by_community.slice(0, 3).map((comm, idx) => (
-            <div key={idx} className="bg-surface p-5 rounded-xl border border-border-strong shadow-sm flex flex-col hidden sm:flex">
+            <Card key={idx} className="p-5 hidden sm:flex flex-col">
               <h3 className="text-sm font-medium text-muted mb-1 truncate" title={comm.community_name}>
                 {comm.community_name}
               </h3>
@@ -163,7 +167,7 @@ export default function AdminSurveysPage() {
                 <p className="text-3xl font-bold text-primary">{comm.count}</p>
                 <span className="text-sm text-muted mb-1">surveys</span>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}
@@ -183,9 +187,9 @@ export default function AdminSurveysPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
-            <input
+            <Input
               type="text"
-              className="block w-full pl-10 pr-3 py-2 border border-border-strong rounded-lg focus:ring-cfss-green focus:border-cfss-green sm:text-sm shadow-sm disabled:opacity-50"
+              className="pl-10"
               placeholder="Search by student email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -195,7 +199,7 @@ export default function AdminSurveysPage() {
 
           {/* Group Filter */}
           <select
-            className="block w-full sm:w-auto xl:w-40 pl-3 pr-10 py-2 border border-border-strong bg-surface rounded-lg focus:outline-none focus:ring-cfss-green focus:border-cfss-green sm:text-sm shadow-sm disabled:opacity-50"
+            className="block w-full sm:w-auto xl:w-40 px-3 py-2 border border-border-strong bg-surface text-primary rounded-lg focus:outline-none focus:ring-1 focus:ring-cfss-green focus:border-cfss-green sm:text-sm shadow-sm disabled:opacity-50"
             value={selectedGroup}
             onChange={(e) => setSelectedGroup(e.target.value)}
             disabled={loading}
@@ -208,7 +212,7 @@ export default function AdminSurveysPage() {
 
           {/* Community Filter */}
           <select
-            className="block w-full sm:w-auto xl:w-56 pl-3 pr-10 py-2 border border-border-strong bg-surface rounded-lg focus:outline-none focus:ring-cfss-green focus:border-cfss-green sm:text-sm shadow-sm disabled:opacity-50"
+            className="block w-full sm:w-auto xl:w-56 px-3 py-2 border border-border-strong bg-surface text-primary rounded-lg focus:outline-none focus:ring-1 focus:ring-cfss-green focus:border-cfss-green sm:text-sm shadow-sm disabled:opacity-50"
             value={selectedCommunity}
             onChange={(e) => setSelectedCommunity(e.target.value)}
             disabled={loading}
@@ -223,14 +227,7 @@ export default function AdminSurveysPage() {
 
       {/* Error Message */}
       {error && (
-        <div className="bg-status-error/10 border-l-4 border-status-error p-4 rounded-md">
-          <div className="flex items-center">
-            <svg className="w-5 h-5 text-red-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <p className="text-red-700 font-medium text-sm">{error}</p>
-          </div>
-        </div>
+        <Alert variant="destructive" title={error} />
       )}
 
       {/* Main Content Area */}
@@ -239,7 +236,7 @@ export default function AdminSurveysPage() {
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-cfss-green"></div>
         </div>
       ) : filteredSurveys.length === 0 ? (
-        <div className="bg-surface rounded-xl shadow-sm border border-border-strong p-12 text-center">
+        <Card className="p-12 text-center">
           <svg className="mx-auto h-12 w-12 text-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
@@ -250,18 +247,19 @@ export default function AdminSurveysPage() {
               : "No surveys match your current search and filter criteria."}
           </p>
           {(searchTerm || selectedCommunity !== 'All' || selectedGroup !== 'All') && (
-            <button
+            <Button
+              variant="outline"
+              className="mt-4"
               onClick={() => { setSearchTerm(''); setSelectedCommunity('All'); setSelectedGroup('All'); }}
-              className="mt-4 text-cfss-green hover:text-cfss-green-hover font-medium text-sm"
             >
               Clear filters
-            </button>
+            </Button>
           )}
-        </div>
+        </Card>
       ) : (
-        <div className="bg-surface rounded-xl shadow-sm border border-border-strong overflow-hidden">
+        <Card className="overflow-hidden">
           <div className="break-words">
-            <table className="hidden md:table w-full text-sm text-left divide-y divide-border">
+            <table className="hidden md:table w-full text-sm text-left divide-y divide-border-strong">
               <thead className="bg-page">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">
@@ -281,7 +279,7 @@ export default function AdminSurveysPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-surface divide-y divide-border">
+              <tbody className="bg-surface divide-y divide-border-strong">
                 {filteredSurveys.map((survey) => (
                   <tr
                     key={survey.id}
@@ -291,7 +289,7 @@ export default function AdminSurveysPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center">
                         <div className="text-sm font-medium text-primary">{survey.student_name || "Anonymous"}</div>
-                          <div className="text-xs text-muted">{survey.student_id}</div>
+                          <div className="text-xs text-muted ml-2">{survey.student_id}</div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -323,7 +321,7 @@ export default function AdminSurveysPage() {
             </div>
 
             {/* Mobile Cards */}
-            <div className="md:hidden flex flex-col divide-y divide-border">
+            <div className="md:hidden flex flex-col divide-y divide-border-strong">
               {filteredSurveys.map((survey) => (
                 <div
                   key={`mobile-${survey.id}`}
@@ -359,18 +357,18 @@ export default function AdminSurveysPage() {
               ))}
             </div>
 
-        </div>
+        </Card>
       )}
 
       {/* Survey Details Modal */}
       {(selectedSurvey || surveyDetailsLoading) && (
         <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-black/50 transition-opacity" aria-hidden="true" onClick={() => setSelectedSurvey(null)}></div>
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" aria-hidden="true" onClick={() => setSelectedSurvey(null)}></div>
 
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-            <div className="inline-block align-bottom bg-surface rounded-t-xl sm:rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-full flex flex-col max-h-[90vh] sm:max-h-none">
+            <Card className="inline-block align-bottom rounded-t-xl sm:rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-full flex flex-col max-h-[90vh] sm:max-h-none border-0">
               {surveyDetailsLoading ? (
                 <div className="p-12 flex flex-col justify-center items-center">
                   <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-cfss-green mb-4"></div>
@@ -387,7 +385,7 @@ export default function AdminSurveysPage() {
                         {selectedSurvey.type} Survey
                       </p>
                     </div>
-                    <button onClick={() => setSelectedSurvey(null)} className="text-muted hover:text-muted">
+                    <button onClick={() => setSelectedSurvey(null)} className="text-muted hover:text-primary transition-colors">
                       <span className="sr-only">Close</span>
                       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -465,20 +463,21 @@ export default function AdminSurveysPage() {
                   </div>
 
                   <div className="bg-page px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-border-strong">
-                    <button
-                      type="button"
-                      className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-cfss-green text-base font-medium text-white hover:bg-cfss-green-hover focus:outline-none sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+                    <Button
+                      variant="default"
                       onClick={() => setSelectedSurvey(null)}
+                      className="w-full sm:w-auto"
                     >
                       Close
-                    </button>
+                    </Button>
                   </div>
                 </>
               ) : null}
-            </div>
+            </Card>
           </div>
         </div>
       )}
     </div>
   );
 }
+

@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { useAdminAuthStore } from '@/lib/store';
-import { useRouter } from 'next/navigation';
-import { api, getErrorMessage } from '@/lib/api';
+import { useEffect, useState, useMemo } from 'react';
+import { api } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Alert } from '@/components/ui/alert';
 
 interface Community {
   id: string;
@@ -15,294 +18,240 @@ interface Community {
   slots_remaining: number;
   group_number: number;
   group_label: string;
+  created_at: string;
 }
 
-interface Student {
-  id: string;
-  student_id: string;
-  name: string;
-  email: string;
-  program: string;
-  level: number;
-  community_id: string;
-}
-
-export default function CommunitiesPage() {
-  const { user, token } = useAdminAuthStore();
-  const router = useRouter();
-
+export default function AdminCommunitiesPage() {
   const [communities, setCommunities] = useState<Community[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   
-  // Create form state
+  const [searchTerm, setSearchTerm] = useState('');
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newComm, setNewComm] = useState({ name: '', district: '', region: '', capacity: 10 });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
-  const [loading, setLoading] = useState(true);
 
-  // Selected community state (for viewing students)
   const [selectedCommunity, setSelectedCommunity] = useState<Community | null>(null);
+  const [communityStudents, setCommunityStudents] = useState<any[]>([]);
 
-  const fetchData = async () => {
-    if (!token) return;
-    setLoading(true);
+  useEffect(() => {
+    fetchCommunities();
+  }, []);
+
+  const fetchCommunities = async () => {
     try {
-      const opts = { headers: { Authorization: `Bearer ${token}` } };
-      const [commRes, studRes] = await Promise.all([
-        api.get('/api/admin/communities', opts),
-        api.get('/api/admin/students', opts)
-      ]);
-      setCommunities(commRes.data);
-      setStudents(studRes.data);
-    } catch (e) {
-      console.error(e);
+      const res = await api.get('/api/admin/communities');
+      setCommunities(res.data);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load communities');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (!user || user.role !== 'admin') {
-      router.push('/admin/login');
-      return;
-    }
-    
-    const timeoutId = window.setTimeout(() => {
-      void fetchData();
-    }, 0);
-
-    return () => window.clearTimeout(timeoutId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, router, token]);
+  const filteredCommunities = useMemo(() => {
+    return communities.filter(c => 
+      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.district.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [communities, searchTerm]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreating(true);
     setCreateError('');
     try {
-      await api.post('/api/admin/communities', newComm, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setNewComm({ name: '', district: '', region: '', capacity: 10 });
+      await api.post('/api/admin/communities', newComm);
+      await fetchCommunities();
       setShowCreateModal(false);
-      // Data reliability requirement: fetch after create
-      await fetchData();
-    } catch (err: unknown) {
-      setCreateError(getErrorMessage(err, "Failed to create community"));
+      setNewComm({ name: '', district: '', region: '', capacity: 10 });
+    } catch (err: any) {
+      console.error(err);
+      setCreateError(err.response?.data?.detail || 'Failed to create community');
     } finally {
       setCreating(false);
     }
   };
 
-  const handleDeleteCommunity = async (e: React.MouseEvent, comm: Community) => {
-    e.stopPropagation(); // Prevent opening the community details
-    if (comm.student_count > 0) {
-      alert("Cannot delete community with assigned students.");
-      return;
-    }
-    if (!confirm(`Are you sure you want to delete the community "${comm.name}"?`)) {
-      return;
-    }
+  const handleViewCommunity = async (comm: Community) => {
+    setSelectedCommunity(comm);
     try {
-      await api.delete(`/api/admin/communities/${comm.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      // Refresh the list
-      await fetchData();
-      if (selectedCommunity?.id === comm.id) {
-        setSelectedCommunity(null);
-      }
-    } catch (err: unknown) {
-      alert(getErrorMessage(err, "Failed to delete community"));
+      const res = await api.get('/api/admin/users/students');
+      const students = res.data.filter((s: any) => s.community_id === comm.id);
+      setCommunityStudents(students);
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  const communityStudents = selectedCommunity 
-    ? students.filter(s => s.community_id === selectedCommunity.id)
-    : [];
+  if (loading) {
+    return <div className="p-8 text-center text-secondary">Loading communities...</div>;
+  }
 
   return (
     <div className="space-y-6">
-      
-      <div className="flex items-center justify-between">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Communities & Groups</h1>
-          <p className="text-sm text-slate-500 mt-1">Manage capacity and group assignments</p>
+          <h1 className="text-2xl font-bold text-primary">Communities</h1>
+          <p className="text-secondary mt-1 text-sm">Manage fieldwork locations and capacities.</p>
         </div>
-        <button 
-          onClick={() => setShowCreateModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 px-5 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-          Create Community
-        </button>
+        <Button onClick={() => setShowCreateModal(true)}>
+          + Add Community
+        </Button>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center items-center py-20">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {communities.map(comm => {
-          const isFull = comm.student_count >= comm.capacity;
-          
-          return (
-            <div 
-              key={comm.id}
-              onClick={() => setSelectedCommunity(comm)}
-              className={`bg-white rounded-xl shadow-sm border ${isFull ? 'border-red-200 hover:border-red-300' : 'border-slate-200 hover:border-blue-300'} p-5 cursor-pointer transition-all hover:shadow-md relative overflow-hidden group`}
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="font-bold text-lg text-slate-900 leading-tight group-hover:text-blue-600 transition-colors">{comm.name}</h3>
-                  <p className="text-sm font-medium text-slate-500 mt-0.5">{comm.group_label}</p>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  {isFull && (
-                    <span className="bg-red-50 text-red-600 text-[10px] font-bold px-2 py-1 rounded border border-red-100 uppercase tracking-wide">
-                      Full
-                    </span>
-                  )}
-                  <button 
-                    onClick={(e) => handleDeleteCommunity(e, comm)}
-                    className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                    title="Delete community"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                  </button>
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  {comm.district}, {comm.region}
-                </div>
-                
-                <div className="pt-2 border-t border-slate-100">
-                  <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Capacity</span>
-                    <span className={`text-sm font-bold ${isFull ? 'text-red-600' : 'text-slate-700'}`}>
-                      {comm.student_count} / {comm.capacity} {isFull && '(FULL)'}
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full transition-all ${isFull ? 'bg-red-500' : 'bg-blue-500'}`}
-                      style={{ width: `${Math.min(100, (comm.student_count / comm.capacity) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+      {error && (
+        <Alert variant="destructive">
+          {error}
+        </Alert>
+      )}
 
-      {communities.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-xl border border-dashed border-slate-300">
-          <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+      <Card>
+        <CardContent className="p-4 sm:p-6">
+          <div className="mb-6">
+            <Input
+              type="text"
+              placeholder="Search by community or district name..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="max-w-md"
+            />
           </div>
-          <h3 className="text-lg font-bold text-slate-900 mb-1">No Communities Found</h3>
-          <p className="text-sm text-slate-500 mb-4">Get started by creating your first community</p>
-          <button 
-            onClick={() => setShowCreateModal(true)}
-            className="text-blue-600 font-semibold hover:underline"
-          >
-            Create Community
-          </button>
-        </div>
-      )}
-      </>
-      )}
+
+          <div className="border border-border rounded-lg overflow-x-auto bg-surface">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-page">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Community</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Location</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Group</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Capacity</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border bg-surface">
+                {filteredCommunities.map((comm) => {
+                  const isFull = comm.student_count >= comm.capacity;
+                  return (
+                    <tr 
+                      key={comm.id} 
+                      className="hover:bg-page cursor-pointer transition-colors"
+                      onClick={() => handleViewCommunity(comm)}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-primary">{comm.name}</div>
+                        <div className="text-xs text-muted mt-1">{comm.student_count} assigned</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-primary">{comm.district}</div>
+                        <div className="text-xs text-secondary">{comm.region}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-cfss-green-soft text-cfss-green">
+                          {comm.group_label}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 bg-border-strong rounded-full h-1.5 overflow-hidden">
+                            <div 
+                              className={`h-full ${isFull ? 'bg-red-500' : 'bg-cfss-green'}`} 
+                              style={{ width: `${Math.min(100, (comm.student_count / comm.capacity) * 100)}%` }}
+                            ></div>
+                          </div>
+                          <span className={`text-xs font-medium ${isFull ? 'text-red-600' : 'text-secondary'}`}>
+                            {comm.slots_remaining} left
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* CREATE MODAL */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <h2 className="text-lg font-bold text-slate-900">Create New Community</h2>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50">
+          <div className="bg-surface rounded-lg w-full max-w-md shadow-lg overflow-hidden">
+            <div className="px-6 py-4 border-b border-border bg-page">
+              <h2 className="text-lg font-bold text-primary">Add New Community</h2>
             </div>
             
             <form onSubmit={handleCreate} className="p-6 space-y-4">
               {createError && (
-                <div className="p-3 bg-red-50 text-red-600 text-sm font-medium rounded-lg border border-red-100">
+                <Alert variant="destructive">
                   {createError}
-                </div>
+                </Alert>
               )}
               
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Community Name</label>
-                <input 
+                <Label>Community Name</Label>
+                <Input 
                   type="text" 
                   required
                   value={newComm.name}
                   onChange={e => setNewComm({...newComm, name: e.target.value})}
-                  className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g. Asuboi Community"
                 />
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">District</label>
-                  <input 
+                  <Label>District</Label>
+                  <Input 
                     type="text" 
                     required
                     value={newComm.district}
                     onChange={e => setNewComm({...newComm, district: e.target.value})}
-                    className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g. Ayensuano"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Region</label>
-                  <input 
+                  <Label>Region</Label>
+                  <Input 
                     type="text" 
                     required
                     value={newComm.region}
                     onChange={e => setNewComm({...newComm, region: e.target.value})}
-                    className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g. Eastern"
                   />
                 </div>
               </div>
               
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Capacity</label>
-                <input 
+                <Label>Capacity</Label>
+                <Input 
                   type="number" 
                   min="1"
                   required
                   value={newComm.capacity}
                   onChange={e => setNewComm({...newComm, capacity: parseInt(e.target.value) || 0})}
-                  className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <p className="text-xs text-slate-500 mt-1.5">Maximum number of students allowed in this community.</p>
+                <p className="text-xs text-muted mt-1">Maximum number of students allowed.</p>
               </div>
               
               <div className="pt-4 flex gap-3">
-                <button 
+                <Button 
                   type="button" 
+                  variant="outline"
                   onClick={() => setShowCreateModal(false)}
-                  className="flex-1 bg-white border border-slate-200 text-slate-700 font-bold py-2.5 rounded-lg hover:bg-slate-50 transition-colors"
+                  className="flex-1"
                 >
                   Cancel
-                </button>
-                <button 
+                </Button>
+                <Button 
                   type="submit" 
                   disabled={creating}
-                  className="flex-1 bg-blue-600 text-white font-bold py-2.5 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  className="flex-1"
                 >
                   {creating ? 'Creating...' : 'Create Community'}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -311,80 +260,67 @@ export default function CommunitiesPage() {
 
       {/* VIEW COMMUNITY DETAILS MODAL */}
       {selectedCommunity && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/30 backdrop-blur-sm">
-          <div className="bg-white h-full w-full max-w-md shadow-2xl flex flex-col animate-slide-in-right">
-            
-            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-start bg-slate-50">
+        <div className="fixed inset-0 z-50 flex justify-end bg-gray-900/50">
+          <div className="bg-surface h-full w-full max-w-md shadow-2xl flex flex-col">
+            <div className="px-6 py-5 border-b border-border flex justify-between items-start bg-page">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">{selectedCommunity.name}</h2>
+                <h2 className="text-xl font-bold text-primary">{selectedCommunity.name}</h2>
                 <div className="flex items-center gap-3 mt-1.5">
-                  <span className="bg-blue-100 text-blue-700 font-bold text-xs px-2.5 py-0.5 rounded uppercase tracking-wide">
+                  <span className="bg-cfss-green-soft text-cfss-green font-bold text-xs px-2.5 py-0.5 rounded uppercase tracking-wide">
                     {selectedCommunity.group_label}
                   </span>
-                  <span className="text-sm font-medium text-slate-500">
+                  <span className="text-sm font-medium text-secondary">
                     {selectedCommunity.district}, {selectedCommunity.region}
                   </span>
                 </div>
               </div>
-              <button onClick={() => setSelectedCommunity(null)} className="text-slate-400 hover:text-slate-600 bg-white rounded-full p-1 shadow-sm border border-slate-200">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
+              <Button variant="ghost" onClick={() => setSelectedCommunity(null)}>
+                X
+              </Button>
             </div>
             
-            <div className="p-6 border-b border-slate-100">
+            <div className="p-6 border-b border-border">
               <div className="flex justify-between items-center mb-2">
-                <h3 className="font-bold text-slate-900">Capacity Status</h3>
-                <span className="text-sm font-bold text-slate-700">{selectedCommunity.student_count} / {selectedCommunity.capacity}</span>
+                <h3 className="font-bold text-primary">Capacity Status</h3>
+                <span className="text-sm font-bold text-primary">{selectedCommunity.student_count} / {selectedCommunity.capacity}</span>
               </div>
-              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden mb-2">
+              <div className="w-full bg-border-strong rounded-full h-2 overflow-hidden mb-2">
                 <div 
-                  className={`h-full rounded-full transition-all ${selectedCommunity.student_count >= selectedCommunity.capacity ? 'bg-red-500' : 'bg-emerald-500'}`}
+                  className={`h-full rounded-full transition-all ${selectedCommunity.student_count >= selectedCommunity.capacity ? 'bg-red-500' : 'bg-cfss-green'}`}
                   style={{ width: `${Math.min(100, (selectedCommunity.student_count / selectedCommunity.capacity) * 100)}%` }}
                 />
               </div>
-              <p className="text-xs font-medium text-slate-500">{selectedCommunity.slots_remaining} slots remaining</p>
+              <p className="text-xs font-medium text-secondary">{selectedCommunity.slots_remaining} slots remaining</p>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
-              <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+            <div className="flex-1 overflow-y-auto p-6 bg-page">
+              <h3 className="font-bold text-primary mb-4 flex items-center gap-2">
                 Assigned Students ({communityStudents.length})
               </h3>
               
               {communityStudents.length === 0 ? (
-                <div className="text-center py-8 text-slate-500 text-sm">
+                <div className="text-center py-8 text-secondary text-sm">
                   No students assigned to this community yet.
                 </div>
               ) : (
                 <div className="space-y-3">
                   {communityStudents.map(student => (
-                    <div key={student.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">
+                    <div key={student.id} className="bg-surface p-4 rounded border border-border shadow-sm flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-page border border-border text-primary flex items-center justify-center font-bold text-xs shrink-0">
                         {student.name.substring(0,2).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-sm text-slate-900 truncate">{student.name}</p>
-                        <p className="text-xs text-slate-500 truncate">{student.student_id} • {student.program}</p>
+                        <p className="font-bold text-sm text-primary truncate">{student.name}</p>
+                        <p className="text-xs text-secondary truncate">{student.student_id} • {student.program}</p>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-            
           </div>
         </div>
       )}
-
-      <style jsx global>{`
-        @keyframes slide-in-right {
-          from { transform: translateX(100%); }
-          to { transform: translateX(0); }
-        }
-        .animate-slide-in-right {
-          animation: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-      `}</style>
     </div>
   );
 }
