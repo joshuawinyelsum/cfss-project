@@ -6,7 +6,7 @@ import { Users, RefreshCw, User as UserIcon, Settings, ChevronRight } from 'luci
 export default function MorePage() {
   const menuItems = [
     { name: 'My Group', href: '/dashboard/group', icon: Users, description: 'View your fieldwork group members' },
-    { name: 'Sync & Activity', href: '/dashboard/sync', icon: RefreshCw, description: 'Manage offline synchronization' },
+    { name: 'Sync & Activity', href: '/dashboard/work/attention', icon: RefreshCw, description: 'Manage offline synchronization' },
     { name: 'Profile', href: '/profile', icon: UserIcon, description: 'View your student profile' },
     { name: 'Settings', href: '/settings', icon: Settings, description: 'App preferences and configuration' },
   ];

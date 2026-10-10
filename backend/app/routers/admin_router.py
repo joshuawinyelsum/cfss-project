@@ -324,8 +324,10 @@ async def get_survey(survey_id: str, db: AsyncSession = Depends(get_db_and_admin
         raise HTTPException(status_code=404, detail="Survey not found")
         
     survey, user, comm = row
-    answers = await db.execute(
-        select(models.SurveyAnswer).where(models.SurveyAnswer.survey_record_id == survey.id)
+    answers_result = await db.execute(
+        select(models.SurveyAnswer, models.SurveyQuestion.question_text)
+        .join(models.SurveyQuestion, models.SurveyAnswer.question_id == models.SurveyQuestion.id)
+        .where(models.SurveyAnswer.survey_record_id == survey.id)
     )
     return {
         "id": str(survey.id),
@@ -339,7 +341,7 @@ async def get_survey(survey_id: str, db: AsyncSession = Depends(get_db_and_admin
         "submitted_at": survey.submitted_at or survey.created_at,
         "status": survey.status,
         "type": survey.survey_type,
-        "responses": {answer.question_id: answer.answer for answer in answers.scalars()}
+        "responses": {question_text: answer.answer for answer, question_text in answers_result.all()}
     }
 
 @router.get("/students", response_model=List[schemas.UserResponse])

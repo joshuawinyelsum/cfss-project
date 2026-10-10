@@ -9,6 +9,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert } from '@/components/ui/alert';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 export default function AdminDashboard() {
   const { user, token, logout } = useAdminAuthStore();
@@ -101,6 +103,40 @@ export default function AdminDashboard() {
       await downloadExport('/admin/export/surveys', 'surveys_export.csv', token!);
     } catch (e) {
       alert("Export failed. Check server.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportReportsPDF = () => {
+    try {
+      setExporting(true);
+      const doc = new (jsPDF as any)();
+      doc.setFontSize(18);
+      doc.text('CFSS Admin Dashboard Report', 14, 22);
+      
+      doc.setFontSize(11);
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 30);
+      
+      doc.setFontSize(14);
+      doc.text('Overview Statistics', 14, 45);
+      
+      const statsData = [
+        ['Total Students', students.length],
+        ['Total Communities', communities.length],
+        ['Total Surveys Submitted', surveys.length]
+      ];
+      
+      doc.autoTable({
+        startY: 50,
+        head: [['Metric', 'Value']],
+        body: statsData,
+        headStyles: { fillColor: [41, 128, 185] }
+      });
+      
+      doc.save(`cfss_admin_report_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (e) {
+      alert("Failed to generate PDF report.");
     } finally {
       setExporting(false);
     }
@@ -478,7 +514,7 @@ export default function AdminDashboard() {
                  <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                  Export Surveys (CSV)
               </Button>
-              <Button variant="outline" className="w-full justify-start text-primary">
+              <Button variant="outline" onClick={handleExportReportsPDF} disabled={exporting} className="w-full justify-start text-primary">
                  <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                  Export Reports (PDF)
               </Button>

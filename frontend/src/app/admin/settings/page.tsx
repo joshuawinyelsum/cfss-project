@@ -29,6 +29,8 @@ export default function SettingsPage() {
     fetchSettings();
   }, []);
 
+  const [adminPasswordForSettings, setAdminPasswordForSettings] = useState('');
+
   const fetchSettings = async () => {
     try {
       const res = await api.get('/api/admin/settings');
@@ -44,14 +46,23 @@ export default function SettingsPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!adminPasswordForSettings) {
+      setMsg('Admin password is required to save settings.');
+      setMsgType('error');
+      return;
+    }
     setSaving(true);
     setMsg('');
     try {
-      await api.put('/api/admin/settings', settings);
+      await api.put('/api/admin/settings', {
+        ...settings,
+        admin_password: adminPasswordForSettings
+      });
       setMsg('Configuration saved successfully');
       setMsgType('success');
+      setAdminPasswordForSettings('');
     } catch (err: any) {
-      setMsg('Failed to save configuration');
+      setMsg(err.response?.data?.detail || 'Failed to save configuration');
       setMsgType('error');
     } finally {
       setSaving(false);
@@ -63,7 +74,7 @@ export default function SettingsPage() {
     setPasswordSaving(true);
     setPasswordMsg('');
     try {
-      await api.put('/api/admin/settings/password', {
+      await api.post('/api/admin/change-password', {
         current_password: currentPassword,
         new_password: newPassword
       });
@@ -193,7 +204,18 @@ export default function SettingsPage() {
               </select>
             </div>
           </CardContent>
-          <CardFooter className="justify-end">
+          <CardFooter className="flex flex-col sm:flex-row items-end sm:items-center justify-between gap-4">
+            <div className="flex-1 w-full sm:w-auto">
+              <Label className="text-sm font-semibold mb-2 block text-primary">Admin Password <span className="text-status-error">*</span></Label>
+              <Input
+                type="password"
+                placeholder="Enter current admin password to save changes"
+                value={adminPasswordForSettings}
+                onChange={(e) => setAdminPasswordForSettings(e.target.value)}
+                className="w-full sm:w-64 border-cfss-green/30 focus:border-cfss-green bg-cfss-green/5"
+                required
+              />
+            </div>
             <Button type="submit" disabled={saving}>
               {saving ? 'Saving...' : 'Save Configuration'}
             </Button>

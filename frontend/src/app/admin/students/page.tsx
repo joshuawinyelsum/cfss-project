@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert } from '@/components/ui/alert';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 interface Student {
   id: string;
@@ -42,7 +44,7 @@ export default function AdminStudentsPage() {
 
   const fetchStudents = async () => {
     try {
-      const res = await api.get('/api/admin/users/students');
+      const res = await api.get('/api/admin/students');
       setStudents(res.data);
     } catch (err) {
       console.error(err);
@@ -50,6 +52,35 @@ export default function AdminStudentsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const exportToPDF = () => {
+    const doc = new (jsPDF as any)();
+    doc.setFontSize(16);
+    doc.text('Students List', 14, 20);
+    
+    doc.setFontSize(10);
+    doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, 28);
+    
+    const tableColumn = ["Index Number", "Name", "Email", "Department", "Community", "Group"];
+    const tableRows = filteredStudents.map(student => [
+      student.student_id || 'N/A',
+      student.name || 'N/A',
+      student.email || 'N/A',
+      student.program || 'N/A',
+      student.community_name || 'N/A',
+      student.group_number || 'N/A'
+    ]);
+    
+    doc.autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: 35,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [41, 128, 185] }
+    });
+    
+    doc.save(`cfss_students_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   const communities = useMemo(() => {
@@ -71,7 +102,7 @@ export default function AdminStudentsPage() {
     setStudentDetailsLoading(true);
     setError('');
     try {
-      const res = await api.get(`/api/admin/users/students/${studentId}`);
+      const res = await api.get(`/api/admin/students/${studentId}`);
       setSelectedStudent(res.data);
     } catch (err) {
       console.error(err);
@@ -92,6 +123,10 @@ export default function AdminStudentsPage() {
           <h1 className="text-2xl font-bold text-primary">Students</h1>
           <p className="text-secondary mt-1 text-sm">Manage enrolled students and community assignments.</p>
         </div>
+        <Button onClick={exportToPDF} variant="outline" className="flex items-center gap-2">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+          Export PDF
+        </Button>
       </div>
 
       {error && (
