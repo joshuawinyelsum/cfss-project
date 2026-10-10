@@ -47,22 +47,25 @@ function ProvisioningScreen({ user, token, logout }: { user: { id: number | null
     };
   }, []);
 
+  // Check once on initial mount if an active provisioning state was interrupted by a previous page reload
   useEffect(() => {
-    // If the component mounts and the status is an "active" provisioning state, 
-    // it means the previous attempt was interrupted by a page reload.
-    if (['PROVISIONING_DEVICE', 'PROVISIONING_DATA', 'VERIFYING_LOCAL_STATE'].includes(status)) {
+    const initialStatus = useAuthStore.getState().provisionedUsers[user.id ?? -1]?.status;
+    if (['PROVISIONING_DEVICE', 'PROVISIONING_DATA', 'VERIFYING_LOCAL_STATE'].includes(initialStatus || '')) {
       if (user.id) setStatus(user.id, 'PROVISIONING_FAILED');
-      return;
     }
+  }, [user.id, setStatus]);
 
+  useEffect(() => {
     if (status === 'UNPROVISIONED' && !retrying) {
       if (isOffline) {
         // Do not attempt provisioning if we are offline and unprovisioned
         return;
       }
-      if (user.id) import('@/lib/provisioning').then(m => m.executeProvisioning(user.id as number, token).finally(() => setRetrying(false)));
+      if (user.id) {
+        import('@/lib/provisioning').then(m => m.executeProvisioning(user.id as number, token).finally(() => setRetrying(false)));
+      }
     }
-  }, [status, retrying, user.id, token, setStatus, isOffline]);
+  }, [status, retrying, user.id, token, isOffline]);
 
   const handleRetry = () => {
     if (isOffline) return;
@@ -332,7 +335,7 @@ export default function DashboardLayout({
     { name: 'My Group', href: '/dashboard/group', icon: Users },
     { name: 'Sync & Activity', href: '/dashboard/work/attention', icon: RefreshCw },
     { name: 'Profile', href: '/profile', icon: UserIcon },
-    { name: 'Settings', href: '/settings', icon: Settings },
+    { name: 'Settings', href: '/dashboard/settings', icon: Settings },
   ];
 
   const mobileNavItems = [

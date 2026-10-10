@@ -15,15 +15,15 @@ export async function executeProvisioning(userId: number, token: string): Promis
     // This minimizes the transaction lifespan and prevents Dexie transaction aborts
     // which occur if we await network calls inside the transaction.
     
-    const definitionsData: { type: string; questions: Record<string, unknown>[] }[] = [];
-    for (const type of types) {
+    const { normalizeSurveyType } = await import('@/lib/surveyType');
+    const questionPromises = types.map(async (type) => {
       const qRes = await api.get("/api/student/surveys/questions", { 
         params: { type },
         headers: { Authorization: `Bearer ${token}` }
       });
-      const { normalizeSurveyType } = await import('@/lib/surveyType');
-      definitionsData.push({ type: normalizeSurveyType(type), questions: qRes.data });
-    }
+      return { type: normalizeSurveyType(type), questions: qRes.data };
+    });
+    const definitionsData = await Promise.all(questionPromises);
 
     setStatus(userId, "PROVISIONING_DATA");
     
@@ -66,6 +66,7 @@ export async function executeProvisioning(userId: number, token: string): Promis
              answers: s.answers,
              status: s.status,
              sync_status: "synced", // Historical server records are fully synced
+             server_synced: true,
              created_at: s.created_at || now,
              updated_at: s.updated_at || now,
              submitted_at: s.submitted_at || undefined

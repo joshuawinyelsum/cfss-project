@@ -93,31 +93,30 @@ export const syncEngine = {
         if (!op) continue;
 
         if (result.success) {
-          await db.sync_operations.delete(op.id);
+          await db.transaction('rw', [db.surveys, db.features, db.communities, db.sync_operations], async () => {
+            await db.sync_operations.delete(op.id);
 
-          if (op.operation_type === 'DELETE') {
-            if (op.entity_type === 'FEATURE') {
-              await db.features.delete(op.entity_id);
-            } else {
-              await db.surveys.delete(op.entity_id);
-            }
-          } else {
-            const store = getStore(op.entity_type);
-            const record = await (store as any).get(getId(op.entity_type, op.entity_id));
-            if (record) {
-              if (record.sync_status === 'syncing') {
-                await (store as any).update(op.entity_id, {
-                  sync_status: 'synced',
-                  sync_error: undefined,
-                  entity_id: result.house_number || record.entity_id
-                });
+            if (op.operation_type === 'DELETE') {
+              if (op.entity_type === 'FEATURE') {
+                await db.features.delete(op.entity_id);
               } else {
-                await (store as any).update(op.entity_id, {
-                  entity_id: result.house_number || record.entity_id
-                });
+                await db.surveys.delete(op.entity_id);
+              }
+            } else {
+              const store = getStore(op.entity_type);
+              const targetId = getId(op.entity_type, op.entity_id);
+              const record = await (store as any).get(targetId);
+              if (record) {
+                const updates: any = {
+                  entity_id: result.house_number || record.entity_id,
+                  server_synced: true,
+                  sync_status: 'synced',
+                  sync_error: undefined
+                };
+                await (store as any).update(targetId, updates);
               }
             }
-          }
+          });
         } else {
           const isFatal = result.error?.includes('400') || result.error?.includes('403') || result.error?.includes('Cannot revert') || result.error?.includes('Cannot update a deleted');
           
@@ -161,21 +160,26 @@ export const syncEngine = {
     } catch (error: unknown) {
       console.error("Sync Engine Error:", error);
       
-      const axiosErr = error as { response?: { status?: number } };
+      const axiosErr = error as { response?: { status?: number, data?: unknown }, message?: string };
       if (axiosErr.response?.status === 401) {
         useAuthStore.getState().logout();
       }
+
+      const errorMsg = axiosErr.response?.status === 401
+        ? "Session expired."
+        : (axiosErr.response?.data ? JSON.stringify(axiosErr.response.data) : (axiosErr.message || "Network error. Will retry when connected."));
 
       const userOperations = await db.sync_operations.where('student_id').equals(userId).toArray();
       const syncingItems = userOperations.filter(s => s.status === 'SYNCING');
       for (const item of syncingItems) {
         await db.sync_operations.update(item.id, {
           status: 'FAILED',
-          last_error: axiosErr.response?.status === 401 ? "Session expired." : "Network error"
+          last_error: errorMsg,
+          retry_count: (item.retry_count || 0) + 1
         });
         if (item.operation_type !== 'DELETE') {
            const store = getStore(item.entity_type);
-           await (store as any).update(getId(item.entity_type, item.entity_id), { sync_status: 'failed' });
+           await (store as any).update(getId(item.entity_type, item.entity_id), { sync_status: 'failed', sync_error: errorMsg });
         }
       }
     } finally {
@@ -196,78 +200,104 @@ export const syncEngine = {
     const userId = useAuthStore.getState().user?.id;
     if (!userId) return;
 
-    // A delete is terminal for this local record. Do not let a late form save
-    // recreate it while its deletion is waiting to be acknowledged.
-    const existingOps = await db.sync_operations.where('entity_id').equals(entityId).toArray();
-    if (operationType !== 'DELETE' && existingOps.some(op => op.operation_type === 'DELETE')) {
+    // Atomically execute local entity write and sync operation queueing in a Dexie transaction
+    await db.transaction('rw', [db.surveys, db.features, db.communities, db.sync_operations], async () => {
+      const store = getStore(entityType);
+      const targetId = getId(entityType, entityId);
+      const existingOps = await db.sync_operations.where('entity_id').equals(entityId).toArray();
+
+      // If a DELETE is already queued for this record, do not allow subsequent writes to recreate or update it
+      if (operationType !== 'DELETE' && existingOps.some(op => op.operation_type === 'DELETE')) {
         return;
-    }
+      }
 
-    if (operationType !== 'DELETE' && payload) {
-        payload.sync_status = 'pending';
-        payload.updated_at = new Date().toISOString();
-        const store = getStore(entityType);
-        await (store as any).put(payload);
-    }
+      const pendingOps = existingOps.filter(op => op.status === 'PENDING' || op.status === 'FAILED' || op.status === 'SYNCING');
 
-    // Coalescing logic
-    const pendingOps = existingOps.filter(op => op.status === 'PENDING' || op.status === 'FAILED');
+      if (operationType === 'DELETE') {
+        const hasCreate = pendingOps.some(o => o.operation_type === 'CREATE');
+        for (const op of pendingOps) {
+          await db.sync_operations.delete(op.id);
+        }
 
-    if (operationType === 'DELETE') {
-       // If there's a pending CREATE that never reached the server, just delete locally
-       const hasCreate = pendingOps.some(o => o.operation_type === 'CREATE');
-       
-       for (const op of pendingOps) {
-           await db.sync_operations.delete(op.id);
-       }
-       
-       if (hasCreate) {
-           const store = getStore(entityType);
-           await (store as any).delete(getId(entityType, entityId));
-           window.dispatchEvent(new Event('sync-queued'));
-           return; // Stop here, no need to tell the server
-       } else {
-           // Mark local survey as pending delete so UI can hide it
-           const store = getStore(entityType);
-           await (store as any).update(getId(entityType, entityId), { sync_status: 'pending', status: 'DELETED' });
-       }
-    } else if (operationType === 'UPDATE') {
-       const hasCreate = pendingOps.find(o => o.operation_type === 'CREATE');
-       if (hasCreate) {
-           // Coalesce into the existing CREATE
-           await db.sync_operations.update(hasCreate.id, { payload: payload === null ? undefined : payload, status: 'PENDING' });
-           for (const op of pendingOps) {
-               if (op.id !== hasCreate.id) await db.sync_operations.delete(op.id);
-           }
-           window.dispatchEvent(new Event('sync-queued'));
-           if (navigator.onLine) this.processQueue(token);
-           return;
-       }
-       
-       const hasUpdate = pendingOps.find(o => o.operation_type === 'UPDATE');
-       if (hasUpdate) {
-           // Coalesce into existing UPDATE
-           await db.sync_operations.update(hasUpdate.id, { payload: payload === null ? undefined : payload, status: 'PENDING' });
-           window.dispatchEvent(new Event('sync-queued'));
-           if (navigator.onLine) this.processQueue(token);
-           return;
-       }
-    }
+        if (hasCreate) {
+          // Never reached the server, delete locally only
+          await (store as any).delete(targetId);
+          return;
+        } else {
+          // Already synced on server: mark as soft-deleted locally and queue server DELETE
+          await (store as any).update(targetId, {
+            sync_status: 'pending',
+            status: 'DELETED',
+            updated_at: new Date().toISOString()
+          });
+          const delOp: SyncOperation = {
+            id: crypto.randomUUID(),
+            student_id: userId,
+            operation_type: 'DELETE',
+            entity_type: entityType,
+            entity_id: entityId,
+            status: 'PENDING',
+            retry_count: 0,
+            created_at: new Date().toISOString()
+          };
+          await db.sync_operations.put(delOp);
+        }
+      } else {
+        // CREATE or UPDATE
+        if (payload) {
+          payload.sync_status = 'pending';
+          payload.updated_at = new Date().toISOString();
+          await (store as any).put(payload);
+        }
 
-    // If no coalescing, add new operation
-    const op: SyncOperation = {
-        id: crypto.randomUUID(),
-        student_id: userId,
-        operation_type: operationType,
-        entity_type: entityType,
-        entity_id: entityId,
-        payload: payload === null ? undefined : payload,
-        status: 'PENDING',
-        retry_count: 0,
-        created_at: new Date().toISOString()
-    };
-    
-    await db.sync_operations.put(op);
+        // Check coalescing:
+        const hasCreate = pendingOps.find(o => o.operation_type === 'CREATE');
+        if (hasCreate) {
+          // If there is an existing CREATE in the queue, this entity has not reached the server yet.
+          // Therefore, any subsequent save/update MUST remain a CREATE operation!
+          await db.sync_operations.update(hasCreate.id, {
+            payload: payload === null ? undefined : payload,
+            status: 'PENDING',
+            last_error: undefined
+          });
+          for (const op of pendingOps) {
+            if (op.id !== hasCreate.id) {
+              await db.sync_operations.delete(op.id);
+            }
+          }
+        } else {
+          const hasUpdate = pendingOps.find(o => o.operation_type === 'UPDATE');
+          if (hasUpdate) {
+            await db.sync_operations.update(hasUpdate.id, {
+              operation_type: operationType,
+              payload: payload === null ? undefined : payload,
+              status: 'PENDING',
+              last_error: undefined
+            });
+            for (const op of pendingOps) {
+              if (op.id !== hasUpdate.id) {
+                await db.sync_operations.delete(op.id);
+              }
+            }
+          } else {
+            // New queue operation
+            const op: SyncOperation = {
+              id: crypto.randomUUID(),
+              student_id: userId,
+              operation_type: operationType,
+              entity_type: entityType,
+              entity_id: entityId,
+              payload: payload === null ? undefined : payload,
+              status: 'PENDING',
+              retry_count: 0,
+              created_at: new Date().toISOString()
+            };
+            await db.sync_operations.put(op);
+          }
+        }
+      }
+    });
+
     window.dispatchEvent(new Event('sync-queued'));
 
     if (navigator.onLine) {

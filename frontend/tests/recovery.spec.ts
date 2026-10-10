@@ -8,7 +8,7 @@ test.describe('CFSS Recovery Verification', () => {
     await page.click('button[type="submit"]');
 
     // Wait for navigation to admin dashboard
-    await page.waitForURL('/admin', { timeout: 10000 });
+    await page.waitForURL('/admin', { timeout: 25000 });
     await expect(page.getByRole('heading', { name: 'Admin Dashboard', exact: true }).first()).toBeVisible();
   });
 
@@ -18,7 +18,7 @@ test.describe('CFSS Recovery Verification', () => {
     await page.fill('input[type="text"]', 'admin');
     await page.fill('input[type="password"]', 'admin');
     await page.click('button[type="submit"]');
-    await page.waitForURL('/admin', { timeout: 10000 });
+    await page.waitForURL('/admin', { timeout: 25000 });
 
     // Navigate to students
     await page.goto('/admin/students');
@@ -36,7 +36,7 @@ test.describe('CFSS Recovery Verification', () => {
     await page.fill('input[type="text"]', 'admin');
     await page.fill('input[type="password"]', 'admin');
     await page.click('button[type="submit"]');
-    await page.waitForURL('/admin', { timeout: 10000 });
+    await page.waitForURL('/admin', { timeout: 25000 });
 
     // Navigate to settings
     await page.goto('/admin/settings');

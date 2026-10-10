@@ -17,6 +17,8 @@ export default function SettingsPage() {
   const [msgType, setMsgType] = useState<'success' | 'error'>('success');
 
   const { theme, setTheme } = useAdminAuthStore();
+  const token = useAdminAuthStore((state) => state.token);
+  const [hydrated, setHydrated] = useState(false);
 
   // Admin password change state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -24,28 +26,43 @@ export default function SettingsPage() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordMsg, setPasswordMsg] = useState('');
   const [passwordMsgType, setPasswordMsgType] = useState<'success' | 'error'>('success');
-
-  useEffect(() => {
-    fetchSettings();
-  }, []);
-
   const [adminPasswordForSettings, setAdminPasswordForSettings] = useState('');
 
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
   const fetchSettings = async () => {
+    const activeToken = token || useAdminAuthStore.getState().token;
+    if (!activeToken) return;
     try {
-      const { token } = useAdminAuthStore.getState();
+      setLoading(true);
+      setMsg('');
       const res = await api.get('/api/admin/settings', {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${activeToken}` }
       });
-      setSettings(res.data);
+      setSettings({
+        strict_gps_enforcement: false,
+        allow_multiple_submissions: false,
+        default_page_size: 100,
+        survey_enabled: false,
+        registration_open: false,
+        ...res.data
+      });
     } catch (err: any) {
       console.error(err);
-      setMsg('Failed to load settings');
+      setMsg(err?.response?.data?.detail || 'Failed to load configuration');
       setMsgType('error');
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (hydrated && token) {
+      fetchSettings();
+    }
+  }, [hydrated, token]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,12 +74,12 @@ export default function SettingsPage() {
     setSaving(true);
     setMsg('');
     try {
-      const { token } = useAdminAuthStore.getState();
+      const activeToken = token || useAdminAuthStore.getState().token;
       await api.put('/api/admin/settings', {
         ...settings,
         admin_password: adminPasswordForSettings
       }, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${activeToken}` }
       });
       setMsg('Configuration saved successfully');
       setMsgType('success');
@@ -80,12 +97,12 @@ export default function SettingsPage() {
     setPasswordSaving(true);
     setPasswordMsg('');
     try {
-      const { token } = useAdminAuthStore.getState();
+      const activeToken = token || useAdminAuthStore.getState().token;
       await api.post('/api/admin/change-password', {
         current_password: currentPassword,
         new_password: newPassword
       }, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${activeToken}` }
       });
       setPasswordMsg('Administrator password updated successfully');
       setPasswordMsgType('success');
@@ -99,14 +116,6 @@ export default function SettingsPage() {
     }
   };
 
-  if (loading) {
-    return <div className="p-8 text-center text-secondary">Loading configuration...</div>;
-  }
-
-  if (!settings) {
-    return <div className="p-8 text-center text-status-error">Configuration unavailable</div>;
-  }
-
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
@@ -114,6 +123,24 @@ export default function SettingsPage() {
         <p className="text-secondary mt-1 text-sm">Configure global application behavior and preferences.</p>
       </div>
 
+      {loading && !settings ? (
+        <Card>
+          <CardContent className="p-12 text-center text-secondary">
+            <div className="inline-block w-8 h-8 border-4 border-cfss-green border-t-transparent rounded-full animate-spin mb-3"></div>
+            <p>Loading configuration...</p>
+          </CardContent>
+        </Card>
+      ) : !settings ? (
+        <Card>
+          <CardContent className="p-8 text-center space-y-4">
+            <Alert variant="destructive">
+              {msg || 'Configuration unavailable'}
+            </Alert>
+            <Button onClick={() => fetchSettings()}>Retry Loading Configuration</Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
       <form onSubmit={handleSave} className="space-y-8">
         
         {msg && (
@@ -270,6 +297,8 @@ export default function SettingsPage() {
           </form>
         </CardContent>
       </Card>
+        </>
+      )}
     </div>
   );
 }

@@ -9,10 +9,11 @@ engine = create_async_engine(
     DATABASE_URL,
     echo=False,
     pool_pre_ping=True,
-    pool_recycle=1800,
+    pool_recycle=300,
     connect_args={
         "statement_cache_size": 0,
-        "prepared_statement_cache_size": 0
+        "prepared_statement_cache_size": 0,
+        "command_timeout": 15
     }
 )
 SessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=AsyncSession)

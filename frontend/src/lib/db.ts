@@ -14,6 +14,7 @@ export interface LocalSurvey {
   created_at: string;
   updated_at: string;
   submitted_at?: string;
+  server_synced?: boolean;
 }
 
 export interface LocalSurveyDefinition {

@@ -110,6 +110,7 @@ export default function SurveyWorkspace() {
         answers: [],
         status: 'DRAFT',
         sync_status: 'pending',
+        server_synced: false,
         created_at: now,
         updated_at: now
       });

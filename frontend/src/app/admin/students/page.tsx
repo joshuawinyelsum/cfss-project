@@ -14,21 +14,23 @@ interface Student {
   id: string;
   name: string;
   student_id: string;
-  email: string;
-  faculty: string;
-  program: string;
-  level: number;
-  gender: string;
-  phone_number: string;
-  community_id: string;
-  community_name: string;
-  group_number: number;
-  group_label: string;
-  district: string;
-  region: string;
+  email?: string;
+  faculty?: string;
+  program?: string;
+  level?: number;
+  gender?: string;
+  phone_number?: string;
+  community_id?: string;
+  community_name?: string;
+  group_number?: number;
+  group_label?: string;
+  district?: string;
+  region?: string;
 }
 
 export default function AdminStudentsPage() {
+  const token = useAdminAuthStore((state) => state.token);
+  const [hydrated, setHydrated] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -40,23 +42,32 @@ export default function AdminStudentsPage() {
   const [studentDetailsLoading, setStudentDetailsLoading] = useState(false);
 
   useEffect(() => {
-    fetchStudents();
+    setHydrated(true);
   }, []);
 
   const fetchStudents = async () => {
+    const activeToken = token || useAdminAuthStore.getState().token;
+    if (!activeToken) return;
     try {
-      const { token } = useAdminAuthStore.getState();
+      setLoading(true);
+      setError('');
       const res = await api.get('/api/admin/students', {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${activeToken}` }
       });
       setStudents(res.data);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError('Failed to load students');
+      setError(err?.response?.data?.detail || 'Failed to load students');
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (hydrated && token) {
+      fetchStudents();
+    }
+  }, [hydrated, token]);
 
   const exportToPDF = () => {
     const doc = new (jsPDF as any)();
@@ -106,22 +117,18 @@ export default function AdminStudentsPage() {
     setStudentDetailsLoading(true);
     setError('');
     try {
-      const { token } = useAdminAuthStore.getState();
+      const activeToken = token || useAdminAuthStore.getState().token;
       const res = await api.get(`/api/admin/students/${studentId}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${activeToken}` }
       });
       setSelectedStudent(res.data);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError('Failed to load student details');
+      setError(err?.response?.data?.detail || 'Failed to load student details');
     } finally {
       setStudentDetailsLoading(false);
     }
   };
-
-  if (loading) {
-    return <div className="p-8 text-center text-secondary">Loading students...</div>;
-  }
 
   return (
     <div className="space-y-6">
@@ -137,12 +144,21 @@ export default function AdminStudentsPage() {
       </div>
 
       {error && (
-        <Alert variant="destructive">
-          {error}
+        <Alert variant="destructive" className="flex items-center justify-between">
+          <span>{error}</span>
+          <Button variant="outline" size="sm" onClick={() => fetchStudents()}>Retry</Button>
         </Alert>
       )}
 
-      <Card>
+      {loading && students.length === 0 ? (
+        <Card>
+          <CardContent className="p-12 text-center text-secondary">
+            <div className="inline-block w-8 h-8 border-4 border-cfss-green border-t-transparent rounded-full animate-spin mb-3"></div>
+            <p>Loading students...</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="flex-1">
@@ -213,11 +229,11 @@ export default function AdminStudentsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-primary font-medium">{student.community_name}</div>
+                        <div className="text-sm text-primary font-medium">{student.community_name || 'Unassigned'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-cfss-green-soft text-cfss-green">
-                          {student.group_label || `Group ${student.group_number}`}
+                          {student.group_label || (student.group_number ? `Group ${student.group_number}` : 'Unassigned')}
                         </span>
                       </td>
                     </tr>
@@ -228,6 +244,7 @@ export default function AdminStudentsPage() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Student Details Modal */}
       {(selectedStudent || studentDetailsLoading) && (
@@ -285,11 +302,11 @@ export default function AdminStudentsPage() {
                           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                             <div className="sm:col-span-2">
                               <dt className="text-sm font-medium text-muted">Community</dt>
-                              <dd className="text-sm text-primary font-semibold">{selectedStudent.community_name}</dd>
+                              <dd className="text-sm text-primary font-semibold">{selectedStudent.community_name || 'Unassigned'}</dd>
                             </div>
                             <div>
                               <dt className="text-sm font-medium text-muted">Group</dt>
-                              <dd className="text-sm text-primary">{selectedStudent.group_label || `Group ${selectedStudent.group_number}`}</dd>
+                              <dd className="text-sm text-primary">{selectedStudent.group_label || (selectedStudent.group_number ? `Group ${selectedStudent.group_number}` : 'Unassigned')}</dd>
                             </div>
                             <div>
                               <dt className="text-sm font-medium text-muted">Location</dt>

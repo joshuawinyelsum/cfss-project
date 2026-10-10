@@ -348,9 +348,9 @@ async def get_survey(survey_id: str, db: AsyncSession = Depends(get_db_and_admin
 async def get_all_students(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db_and_admin)):
     query = (
         select(models.User, models.Community)
-        .join(models.Community, models.User.community_id == models.Community.id)
+        .outerjoin(models.Community, models.User.community_id == models.Community.id)
         .filter(models.User.role == "student")
-        .order_by(models.Community.name, models.Community.group_number, models.User.email)
+        .order_by(models.User.name.asc().nulls_last(), models.User.student_id.asc())
         .offset(skip)
         .limit(limit)
     )
@@ -361,20 +361,20 @@ async def get_all_students(skip: int = 0, limit: int = 100, db: AsyncSession = D
         response.append({
             "id": str(user.id),
             "student_id": user.student_id,
-            "name": user.name,
+            "name": user.name or user.student_id,
             "email": user.email or "",
             "faculty": user.faculty,
             "program": user.program,
             "gender": user.gender,
             "phone_number": user.phone_number,
-            "level": user.level,
+            "level": user.level or 100,
             "role": user.role,
-            "community_id": str(user.community_id),
-            "community_name": comm.name,
-            "group_label": comm.group_label if hasattr(comm, "group_label") else f"Group {comm.group_number}",
-            "group_number": comm.group_number,
-            "district": comm.district,
-            "region": comm.region
+            "community_id": str(user.community_id) if user.community_id else None,
+            "community_name": comm.name if comm else "Unassigned",
+            "group_label": (comm.group_label if hasattr(comm, "group_label") and comm.group_label else f"Group {comm.group_number}") if comm else "Unassigned",
+            "group_number": comm.group_number if comm else None,
+            "district": comm.district if comm else None,
+            "region": comm.region if comm else None
         })
     return response
 
@@ -388,33 +388,33 @@ async def get_student(student_id: str, db: AsyncSession = Depends(get_db_and_adm
         
     query = (
         select(models.User, models.Community)
-        .join(models.Community, models.User.community_id == models.Community.id)
+        .outerjoin(models.Community, models.User.community_id == models.Community.id)
         .filter(models.User.id == user_id_int, models.User.role == "student")
     )
     result = await db.execute(query)
     row = result.first()
     
     if not row:
-        raise HTTPException(status_code=404, detail="Student not found or not in a community")
+        raise HTTPException(status_code=404, detail="Student not found")
         
     user, comm = row
     return {
         "id": str(user.id),
         "student_id": user.student_id,
-        "name": user.name,
+        "name": user.name or user.student_id,
         "email": user.email or "",
         "faculty": user.faculty,
         "program": user.program,
         "gender": user.gender,
         "phone_number": user.phone_number,
-        "level": user.level,
+        "level": user.level or 100,
         "role": user.role,
-        "community_id": str(user.community_id),
-        "community_name": comm.name,
-        "group_label": comm.group_label if hasattr(comm, "group_label") else f"Group {comm.group_number}",
-        "group_number": comm.group_number,
-        "district": comm.district,
-        "region": comm.region
+        "community_id": str(user.community_id) if user.community_id else None,
+        "community_name": comm.name if comm else "Unassigned",
+        "group_label": (comm.group_label if hasattr(comm, "group_label") and comm.group_label else f"Group {comm.group_number}") if comm else "Unassigned",
+        "group_number": comm.group_number if comm else None,
+        "district": comm.district if comm else None,
+        "region": comm.region if comm else None
     }
 
 

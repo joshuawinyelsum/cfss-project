@@ -87,7 +87,8 @@ function QuestionnaireContent() {
             sync_status: 'pending',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            has_been_saved: false
+            has_been_saved: false,
+            server_synced: false
           };
         } else {
           // Check IndexedDB first
@@ -97,21 +98,34 @@ function QuestionnaireContent() {
             if (localRecord.student_id !== user.id) {
               throw new Error("You do not have permission to view this survey.");
             }
-            recordData = { ...localRecord, has_been_saved: true };
-            try {
+            const isSynced = Boolean(localRecord.server_synced || localRecord.entity_id || localRecord.sync_status === 'synced');
+            recordData = { ...localRecord, has_been_saved: true, server_synced: isSynced };
+            const cachedDef = await db.definitions.get(normalizedType);
+            if (cachedDef && cachedDef.questions && cachedDef.questions.length > 0) {
+              questionsData = cachedDef.questions;
               if (navigator.onLine) {
-                const qRes = await api.get('/api/student/surveys/questions', { params: { type: typeStr }, headers: { Authorization: `Bearer ${token}` } });
-                questionsData = qRes.data;
-                await db.definitions.put({ type: normalizedType, questions: questionsData, updated_at: new Date().toISOString() });
-              } else {
-                throw new Error("Offline");
+                api.get('/api/student/surveys/questions', { params: { type: typeStr }, headers: { Authorization: `Bearer ${token}` } })
+                  .then(qRes => {
+                    db.definitions.put({ type: normalizedType, questions: qRes.data, updated_at: new Date().toISOString() });
+                  })
+                  .catch(() => {});
               }
-            } catch (e) {
-              const cachedDef = await db.definitions.get(normalizedType);
-              if (cachedDef) {
-                questionsData = cachedDef.questions;
-              } else {
-                throw new Error("No internet and survey definition not cached.");
+            } else {
+              try {
+                if (navigator.onLine) {
+                  const qRes = await api.get('/api/student/surveys/questions', { params: { type: typeStr }, headers: { Authorization: `Bearer ${token}` } });
+                  questionsData = qRes.data;
+                  await db.definitions.put({ type: normalizedType, questions: questionsData, updated_at: new Date().toISOString() });
+                } else {
+                  throw new Error("Offline");
+                }
+              } catch (e) {
+                const fallbackDef = await db.definitions.get(normalizedType);
+                if (fallbackDef) {
+                  questionsData = fallbackDef.questions;
+                } else {
+                  throw new Error("No internet and survey definition not cached.");
+                }
               }
             }
             answersData = localRecord.answers || [];
@@ -121,7 +135,7 @@ function QuestionnaireContent() {
               throw new Error("Record not found locally and you are offline.");
             }
             const res = await api.get(`/api/student/surveys/record/${recordId}`, { headers: { Authorization: `Bearer ${token}` } });
-            recordData = { ...res.data.record, has_been_saved: true };
+            recordData = { ...res.data.record, has_been_saved: true, server_synced: true };
             questionsData = res.data.questions;
             answersData = res.data.answers || [];
           }
@@ -220,10 +234,13 @@ function QuestionnaireContent() {
       return;
     }
 
-    const formattedAnswers = Object.keys(answers).map(qid => ({
-      question_id: qid,
-      answer: answers[qid]
-    }));
+    const validQuestionIds = new Set(questions.map((q: any) => q.id));
+    const formattedAnswers = Object.keys(answers)
+      .filter(qid => validQuestionIds.has(qid) && answers[qid] !== undefined && answers[qid] !== null && answers[qid] !== '')
+      .map(qid => ({
+        question_id: qid,
+        answer: answers[qid]
+      }));
 
     try {
       if (isSubmit) {
@@ -232,34 +249,43 @@ function QuestionnaireContent() {
         setSaving(true);
       }
 
-      const opType = !record.has_been_saved ? 'CREATE' : 'UPDATE';
+      const isServerSynced = Boolean(record.server_synced || record.entity_id || record.sync_status === 'synced');
+      const opType = isServerSynced ? 'UPDATE' : 'CREATE';
       const submittedAt = isSubmit ? (record.submitted_at || new Date().toISOString()) : record.submitted_at;
 
-      await syncEngine.queueOperation(opType, 'SURVEY', record.id, {
+      const payload = {
         id: record.id,
         survey_type: record.survey_type,
         community_id: user.community_id,
         student_id: user.id as number,
         entity_id: record.entity_id,
+        field_feature_id: record.field_feature_id || null,
         answers: formattedAnswers,
-        status: isSubmit ? 'SUBMITTED' : 'DRAFT',
-        sync_status: 'pending',
+        status: (isSubmit ? 'SUBMITTED' : 'DRAFT') as 'SUBMITTED' | 'DRAFT',
+        sync_status: 'pending' as const,
+        server_synced: isServerSynced,
         created_at: record.created_at,
         updated_at: new Date().toISOString(),
         submitted_at: submittedAt
-      }, token);
+      };
+
+      await syncEngine.queueOperation(opType, 'SURVEY', record.id, payload, token);
 
       setHasUnsavedChanges(false);
 
-      if (!isSubmit && recordId === 'new') {
-        setRecord((prev: any) => ({ ...prev, has_been_saved: true, submitted_at: submittedAt }));
+      if (!isSubmit) {
+        setRecord((prev: any) => ({
+          ...prev,
+          answers: formattedAnswers,
+          status: 'DRAFT',
+          sync_status: 'pending',
+          has_been_saved: true,
+          server_synced: isServerSynced,
+          submitted_at: submittedAt
+        }));
       }
 
-      if (isSubmit) {
-        router.push('/dashboard/work');
-      } else {
-        router.push('/dashboard/work');
-      }
+      router.push('/dashboard/work');
     } catch (e: any) {
       setError(e.message || "An error occurred while saving locally.");
       setSaving(false);

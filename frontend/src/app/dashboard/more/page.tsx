@@ -8,7 +8,7 @@ export default function MorePage() {
     { name: 'My Group', href: '/dashboard/group', icon: Users, description: 'View your fieldwork group members' },
     { name: 'Sync & Activity', href: '/dashboard/work/attention', icon: RefreshCw, description: 'Manage offline synchronization' },
     { name: 'Profile', href: '/profile', icon: UserIcon, description: 'View your student profile' },
-    { name: 'Settings', href: '/settings', icon: Settings, description: 'App preferences and configuration' },
+    { name: 'Settings', href: '/dashboard/settings', icon: Settings, description: 'App preferences and configuration' },
   ];
 
   return (

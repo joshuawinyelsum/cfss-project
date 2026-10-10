@@ -15,7 +15,7 @@ class UserResponse(BaseModel):
     program: Optional[str] = None
     gender: Optional[str] = None
     phone_number: Optional[str] = None
-    level: int
+    level: Optional[int] = 100
     role: str
     community_id: Optional[str] = None
     community_name: Optional[str] = None
@@ -133,6 +133,7 @@ class SettingsBase(BaseModel):
     survey_deadline: Optional[datetime] = None
     allow_multiple_submissions: bool = Field(default=False)
     default_page_size: int = Field(default=100, ge=1)
+    strict_gps_enforcement: bool = Field(default=False)
 
 class SettingsUpdate(SettingsBase):
     admin_password: str
@@ -148,7 +149,8 @@ class AdminChangePasswordRequest(BaseModel):
     new_password: str
 
 class SettingsResponse(SettingsBase):
-    pass
+    class Config:
+        from_attributes = True
 
 class SurveySubmission(BaseModel):
     unique_submission_id: str
