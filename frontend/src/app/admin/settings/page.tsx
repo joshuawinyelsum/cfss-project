@@ -33,7 +33,10 @@ export default function SettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      const res = await api.get('/api/admin/settings');
+      const { token } = useAdminAuthStore.getState();
+      const res = await api.get('/api/admin/settings', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setSettings(res.data);
     } catch (err: any) {
       console.error(err);
@@ -54,9 +57,12 @@ export default function SettingsPage() {
     setSaving(true);
     setMsg('');
     try {
+      const { token } = useAdminAuthStore.getState();
       await api.put('/api/admin/settings', {
         ...settings,
         admin_password: adminPasswordForSettings
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
       setMsg('Configuration saved successfully');
       setMsgType('success');
@@ -74,9 +80,12 @@ export default function SettingsPage() {
     setPasswordSaving(true);
     setPasswordMsg('');
     try {
+      const { token } = useAdminAuthStore.getState();
       await api.post('/api/admin/change-password', {
         current_password: currentPassword,
         new_password: newPassword
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
       setPasswordMsg('Administrator password updated successfully');
       setPasswordMsgType('success');

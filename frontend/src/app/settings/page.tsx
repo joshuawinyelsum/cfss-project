@@ -33,13 +33,11 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!hydrated) return;
-
     if (!token || user?.role !== 'student') {
       router.push('/login');
       return;
     }
     
-    // Fetch user settings
     const fetchSettings = async () => {
       try {
         const res = await api.get('/api/student/settings', { headers: { Authorization: `Bearer ${token}` } });
@@ -52,7 +50,7 @@ export default function SettingsPage() {
     };
     
     fetchSettings();
-  }, [user, token, router, setTheme]);
+  }, [user, token, router, setTheme, hydrated]);
 
   const handleThemeChange = async (newTheme: string) => {
     setTheme(newTheme);
@@ -103,19 +101,25 @@ export default function SettingsPage() {
     router.push('/login');
   };
 
-  if (!user || loading) return (
-    <DashboardLayout>
-      <div className="flex justify-center items-center h-full text-muted">
-
-        {/* Mobile Back Navigation */}
-        <div className="lg:hidden mb-4">
-          <Link href="/dashboard/more" className="inline-flex items-center text-sm font-medium text-muted hover:text-primary transition-colors">
-            <ArrowLeft size={16} className="mr-1" /> Back to More
-          </Link>
+  if (!hydrated || !user || loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col h-full p-6">
+          <div className="lg:hidden mb-6">
+            <Link href="/dashboard/more" className="inline-flex items-center text-sm font-medium text-muted hover:text-primary transition-colors">
+              <ArrowLeft size={16} className="mr-1" /> Back to More
+            </Link>
+          </div>
+          <div className="flex-1 flex justify-center items-center text-muted">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-4 border-border border-t-cfss-green rounded-full animate-spin"></div>
+              <p>Loading settings...</p>
+            </div>
+          </div>
         </div>
-Loading settings...</div>
-    </DashboardLayout>
-  );
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

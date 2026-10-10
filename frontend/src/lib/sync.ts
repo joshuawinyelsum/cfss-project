@@ -48,6 +48,13 @@ export const syncEngine = {
     }
 
     try {
+      // First, recover any orphaned SYNCING items from a previous crash
+      const allOps = await db.sync_operations.where('student_id').equals(userId).toArray();
+      const orphanSyncing = allOps.filter(op => op.status === 'SYNCING');
+      for (const orphan of orphanSyncing) {
+         await db.sync_operations.update(orphan.id, { status: 'PENDING' });
+      }
+
       const userOperations = await db.sync_operations.where('student_id').equals(userId).toArray();
       const queueItems = userOperations
         .filter(op => op.status === 'PENDING' || op.status === 'FAILED')
@@ -133,6 +140,22 @@ export const syncEngine = {
                  await (store as any).update(getId(op.entity_type, op.entity_id), { sync_status: 'failed', sync_error: result.error });
              }
           }
+        }
+      }
+
+      // Handle items that the server didn't respond to
+      const respondedIds = new Set(results.map((r: any) => r.operation_id));
+      for (const item of queueItems) {
+        if (!respondedIds.has(item.id)) {
+           await db.sync_operations.update(item.id, {
+             status: 'FAILED',
+             last_error: "Server did not respond for this operation",
+             retry_count: (item.retry_count || 0) + 1
+           });
+           if (item.operation_type !== 'DELETE') {
+               const store = getStore(item.entity_type);
+               await (store as any).update(getId(item.entity_type, item.entity_id), { sync_status: 'failed', sync_error: "Server did not respond" });
+           }
         }
       }
     } catch (error: unknown) {

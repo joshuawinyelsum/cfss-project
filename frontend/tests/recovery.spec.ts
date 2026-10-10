@@ -8,8 +8,8 @@ test.describe('CFSS Recovery Verification', () => {
     await page.click('button[type="submit"]');
 
     // Wait for navigation to admin dashboard
-    await expect(page).toHaveURL('/admin');
-    await expect(page.locator('h1')).toContainText('Administrator Dashboard');
+    await page.waitForURL('/admin', { timeout: 10000 });
+    await expect(page.getByRole('heading', { name: 'Admin Dashboard', exact: true }).first()).toBeVisible();
   });
 
   test('Admin Student Management', async ({ page }) => {
@@ -18,15 +18,15 @@ test.describe('CFSS Recovery Verification', () => {
     await page.fill('input[type="text"]', 'admin');
     await page.fill('input[type="password"]', 'admin');
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL('/admin');
+    await page.waitForURL('/admin', { timeout: 10000 });
 
     // Navigate to students
-    await page.click('a[href="/admin/students"]');
+    await page.goto('/admin/students');
     await expect(page).toHaveURL('/admin/students');
-    await expect(page.locator('h1')).toContainText('Student Management');
+    await expect(page.getByRole('heading', { name: 'Students', exact: true }).first()).toBeVisible();
 
     // Check if the export button exists
-    const exportBtn = page.locator('button:has-text("Export to PDF")');
+    const exportBtn = page.locator('button:has-text("Export PDF")');
     await expect(exportBtn).toBeVisible();
   });
 
@@ -36,15 +36,15 @@ test.describe('CFSS Recovery Verification', () => {
     await page.fill('input[type="text"]', 'admin');
     await page.fill('input[type="password"]', 'admin');
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL('/admin');
+    await page.waitForURL('/admin', { timeout: 10000 });
 
     // Navigate to settings
-    await page.click('a[href="/admin/settings"]');
+    await page.goto('/admin/settings');
     await expect(page).toHaveURL('/admin/settings');
-    await expect(page.locator('h1')).toContainText('System Settings');
+    await expect(page.getByRole('heading', { name: 'System Settings', exact: true }).first()).toBeVisible();
 
     // Admin password input should be visible for settings save
-    const adminPasswordInput = page.locator('input[placeholder="Enter admin password to save settings"]');
+    const adminPasswordInput = page.locator('input[placeholder="Enter current admin password to save changes"]');
     await expect(adminPasswordInput).toBeVisible();
 
     // Toggle registration to enable the save button

@@ -1,7 +1,6 @@
 import re
 from sqlalchemy import event
-from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, DateTime, UniqueConstraint, Float
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, DateTime, UniqueConstraint, Float, JSON
 import uuid
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -44,7 +43,7 @@ class Community(Base):
     # Spatial metadata
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
-    spatial_metadata = Column(JSONB, nullable=True) # boundary, area, centroid metadata
+    spatial_metadata = Column(JSON, nullable=True) # boundary, area, centroid metadata
 
 class WhitelistV2(Base):
     __tablename__ = "whitelists"
@@ -68,7 +67,7 @@ class WhitelistEntry(Base):
     gender = Column(String, nullable=True)       # Male | Female | Other
     phone_number = Column(String, nullable=True) # Required for new uploads
     level = Column(Integer, nullable=True)
-    metadata_json = Column(JSONB, nullable=True)
+    metadata_json = Column(JSON, nullable=True)
 
 
 class Survey(Base):
@@ -80,7 +79,7 @@ class Survey(Base):
     community_id = Column(Integer, ForeignKey("communities.id"), index=True, nullable=False)
     type = Column(String, index=True, nullable=False) # 'household', 'education', 'health', 'governance'
     status = Column(String, nullable=False, default="submitted")
-    data = Column(JSONB, nullable=False)
+    data = Column(JSON, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class SystemSettings(Base):
@@ -104,7 +103,7 @@ class IdempotencyKey(Base):
     locked_until = Column(DateTime(timezone=True), nullable=True)
     lock_owner_id = Column(String, nullable=True)
     retry_count = Column(Integer, default=0, nullable=False)
-    response_payload = Column(JSONB, nullable=True)
+    response_payload = Column(JSON, nullable=True)
     trace_id = Column(String, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -125,7 +124,7 @@ class AuditLog(Base):
     user_id = Column(String, nullable=True)
     ip_address = Column(String, nullable=True)
     user_agent = Column(String, nullable=True)
-    metadata_payload = Column(JSONB, nullable=True)
+    metadata_payload = Column(JSON, nullable=True)
     trace_id = Column(String, index=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -174,7 +173,7 @@ class SurveyQuestion(Base):
     section = Column(String, nullable=False)
     question_text = Column(String, nullable=False)
     question_type = Column(String, nullable=False) # text, number, select, radio, checkbox, date
-    options = Column(JSONB, nullable=True)
+    options = Column(JSON, nullable=True)
     required = Column(Boolean, default=False)
     order_number = Column(Integer, nullable=False, default=0)
 
@@ -184,7 +183,7 @@ class SurveyAnswer(Base):
     id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     survey_record_id = Column(String, ForeignKey("survey_records.id", ondelete="CASCADE"), nullable=False, index=True)
     question_id = Column(String, ForeignKey("survey_questions.id"), nullable=False)
-    answer = Column(JSONB, nullable=True)
+    answer = Column(JSON, nullable=True)
 
 
 @event.listens_for(User, "before_insert")
@@ -226,7 +225,7 @@ class FieldFeature(Base):
     longitude = Column(Float, nullable=False)
     accuracy_meters = Column(Float, nullable=True)
     captured_by_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    metadata_json = Column(JSONB, nullable=True)
+    metadata_json = Column(JSON, nullable=True)
     captured_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())

@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 @router.post("/student/login", response_model=schemas.Token)
 async def student_login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(models.User).filter(models.User.student_id == form_data.username))
+    result = await db.execute(select(models.User).filter(models.User.student_id == form_data.username.upper()))
     user = result.scalars().first()
     
     if not user or user.role != "student" or not auth.verify_password(form_data.password, user.password_hash):
@@ -30,7 +30,7 @@ async def student_login(form_data: OAuth2PasswordRequestForm = Depends(), db: As
 @router.post("/admin/login", response_model=schemas.Token)
 async def admin_login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(models.User).filter(
-        models.User.student_id == form_data.username, models.User.role == "admin"
+        models.User.student_id == form_data.username.upper(), models.User.role == "admin"
     ))
     user = result.scalars().first()
 

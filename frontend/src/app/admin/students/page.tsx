@@ -44,7 +44,10 @@ export default function AdminStudentsPage() {
 
   const fetchStudents = async () => {
     try {
-      const res = await api.get('/api/admin/students');
+      const { token } = useAdminAuthStore.getState();
+      const res = await api.get('/api/admin/students', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setStudents(res.data);
     } catch (err) {
       console.error(err);
@@ -102,7 +105,10 @@ export default function AdminStudentsPage() {
     setStudentDetailsLoading(true);
     setError('');
     try {
-      const res = await api.get(`/api/admin/students/${studentId}`);
+      const { token } = useAdminAuthStore.getState();
+      const res = await api.get(`/api/admin/students/${studentId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setSelectedStudent(res.data);
     } catch (err) {
       console.error(err);
