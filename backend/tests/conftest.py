@@ -10,7 +10,7 @@ import os
 
 # ── Set env vars FIRST, before any app module import ──────────────────────────
 os.environ["DATABASE_URL"] = "postgresql+asyncpg://test:test@localhost:5432/testdb"
-os.environ["SECRET_KEY"] = "test-secret-key-for-pytest-only"
+os.environ["SECRET_KEY"] = "test-secret-key-for-pytest-only-at-least-32-bytes"
 
 import pytest
 import pytest_asyncio

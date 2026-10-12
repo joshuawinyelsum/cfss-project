@@ -15,8 +15,7 @@ router = APIRouter(prefix="/auth", tags=["auth_whitelist"])
 # Password hashing setup
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# JWT Setup
-SECRET_KEY = "super-secure-jwt-secret-key"
+from app.settings import SECRET_KEY
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 

@@ -57,4 +57,25 @@ SECRET_KEY = _require(
     'Generate one with `python -c "import secrets; print(secrets.token_urlsafe(48))"`.',
 )
 
+if len(SECRET_KEY.encode("utf-8")) < 32:
+    if os.getenv("ENVIRONMENT") == "production":
+        raise RuntimeError(
+            "Insecure SECRET_KEY: Key must be at least 32 bytes (256 bits). "
+            'Generate one with `python -c "import secrets; print(secrets.token_urlsafe(48))"`.'
+        )
+
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+# Allowed CORS origins (trusted origins list)
+_default_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+_env_origins = os.getenv("ALLOWED_ORIGINS", "")
+if _env_origins.strip():
+    CORS_ORIGINS = [orig.strip() for orig in _env_origins.split(",") if orig.strip()]
+else:
+    CORS_ORIGINS = _default_origins
+

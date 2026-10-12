@@ -13,11 +13,15 @@ from app.rate_limiter import limiter
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+from app.settings import CORS_ORIGINS
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.database import SessionLocal
     from sqlalchemy.future import select
     from app.auth import get_password_hash
+    import os
+    import logging
     
     try:
         async with SessionLocal() as db:
@@ -26,22 +30,34 @@ async def lifespan(app: FastAPI):
             
             # Secure: Only create if missing. Do NOT overwrite existing passwords.
             if not admin:
+                initial_pwd = os.getenv("ADMIN_INITIAL_PASSWORD", "CfssAdmin2026!SecureKey")
                 new_admin = User(
-                    student_id="admin",
+                    student_id="ADMIN",
                     name="System Administrator",
                     email="admin@cfss.local",
                     level=0,
                     role="admin",
-                    password_hash=get_password_hash("admin123"),
+                    password_hash=get_password_hash(initial_pwd),
                     is_verified=True,
                     is_active=True
                 )
                 db.add(new_admin)
                 await db.commit()
-                print(">>> SUCCESS: Default ADMIN created.")
+            # Ensure active_whitelist_entries view exists
+            from sqlalchemy import text
+            await db.execute(text("""
+                CREATE OR REPLACE VIEW active_whitelist_entries AS
+                SELECT we.*
+                FROM whitelist_entries we
+                JOIN whitelists w ON we.whitelist_id = w.id
+                WHERE w.status = 'ACTIVE';
+            """))
+            await db.commit()
     except Exception as e:
         import logging
-        logging.error(f"Failed to initialize default admin during startup: {e}")
+        logging.error(f"Failed to initialize default admin or active_whitelist_entries view during startup: {e}")
+        if os.getenv("ENVIRONMENT") == "production" or os.getenv("STRICT_STARTUP") == "true":
+            raise RuntimeError(f"Startup aborted due to database initialization failure: {e}") from e
             
     yield
 
@@ -49,6 +65,23 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="CFSS API", lifespan=lifespan)
+
+# Health & Readiness checks
+@app.get("/health", tags=["system"])
+async def health_check():
+    return {"status": "ok"}
+
+@app.get("/ready", tags=["system"])
+async def readiness_check():
+    from app.database import SessionLocal
+    from sqlalchemy import text
+    from fastapi import HTTPException
+    try:
+        async with SessionLocal() as db:
+            await db.execute(text("SELECT 1"))
+        return {"status": "ready", "database": "connected"}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Database unreachable: {str(e)}")
 
 # Rate limiter setup
 app.state.limiter = limiter
@@ -58,9 +91,9 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(TraceMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=".*", 
+    allow_origins=CORS_ORIGINS, 
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["Content-Disposition", "X-Total-Count"],
 )
