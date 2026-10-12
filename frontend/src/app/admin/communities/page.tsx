@@ -49,6 +49,17 @@ export default function AdminCommunitiesPage() {
   const [communityStudents, setCommunityStudents] = useState<any[]>([]);
   const [isEditingMap, setIsEditingMap] = useState(false);
 
+  // Deletion state
+  const [deleteTarget, setDeleteTarget] = useState<Community | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteStrategy, setDeleteStrategy] = useState<'REASSIGN_EXISTING' | 'CREATE_REPLACEMENT'>('REASSIGN_EXISTING');
+  const [targetCommunityId, setTargetCommunityId] = useState<string>('');
+  const [replacementComm, setReplacementComm] = useState({ name: '', district: '', region: '', capacity: 10 });
+  const [adminPassword, setAdminPassword] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [actionSuccess, setActionSuccess] = useState('');
+
   useEffect(() => {
     setHydrated(true);
   }, []);
@@ -148,6 +159,79 @@ export default function AdminCommunitiesPage() {
     }
   };
 
+  const handleDeleteEmpty = async () => {
+    if (!deleteTarget) return;
+    const activeToken = token || useAdminAuthStore.getState().token;
+    setDeleteLoading(true);
+    setDeleteError('');
+    try {
+      await api.delete(`/api/admin/communities/${deleteTarget.id}`, {
+        headers: { Authorization: `Bearer ${activeToken}` }
+      });
+      setActionSuccess(`Community "${deleteTarget.name}" deleted successfully.`);
+      setDeleteModalOpen(false);
+      setDeleteTarget(null);
+      if (selectedCommunity?.id === deleteTarget.id) {
+        setSelectedCommunity(null);
+      }
+      await fetchCommunities();
+    } catch (err: any) {
+      setDeleteError(getErrorMessage(err, 'Failed to delete community'));
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleProtectedDelete = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deleteTarget) return;
+    const activeToken = token || useAdminAuthStore.getState().token;
+    if (!adminPassword) {
+      setDeleteError('Administrator password is required to authorize this protected deletion.');
+      return;
+    }
+    setDeleteLoading(true);
+    setDeleteError('');
+    try {
+      const payload: any = {
+        admin_password: adminPassword,
+        strategy: deleteStrategy
+      };
+      if (deleteStrategy === 'REASSIGN_EXISTING') {
+        if (!targetCommunityId) {
+          setDeleteError('Please select a target community for student reassignment.');
+          setDeleteLoading(false);
+          return;
+        }
+        payload.target_community_id = parseInt(targetCommunityId);
+      } else {
+        if (!replacementComm.name || !replacementComm.district || !replacementComm.region) {
+          setDeleteError('Please provide all replacement community details.');
+          setDeleteLoading(false);
+          return;
+        }
+        payload.replacement_community = replacementComm;
+      }
+
+      const res = await api.post(`/api/admin/communities/${deleteTarget.id}/delete-with-reassignment`, payload, {
+        headers: { Authorization: `Bearer ${activeToken}` }
+      });
+
+      setActionSuccess(res.data.message || `Community "${deleteTarget.name}" deleted and students reassigned.`);
+      setDeleteModalOpen(false);
+      setDeleteTarget(null);
+      setAdminPassword('');
+      if (selectedCommunity?.id === deleteTarget.id) {
+        setSelectedCommunity(null);
+      }
+      await fetchCommunities();
+    } catch (err: any) {
+      setDeleteError(getErrorMessage(err, 'Failed to delete community with reassignment'));
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -164,6 +248,13 @@ export default function AdminCommunitiesPage() {
         <Alert variant="destructive" className="flex items-center justify-between">
           <span>{error}</span>
           <Button variant="outline" size="sm" onClick={() => fetchCommunities()}>Retry</Button>
+        </Alert>
+      )}
+
+      {actionSuccess && (
+        <Alert variant="success" className="flex items-center justify-between">
+          <span>{actionSuccess}</span>
+          <Button variant="ghost" size="sm" onClick={() => setActionSuccess('')}>✕</Button>
         </Alert>
       )}
 
@@ -196,6 +287,7 @@ export default function AdminCommunitiesPage() {
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Location</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Group</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Capacity</th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-secondary uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border bg-surface">
@@ -232,6 +324,23 @@ export default function AdminCommunitiesPage() {
                             {comm.slots_remaining} left
                           </span>
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-medium" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-700 hover:text-red-800 hover:bg-red-50 border-red-200"
+                          onClick={() => {
+                            setDeleteTarget(comm);
+                            setDeleteStrategy('REASSIGN_EXISTING');
+                            setTargetCommunityId('');
+                            setAdminPassword('');
+                            setDeleteError('');
+                            setDeleteModalOpen(true);
+                          }}
+                        >
+                          Delete
+                        </Button>
                       </td>
                     </tr>
                   );
@@ -373,9 +482,26 @@ export default function AdminCommunitiesPage() {
                   <div className="mt-6 pt-6 border-t border-border">
                     <div className="flex justify-between items-center mb-2">
                       <h3 className="font-bold text-primary">Geographic Boundary</h3>
-                      <Button variant="outline" size="sm" onClick={() => setIsEditingMap(true)}>
-                        {(selectedCommunity as any).spatial_metadata ? 'Edit Map' : 'Set Map'}
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setIsEditingMap(true)}>
+                          {(selectedCommunity as any).spatial_metadata ? 'Edit Map' : 'Set Map'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-700 hover:text-red-800 hover:bg-red-50 border-red-200"
+                          onClick={() => {
+                            setDeleteTarget(selectedCommunity);
+                            setDeleteStrategy('REASSIGN_EXISTING');
+                            setTargetCommunityId('');
+                            setAdminPassword('');
+                            setDeleteError('');
+                            setDeleteModalOpen(true);
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </div>
                     {(selectedCommunity as any).spatial_metadata ? (
                        <div className="text-xs text-secondary mt-1 flex gap-4">
@@ -415,6 +541,201 @@ export default function AdminCommunitiesPage() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* DELETE MODAL (EMPTY COMMUNITY) */}
+      {deleteModalOpen && deleteTarget && deleteTarget.student_count === 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50">
+          <div className="bg-surface rounded-lg w-full max-w-md shadow-lg overflow-hidden border border-border">
+            <div className="px-6 py-4 border-b border-border bg-page">
+              <h2 className="text-lg font-bold text-primary">Delete Community</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              {deleteError && <Alert variant="destructive">{deleteError}</Alert>}
+              <p className="text-sm text-secondary">
+                Are you sure you want to delete <strong className="text-primary">{deleteTarget.name}</strong> ({deleteTarget.group_label})?
+              </p>
+              <p className="text-xs text-muted">
+                This community has no assigned students and will be permanently removed.
+              </p>
+              <div className="pt-4 flex gap-3">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => { setDeleteModalOpen(false); setDeleteTarget(null); }}
+                  className="flex-1"
+                  disabled={deleteLoading}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="default"
+                  onClick={handleDeleteEmpty}
+                  disabled={deleteLoading}
+                  className="flex-1 bg-red-700 hover:bg-red-800 text-white"
+                >
+                  {deleteLoading ? 'Deleting...' : 'Delete Community'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PROTECTED DELETE MODAL (POPULATED COMMUNITY) */}
+      {deleteModalOpen && deleteTarget && deleteTarget.student_count > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50">
+          <div className="bg-surface rounded-lg w-full max-w-lg shadow-xl overflow-hidden border border-border">
+            <div className="px-6 py-4 border-b border-border bg-amber-50/50">
+              <h2 className="text-lg font-bold text-amber-900">Protected Deletion — {deleteTarget.name}</h2>
+              <p className="text-xs text-amber-700 mt-0.5">
+                This community currently has <strong className="font-bold">{deleteTarget.student_count}</strong> assigned student(s).
+              </p>
+            </div>
+
+            <form onSubmit={handleProtectedDelete} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              {deleteError && <Alert variant="destructive">{deleteError}</Alert>}
+
+              <div>
+                <Label className="text-sm font-semibold text-primary">Select Reassignment Strategy</Label>
+                <div className="grid grid-cols-2 gap-3 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteStrategy('REASSIGN_EXISTING')}
+                    className={`p-3 rounded-lg border text-left text-xs transition-colors ${
+                      deleteStrategy === 'REASSIGN_EXISTING'
+                        ? 'border-cfss-green bg-cfss-green-soft text-cfss-green font-bold ring-1 ring-cfss-green'
+                        : 'border-border text-secondary hover:bg-page'
+                    }`}
+                  >
+                    <div className="font-semibold">Reassign Existing</div>
+                    <div className="text-[11px] text-muted mt-0.5">Transfer students to an existing community with capacity</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDeleteStrategy('CREATE_REPLACEMENT')}
+                    className={`p-3 rounded-lg border text-left text-xs transition-colors ${
+                      deleteStrategy === 'CREATE_REPLACEMENT'
+                        ? 'border-cfss-green bg-cfss-green-soft text-cfss-green font-bold ring-1 ring-cfss-green'
+                        : 'border-border text-secondary hover:bg-page'
+                    }`}
+                  >
+                    <div className="font-semibold">Create Replacement</div>
+                    <div className="text-[11px] text-muted mt-0.5">Create a new community and move students immediately</div>
+                  </button>
+                </div>
+              </div>
+
+              {deleteStrategy === 'REASSIGN_EXISTING' ? (
+                <div>
+                  <Label htmlFor="targetCommunity">Destination Community</Label>
+                  <select
+                    id="targetCommunity"
+                    value={targetCommunityId}
+                    onChange={(e) => setTargetCommunityId(e.target.value)}
+                    required
+                    className="w-full mt-1.5 px-3 py-2 text-sm border border-border rounded-lg bg-surface text-primary"
+                  >
+                    <option value="">-- Choose destination community --</option>
+                    {communities
+                      .filter((c) => c.id !== deleteTarget.id)
+                      .map((c) => {
+                        const hasCapacity = c.slots_remaining >= deleteTarget.student_count;
+                        return (
+                          <option key={c.id} value={c.id} disabled={!hasCapacity}>
+                            {c.name} ({c.group_label}) — {c.slots_remaining} slots remaining {hasCapacity ? '' : `(Needs ${deleteTarget.student_count})`}
+                          </option>
+                        );
+                      })}
+                  </select>
+                </div>
+              ) : (
+                <div className="space-y-3 bg-page p-4 rounded-lg border border-border">
+                  <h4 className="text-xs font-bold text-primary uppercase tracking-wide">Replacement Community Details</h4>
+                  <div>
+                    <Label>Community Name</Label>
+                    <Input
+                      type="text"
+                      required
+                      value={replacementComm.name}
+                      onChange={(e) => setReplacementComm({ ...replacementComm, name: e.target.value })}
+                      placeholder="e.g. Asuboi North"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>District</Label>
+                      <Input
+                        type="text"
+                        required
+                        value={replacementComm.district}
+                        onChange={(e) => setReplacementComm({ ...replacementComm, district: e.target.value })}
+                        placeholder="District"
+                      />
+                    </div>
+                    <div>
+                      <Label>Region</Label>
+                      <Input
+                        type="text"
+                        required
+                        value={replacementComm.region}
+                        onChange={(e) => setReplacementComm({ ...replacementComm, region: e.target.value })}
+                        placeholder="Region"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Capacity (Minimum: {deleteTarget.student_count})</Label>
+                    <Input
+                      type="number"
+                      min={deleteTarget.student_count}
+                      required
+                      value={replacementComm.capacity}
+                      onChange={(e) => setReplacementComm({ ...replacementComm, capacity: parseInt(e.target.value) || deleteTarget.student_count })}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <Label htmlFor="adminPassword">Administrator Password Confirmation</Label>
+                <Input
+                  id="adminPassword"
+                  type="password"
+                  required
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  placeholder="Enter your administrator password"
+                  className="mt-1.5"
+                />
+                <p className="text-[11px] text-muted mt-1">
+                  Required to authorize sensitive student reassignment and permanent record deletion.
+                </p>
+              </div>
+
+              <div className="pt-4 flex gap-3 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => { setDeleteModalOpen(false); setDeleteTarget(null); setAdminPassword(''); }}
+                  className="flex-1"
+                  disabled={deleteLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={deleteLoading}
+                  className="flex-1 bg-red-700 hover:bg-red-800 text-white"
+                >
+                  {deleteLoading ? 'Processing...' : 'Authorize & Execute'}
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

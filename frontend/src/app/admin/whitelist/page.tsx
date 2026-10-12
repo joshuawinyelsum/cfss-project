@@ -460,63 +460,61 @@ export default function WhitelistUploadPage() {
                             </span>
                           </td>
                           <td className="px-4 py-3 text-gray-500 text-xs">{new Date(w.created_at).toLocaleString()}</td>
-                          <td className="px-4 py-3 text-right space-x-2">
-                            {/* Toggle Active/Archived */}
-                            <button
-                              onClick={() => handleToggleStatus(w.id, w.status)}
-                              disabled={togglingId === w.id}
-                              className={`inline-flex items-center text-xs font-medium px-2 py-1 rounded transition-colors ${
-                                w.status === 'ACTIVE'
-                                  ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
-                                  : 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
-                              }`}
-                            >
-                              {togglingId === w.id ? (
-                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                              ) : null}
-                              {w.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
-                            </button>
-
-                            {/* Inspect Members */}
-                            <button
-                              onClick={() => handleInspect(w.id)}
-                              className="inline-flex items-center text-xs font-medium text-indigo-600 hover:text-indigo-800 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200"
-                              title="Inspect Members"
-                            >
-                              Inspect
-                            </button>
-
-                            {/* Export CSV */}
-                            <button
-                              onClick={() => handleExport(w.id)}
-                              disabled={exportingId === w.id}
-                              className="inline-flex items-center text-xs font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50"
-                              title="Export CSV"
-                            >
-                              {exportingId === w.id ? (
-                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                              ) : (
-                                <Download className="w-3.5 h-3.5 mr-1" />
-                              )}
-                              Export
-                            </button>
-
-                            {/* Delete (only allowed if not active) */}
-                            {w.status !== 'ACTIVE' && (
+                          <td className="px-4 py-3 text-right">
+                            <div className="inline-flex items-center gap-1.5 justify-end">
+                              {/* Inspect Entries */}
                               <button
-                                onClick={() => handleDelete(w.id)}
-                                disabled={deletingId === w.id}
-                                className="inline-flex items-center text-xs font-medium text-red-600 hover:text-red-800 disabled:opacity-50 ml-2"
-                                title="Delete Whitelist"
+                                onClick={() => handleInspect(w.id)}
+                                className="inline-flex items-center text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 px-2.5 py-1 rounded transition-colors"
+                                title="Inspect Entries"
                               >
-                                {deletingId === w.id ? (
-                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                ) : (
-                                  <Trash2 className="w-3.5 h-3.5 mr-1" />
-                                )}
-                                Delete
+                                Inspect
                               </button>
-                            )}
+
+                              {/* Export CSV */}
+                              <button
+                                onClick={() => handleExport(w.id)}
+                                disabled={exportingId === w.id}
+                                className="inline-flex items-center text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 px-2.5 py-1 rounded transition-colors disabled:opacity-50"
+                                title="Export CSV"
+                              >
+                                {exportingId === w.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin text-slate-500" />
+                                ) : (
+                                  <Download className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                                )}
+                                Export
+                              </button>
+
+                              {/* Toggle Active / Archived */}
+                              <button
+                                onClick={() => handleToggleStatus(w.id, w.status)}
+                                disabled={togglingId === w.id}
+                                className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors disabled:opacity-50"
+                              >
+                                {togglingId === w.id && (
+                                  <Loader2 className="w-3 h-3 mr-1 animate-spin text-slate-500" />
+                                )}
+                                {w.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                              </button>
+
+                              {/* Delete (only allowed if not active) */}
+                              {w.status !== 'ACTIVE' && (
+                                <button
+                                  onClick={() => handleDelete(w.id)}
+                                  disabled={deletingId === w.id}
+                                  className="inline-flex items-center text-xs font-medium text-red-700 hover:text-red-800 hover:bg-red-50 border border-red-200 px-2.5 py-1 rounded transition-colors disabled:opacity-50"
+                                  title="Delete Whitelist"
+                                >
+                                  {deletingId === w.id ? (
+                                    <Loader2 className="w-3 h-3 mr-1 animate-spin text-red-600" />
+                                  ) : (
+                                    <Trash2 className="w-3.5 h-3.5 mr-1 text-red-600" />
+                                  )}
+                                  Delete
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))

@@ -8,7 +8,15 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert } from '@/components/ui/alert';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable, { applyPlugin } from 'jspdf-autotable';
+
+if (typeof window !== 'undefined') {
+  try {
+    applyPlugin(jsPDF);
+  } catch {
+    // Already applied
+  }
+}
 
 interface Student {
   id: string;
@@ -87,18 +95,42 @@ export default function AdminStudentsPage() {
     });
   }, [students, searchTerm, communityFilter]);
 
-  const studentsByCommunity = useMemo(() => {
-    const map: Record<string, Student[]> = {};
-    filteredStudents.forEach(s => {
-      const key = s.community_name || 'Unassigned';
-      if (!map[key]) map[key] = [];
-      map[key].push(s);
+  const groupedCommunities = useMemo(() => {
+    const map = new Map<string, {
+      group_number: number;
+      group_label: string;
+      community_name: string;
+      district: string;
+      region: string;
+      students: Student[];
+    }>();
+
+    filteredStudents.forEach((student) => {
+      const commKey = student.community_name || 'Unassigned';
+      if (!map.has(commKey)) {
+        map.set(commKey, {
+          group_number: student.group_number ?? 9999,
+          group_label: student.group_label || (student.group_number ? `Group ${student.group_number}` : 'Unassigned'),
+          community_name: commKey,
+          district: student.district || '—',
+          region: student.region || '—',
+          students: []
+        });
+      }
+      map.get(commKey)!.students.push(student);
     });
-    return map;
+
+    // Sort students by student_id inside each group
+    map.forEach((g) => {
+      g.students.sort((a, b) => (a.student_id || '').localeCompare(b.student_id || ''));
+    });
+
+    // Sort groups numerically by canonical group_number
+    return Array.from(map.values()).sort((a, b) => a.group_number - b.group_number);
   }, [filteredStudents]);
 
   const generateStudentReportPDF = () => {
-    const doc = new (jsPDF as any)({
+    const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4'
@@ -108,7 +140,7 @@ export default function AdminStudentsPage() {
     const pageHeight = doc.internal.pageSize.height;
     const margin = 14;
 
-    const primaryColor = [9, 60, 34]; // CFSS Green #093C22
+    const primaryColor = [9, 60, 34]; // CFSS Institutional Green #093C22
     const textColor = [30, 41, 59];
 
     const now = new Date();
@@ -117,130 +149,127 @@ export default function AdminStudentsPage() {
 
     let currentY = 18;
 
+    // Official Title
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(15);
+    doc.setFontSize(14);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.text('COMMUNITY FIELD STUDY SYSTEM (CFSS)', margin, currentY);
+    doc.text('CFSS — STUDENT GROUP REGISTER', margin, currentY);
 
     currentY += 6;
-    doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
     doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-    doc.text('Official Student Fieldwork & Community Enrollment Report', margin, currentY);
+    doc.text('Academic Year: 2025/2026 Academic Year', margin, currentY);
 
     currentY += 5;
     doc.setFontSize(8.5);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Generated: ${dateStr} at ${timeStr} | Scope: ${communityFilter ? `Community "${communityFilter}"` : 'All Communities'} | Total Students: ${filteredStudents.length}`, margin, currentY);
+    doc.text(`Report Generation Date: ${dateStr} at ${timeStr} | Total Students: ${filteredStudents.length} | Total Groups: ${groupedCommunities.length}`, margin, currentY);
 
     currentY += 4;
     doc.setDrawColor(203, 213, 225);
-    doc.setLineWidth(0.4);
+    doc.setLineWidth(0.3);
     doc.line(margin, currentY, pageWidth - margin, currentY);
-    currentY += 6;
+    currentY += 8;
 
-    const communityEntries = Object.entries(studentsByCommunity);
-
-    if (communityEntries.length === 0) {
+    if (groupedCommunities.length === 0) {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'italic');
       doc.setTextColor(100, 116, 139);
-      doc.text('No student records found matching the current filter criteria.', margin, currentY + 6);
+      doc.text('No student records found matching the current filter criteria.', margin, currentY + 4);
     } else {
-      for (const [commName, groupStudents] of communityEntries) {
-        const firstStudent = groupStudents[0];
-        const groupLabel = firstStudent?.group_label || (firstStudent?.group_number ? `Group ${firstStudent.group_number}` : 'Unassigned Group');
-        const locationParts = [firstStudent?.district, firstStudent?.region].filter(Boolean);
-        const locationInfo = locationParts.length > 0 ? ` (${locationParts.join(', ')})` : '';
+      for (const group of groupedCommunities) {
+        if (currentY > pageHeight - 45) {
+          doc.addPage();
+          currentY = 20;
+        }
+
+        const groupTitle = group.group_number !== 9999
+          ? `GROUP ${group.group_number} — ${group.community_name.toUpperCase()}`
+          : `${group.community_name.toUpperCase()}`;
 
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
+        doc.setFontSize(10.5);
         doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-        doc.text(`Community: ${commName} — ${groupLabel}${locationInfo} [${groupStudents.length} Students]`, margin, currentY);
-        currentY += 3;
+        doc.text(groupTitle, margin, currentY);
+        currentY += 4.5;
 
-        const tableRows = groupStudents.map((s, idx) => [
-          String(idx + 1),
-          s.student_id || 'N/A',
-          s.name || 'N/A',
-          s.program || s.faculty || 'N/A',
-          s.gender || 'N/A',
-          s.phone_number || s.email || 'N/A',
-          groupLabel
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(71, 85, 105);
+        doc.text(`District: ${group.district || '—'}   |   Region: ${group.region || '—'}   |   Number of students: ${group.students.length}`, margin, currentY);
+        currentY += 3.5;
+
+        const tableRows = group.students.map((s) => [
+          s.student_id || '—',
+          s.name || '—',
+          s.faculty || '—',
+          s.program || '—',
+          s.gender || '—'
         ]);
 
-        (doc as any).autoTable({
+        autoTable(doc, {
           startY: currentY,
           head: [[
-            '#',
             'Index No.',
-            'Full Name',
-            'Program / Faculty',
-            'Gender',
-            'Contact',
-            'Group'
+            'Student Name',
+            'Faculty',
+            'Programme',
+            'Gender'
           ]],
           body: tableRows,
-          margin: { left: margin, right: margin, top: 22, bottom: 18 },
+          margin: { left: margin, right: margin, top: 20, bottom: 18 },
           showHead: 'everyPage',
-          theme: 'striped',
+          theme: 'plain',
           styles: {
             fontSize: 8,
-            cellPadding: 2,
+            cellPadding: 2.5,
             textColor: [30, 41, 59],
             overflow: 'linebreak',
             lineColor: [226, 232, 240],
             lineWidth: 0.1
           },
           headStyles: {
-            fillColor: primaryColor,
-            textColor: [255, 255, 255],
+            fillColor: [241, 245, 249],
+            textColor: [15, 23, 42],
             fontStyle: 'bold',
             fontSize: 8
           },
-          alternateRowStyles: {
-            fillColor: [248, 250, 252]
-          },
           columnStyles: {
-            0: { cellWidth: 8, halign: 'center' },
-            1: { cellWidth: 26, fontStyle: 'bold' },
+            0: { cellWidth: 32, fontStyle: 'bold' },
+            1: { cellWidth: 50 },
             2: { cellWidth: 42 },
-            3: { cellWidth: 42 },
-            4: { cellWidth: 16, halign: 'center' },
-            5: { cellWidth: 30 },
-            6: { cellWidth: 18, halign: 'center' }
+            3: { cellWidth: 44 },
+            4: { cellWidth: 14, halign: 'center' }
           },
           didDrawPage: (data: any) => {
             if (data.pageNumber > 1) {
               doc.setFontSize(8);
               doc.setFont('helvetica', 'normal');
               doc.setTextColor(100, 116, 139);
-              doc.text('COMMUNITY FIELD STUDY SYSTEM (CFSS) — STUDENT ENROLLMENT REPORT', margin, 12);
+              doc.text('CFSS — STUDENT GROUP REGISTER', margin, 12);
               doc.setDrawColor(226, 232, 240);
               doc.line(margin, 14, pageWidth - margin, 14);
             }
           }
         });
 
-        currentY = (doc as any).lastAutoTable.finalY + 8;
-        if (currentY > pageHeight - 30) {
-          doc.addPage();
-          currentY = 22;
-        }
+        const finalY = (doc as any).lastAutoTable?.finalY;
+        currentY = finalY ? finalY + 8 : currentY + 30;
       }
     }
 
-    const totalPages = doc.internal.getNumberOfPages();
+    const totalPages = (doc as any).internal.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
-      doc.setFontSize(8);
+      doc.setFontSize(7.5);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(148, 163, 184);
 
       doc.setDrawColor(226, 232, 240);
       doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
 
-      doc.text('CONFIDENTIAL — OFFICIAL ADMINISTRATIVE ENROLLMENT REPORT', margin, pageHeight - 7);
+      doc.text('CONFIDENTIAL — COMMUNITY FIELD STUDY SYSTEM (CFSS)', margin, pageHeight - 7);
       const pageText = `Page ${i} of ${totalPages}`;
       doc.text(pageText, pageWidth - margin - doc.getTextWidth(pageText), pageHeight - 7);
     }
@@ -252,7 +281,7 @@ export default function AdminStudentsPage() {
     try {
       setExportError('');
       const doc = generateStudentReportPDF();
-      doc.save(`CFSS_Students_${new Date().toISOString().split('T')[0]}.pdf`);
+      doc.save(`CFSS_Student_Group_Register_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (err: any) {
       console.error(err);
       setExportError(err.message || 'Failed to export PDF');
@@ -539,87 +568,77 @@ export default function AdminStudentsPage() {
             </div>
 
             {/* Modal Body: A4 Paper emulation */}
-            <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-gray-100 flex justify-center">
-              <div className="w-full max-w-[210mm] bg-white p-8 sm:p-12 rounded shadow-md border border-gray-200 text-gray-900 font-sans print:shadow-none print:border-none print:p-0">
+            <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-slate-100 flex justify-center">
+              <div className="w-full max-w-[210mm] bg-white p-8 sm:p-12 rounded shadow border border-slate-200 text-slate-900 font-sans print:shadow-none print:border-none print:p-0">
                 {/* Official Header */}
-                <div className="border-b-2 border-[#093C22] pb-4 mb-6">
+                <div className="border-b border-slate-200 pb-5 mb-6">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h1 className="text-xl font-bold tracking-tight text-[#093C22]">COMMUNITY FIELD STUDY SYSTEM (CFSS)</h1>
-                      <p className="text-sm font-semibold text-gray-700 mt-0.5">Official Student Fieldwork & Community Enrollment Report</p>
+                      <h1 className="text-xl font-bold tracking-tight text-[#093C22]">CFSS — STUDENT GROUP REGISTER</h1>
+                      <p className="text-xs text-slate-600 mt-1">Academic Year: 2025/2026 Academic Year</p>
                     </div>
-                    <div className="text-right text-xs text-gray-500">
-                      <p className="font-semibold text-gray-700">Official Report</p>
-                      <p>Date: {new Date().toLocaleDateString('en-GB')}</p>
+                    <div className="text-right text-xs text-slate-500">
+                      <p className="font-semibold text-slate-700">Official Administrative Register</p>
+                      <p>Date: {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                     </div>
                   </div>
-                  <div className="mt-3 pt-3 border-t border-gray-200 flex flex-wrap gap-4 text-xs text-gray-600">
-                    <span><strong className="text-gray-800">Filter:</strong> {communityFilter || 'All Communities'}</span>
-                    <span><strong className="text-gray-800">Total Enrolled:</strong> {filteredStudents.length} Students</span>
-                    <span><strong className="text-gray-800">Communities:</strong> {Object.keys(studentsByCommunity).length}</span>
+                  <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-5 text-xs text-slate-600">
+                    <span><strong className="text-slate-800">Total Enrolled:</strong> {filteredStudents.length} Students</span>
+                    <span><strong className="text-slate-800">Total Groups:</strong> {groupedCommunities.length} Groups</span>
+                    <span><strong className="text-slate-800">Scope:</strong> {communityFilter ? `Community "${communityFilter}"` : 'All Communities'}</span>
                   </div>
                 </div>
 
-                {/* Content: Grouped by Community */}
-                {Object.keys(studentsByCommunity).length === 0 ? (
-                  <div className="p-8 text-center text-gray-500 italic">
+                {/* Content: Grouped by Community in canonical group order */}
+                {groupedCommunities.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 italic">
                     No student records matching the selected criteria.
                   </div>
                 ) : (
                   <div className="space-y-8">
-                    {Object.entries(studentsByCommunity).map(([commName, groupStudents]) => {
-                      const firstStudent = groupStudents[0];
-                      const groupLabel = firstStudent?.group_label || (firstStudent?.group_number ? `Group ${firstStudent.group_number}` : 'Unassigned Group');
-                      const location = [firstStudent?.district, firstStudent?.region].filter(Boolean).join(', ');
-
-                      return (
-                        <div key={commName} className="break-inside-avoid">
-                          <div className="bg-gray-50 border-l-4 border-[#093C22] px-4 py-2 mb-2 flex justify-between items-center rounded-r">
-                            <div>
-                              <h3 className="text-sm font-bold text-gray-900">{commName.toUpperCase()} — {groupLabel}</h3>
-                              {location && <p className="text-xs text-gray-500">{location}</p>}
-                            </div>
-                            <span className="text-xs font-semibold px-2 py-0.5 bg-white border border-gray-200 rounded text-gray-700">
-                              {groupStudents.length} {groupStudents.length === 1 ? 'Student' : 'Students'}
-                            </span>
-                          </div>
-
-                          <div className="overflow-x-auto border border-gray-200 rounded">
-                            <table className="w-full text-left text-xs border-collapse">
-                              <thead className="bg-[#093C22] text-white">
-                                <tr>
-                                  <th className="py-2 px-2.5 font-bold w-8 text-center">#</th>
-                                  <th className="py-2 px-3 font-bold">Index No.</th>
-                                  <th className="py-2 px-3 font-bold">Student Name</th>
-                                  <th className="py-2 px-3 font-bold">Program / Faculty</th>
-                                  <th className="py-2 px-2.5 font-bold text-center">Gender</th>
-                                  <th className="py-2 px-3 font-bold">Contact</th>
-                                  <th className="py-2 px-2.5 font-bold text-center">Group</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-200">
-                                {groupStudents.map((s, idx) => (
-                                  <tr key={s.id || idx} className={idx % 2 === 1 ? 'bg-gray-50/70' : 'bg-white'}>
-                                    <td className="py-1.5 px-2.5 text-center text-gray-500">{idx + 1}</td>
-                                    <td className="py-1.5 px-3 font-mono font-bold text-gray-900">{s.student_id}</td>
-                                    <td className="py-1.5 px-3 font-medium text-gray-900">{s.name}</td>
-                                    <td className="py-1.5 px-3 text-gray-700">{s.program || s.faculty || 'N/A'}</td>
-                                    <td className="py-1.5 px-2.5 text-center text-gray-600">{s.gender || '—'}</td>
-                                    <td className="py-1.5 px-3 text-gray-600">{s.phone_number || s.email || '—'}</td>
-                                    <td className="py-1.5 px-2.5 text-center text-gray-700">{groupLabel}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                    {groupedCommunities.map((group) => (
+                      <div key={group.community_name} className="break-inside-avoid">
+                        {/* Group Header */}
+                        <div className="border-b border-slate-200 pb-2 mb-3">
+                          <h3 className="text-sm font-bold text-slate-900 tracking-wide">
+                            {group.group_number !== 9999 ? `GROUP ${group.group_number} — ${group.community_name.toUpperCase()}` : group.community_name.toUpperCase()}
+                          </h3>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            District: {group.district || '—'} &nbsp;|&nbsp; Region: {group.region || '—'} &nbsp;|&nbsp; Number of students: {group.students.length}
+                          </p>
                         </div>
-                      );
-                    })}
+
+                        <div className="border border-slate-200 rounded overflow-hidden">
+                          <table className="w-full text-left text-xs border-collapse">
+                            <thead className="bg-slate-50 border-b border-slate-200 text-slate-800">
+                              <tr>
+                                <th className="py-2 px-3 font-semibold w-36">Index No.</th>
+                                <th className="py-2 px-3 font-semibold">Student Name</th>
+                                <th className="py-2 px-3 font-semibold">Faculty</th>
+                                <th className="py-2 px-3 font-semibold">Programme</th>
+                                <th className="py-2 px-3 font-semibold text-center w-20">Gender</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {group.students.map((s, idx) => (
+                                <tr key={s.id || idx} className="hover:bg-slate-50/50">
+                                  <td className="py-2 px-3 font-mono font-medium text-slate-900">{s.student_id || '—'}</td>
+                                  <td className="py-2 px-3 text-slate-800">{s.name || '—'}</td>
+                                  <td className="py-2 px-3 text-slate-600">{s.faculty || '—'}</td>
+                                  <td className="py-2 px-3 text-slate-600">{s.program || '—'}</td>
+                                  <td className="py-2 px-3 text-center text-slate-600">{s.gender || '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
 
                 {/* Footer notes */}
-                <div className="mt-12 pt-4 border-t border-gray-200 text-[10px] text-gray-400 flex justify-between items-center">
+                <div className="mt-12 pt-4 border-t border-slate-200 text-[10px] text-slate-400 flex justify-between items-center">
                   <span>CONFIDENTIAL — COMMUNITY FIELD STUDY SYSTEM</span>
                   <span>Administrative Use Only</span>
                 </div>

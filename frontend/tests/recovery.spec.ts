@@ -81,7 +81,7 @@ test.describe('CFSS Recovery Verification', () => {
 
     // Verify A4 Preview Modal is visible
     await expect(page.locator('text=Student Enrollment Report — Print Preview').first()).toBeVisible();
-    await expect(page.locator('text=Official Student Fieldwork & Community Enrollment Report').first()).toBeVisible();
+    await expect(page.locator('text=CFSS — STUDENT GROUP REGISTER').first()).toBeVisible();
 
     // Close preview modal
     await page.click('button:has-text("✕")');

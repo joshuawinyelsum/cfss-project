@@ -28,9 +28,10 @@ async def lifespan(app: FastAPI):
             result = await db.execute(select(User).filter(User.student_id == "ADMIN"))
             admin = result.scalars().first()
             
-            # Secure: Only create if missing. Do NOT overwrite existing passwords.
+            # Secure: Only create if missing, or update if operator explicitly provides ADMIN_BOOTSTRAP_PASSWORD
+            bootstrap_pwd = os.getenv("ADMIN_BOOTSTRAP_PASSWORD")
             if not admin:
-                initial_pwd = os.getenv("ADMIN_INITIAL_PASSWORD", "CfssAdmin2026!SecureKey")
+                initial_pwd = bootstrap_pwd or os.getenv("ADMIN_INITIAL_PASSWORD", "CfssAdmin2026!SecureKey")
                 new_admin = User(
                     student_id="ADMIN",
                     name="System Administrator",
@@ -42,6 +43,13 @@ async def lifespan(app: FastAPI):
                     is_active=True
                 )
                 db.add(new_admin)
+                await db.commit()
+            elif bootstrap_pwd:
+                admin.password_hash = get_password_hash(bootstrap_pwd)
+                await db.commit()
+
+            if admin and not admin.email:
+                admin.email = os.getenv("ADMIN_EMAIL", "admin@cfss.local")
                 await db.commit()
             # Ensure active_whitelist_entries view exists
             from sqlalchemy import text

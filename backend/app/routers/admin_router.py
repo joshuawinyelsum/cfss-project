@@ -27,7 +27,11 @@ async def verify_admin_password(db: AsyncSession, password: str, current_admin: 
 
 
 @router.post("/communities", response_model=schemas.CommunityResponse)
-async def create_community(comm: schemas.CommunityCreate, db: AsyncSession = Depends(get_db_and_admin)):
+async def create_community(
+    comm: schemas.CommunityCreate, 
+    db: AsyncSession = Depends(get_db), 
+    admin: models.User = Depends(auth.get_current_admin)
+):
     # Check if exists
     result = await db.execute(select(models.Community).filter(models.Community.name == comm.name))
     if result.scalars().first():
@@ -39,9 +43,12 @@ async def create_community(comm: schemas.CommunityCreate, db: AsyncSession = Dep
     group_created = False
     for attempt in range(3):
         try:
-            max_group_result = await db.execute(select(func.max(models.Community.group_number)))
-            max_group = max_group_result.scalar() or 0
-            next_group = max_group + 1
+            # Deterministic, dense sequential group numbering
+            existing_groups_res = await db.execute(select(models.Community.group_number))
+            existing_groups = set(existing_groups_res.scalars().all())
+            next_group = 1
+            while next_group in existing_groups:
+                next_group += 1
             
             new_community = models.Community(
                 name=comm.name,
@@ -57,6 +64,13 @@ async def create_community(comm: schemas.CommunityCreate, db: AsyncSession = Dep
             db.add(new_community)
             await db.flush()
             
+            audit_log = models.AuditLog(
+                action="COMMUNITY_CREATED",
+                user_id=str(admin.id),
+                metadata_payload={"community_id": new_community.id, "name": new_community.name, "group_number": next_group}
+            )
+            db.add(audit_log)
+
             response_data = {
                 "id": str(new_community.id),
                 "name": new_community.name,
@@ -82,11 +96,14 @@ async def create_community(comm: schemas.CommunityCreate, db: AsyncSession = Dep
         raise HTTPException(status_code=500, detail="Failed to create community due to high concurrency")
         
     await db.commit()
-    
     return response_data
 
 @router.delete("/communities/{community_id}")
-async def delete_community(community_id: str, db: AsyncSession = Depends(get_db_and_admin)):
+async def delete_community(
+    community_id: str, 
+    db: AsyncSession = Depends(get_db), 
+    admin: models.User = Depends(auth.get_current_admin)
+):
     try:
         community_id_int = int(community_id)
     except ValueError:
@@ -98,16 +115,177 @@ async def delete_community(community_id: str, db: AsyncSession = Depends(get_db_
     if not community:
         raise HTTPException(status_code=404, detail="Community not found")
         
-    if community.current_count > 0:
-        raise HTTPException(status_code=400, detail="Cannot delete community with assigned students")
+    st_count_res = await db.execute(select(func.count(models.User.id)).filter(models.User.community_id == community_id_int))
+    actual_students = st_count_res.scalar() or 0
+
+    if actual_students > 0 or community.current_count > 0:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cannot delete community '{community.name}' with {actual_students or community.current_count} assigned students. Please use the protected reassignment workflow."
+        )
         
+    comm_name = community.name
     await db.delete(community)
+    
+    audit_log = models.AuditLog(
+        action="COMMUNITY_DELETED",
+        user_id=str(admin.id),
+        metadata_payload={"deleted_community_id": community_id_int, "community_name": comm_name}
+    )
+    db.add(audit_log)
     await db.commit()
-    return {"message": "Community deleted successfully"}
+    return {"message": f"Community '{comm_name}' deleted successfully"}
+
+@router.post("/communities/{community_id}/delete-with-reassignment", response_model=schemas.CommunityDeleteReassignResponse)
+async def delete_community_with_reassignment(
+    community_id: str,
+    payload: schemas.CommunityDeleteReassignRequest,
+    db: AsyncSession = Depends(get_db),
+    admin: models.User = Depends(auth.get_current_admin)
+):
+    try:
+        community_id_int = int(community_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid community ID")
+
+    # 1. Server-side password verification against current authenticated administrator
+    if not auth.verify_password(payload.admin_password, admin.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Incorrect administrator password. Re-authentication failed."
+        )
+
+    # 2. Retrieve source community
+    result = await db.execute(select(models.Community).filter(models.Community.id == community_id_int))
+    community = result.scalars().first()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    # 3. Retrieve all students currently assigned to this community
+    st_res = await db.execute(select(models.User).filter(models.User.community_id == community_id_int))
+    affected_students = st_res.scalars().all()
+    affected_count = len(affected_students)
+
+    target_id = None
+    target_name = ""
+
+    from sqlalchemy import update
+
+    if payload.strategy == "REASSIGN_EXISTING":
+        if not payload.target_community_id:
+            raise HTTPException(status_code=400, detail="Target community ID is required for strategy REASSIGN_EXISTING")
+        if payload.target_community_id == community_id_int:
+            raise HTTPException(status_code=400, detail="Target community cannot be the same as the community being deleted")
+
+        target_res = await db.execute(select(models.Community).filter(models.Community.id == payload.target_community_id))
+        target_comm = target_res.scalars().first()
+        if not target_comm:
+            raise HTTPException(status_code=404, detail="Target community not found")
+
+        # Capacity check
+        current_target_st = (await db.execute(select(func.count(models.User.id)).filter(models.User.community_id == target_comm.id))).scalar() or 0
+        available_slots = target_comm.capacity - current_target_st
+        if affected_count > available_slots:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Target community '{target_comm.name}' has insufficient capacity: needs {affected_count} slots, but only {available_slots} available."
+            )
+
+        # Atomic student reassignment
+        for st in affected_students:
+            st.community_id = target_comm.id
+        target_comm.current_count = current_target_st + affected_count
+
+        await db.execute(
+            update(models.SurveyRecord)
+            .where(models.SurveyRecord.community_id == community_id_int)
+            .values(community_id=target_comm.id)
+        )
+        target_id = target_comm.id
+        target_name = target_comm.name
+
+    elif payload.strategy == "CREATE_REPLACEMENT":
+        rep = payload.replacement_community
+        if not rep:
+            raise HTTPException(status_code=400, detail="Replacement community details required for CREATE_REPLACEMENT")
+        if rep.capacity < affected_count:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Replacement community capacity ({rep.capacity}) cannot be less than affected students ({affected_count})"
+            )
+
+        dup = (await db.execute(select(models.Community).filter(models.Community.name == rep.name))).scalars().first()
+        if dup:
+            raise HTTPException(status_code=400, detail=f"A community named '{rep.name}' already exists")
+
+        # Next canonical sequential group number
+        existing_groups_res = await db.execute(select(models.Community.group_number))
+        existing_groups = set(existing_groups_res.scalars().all())
+        next_group = 1
+        while next_group in existing_groups:
+            next_group += 1
+
+        new_comm = models.Community(
+            name=rep.name,
+            district=rep.district,
+            region=rep.region,
+            capacity=rep.capacity,
+            current_count=affected_count,
+            group_number=next_group,
+            latitude=rep.latitude,
+            longitude=rep.longitude,
+            spatial_metadata=rep.spatial_metadata
+        )
+        db.add(new_comm)
+        await db.flush()
+
+        for st in affected_students:
+            st.community_id = new_comm.id
+
+        await db.execute(
+            update(models.SurveyRecord)
+            .where(models.SurveyRecord.community_id == community_id_int)
+            .values(community_id=new_comm.id)
+        )
+        target_id = new_comm.id
+        target_name = new_comm.name
+
+    else:
+        raise HTTPException(status_code=400, detail="Invalid strategy. Must be REASSIGN_EXISTING or CREATE_REPLACEMENT.")
+
+    # 4. Safely delete the source community
+    deleted_comm_name = community.name
+    await db.delete(community)
+
+    # 5. Record audit trail
+    audit_log = models.AuditLog(
+        action="COMMUNITY_DELETED_AND_REASSIGNED",
+        user_id=str(admin.id),
+        metadata_payload={
+            "deleted_community_id": community_id_int,
+            "deleted_community_name": deleted_comm_name,
+            "strategy": payload.strategy,
+            "reassigned_count": affected_count,
+            "target_community_id": target_id,
+            "target_community_name": target_name
+        }
+    )
+    db.add(audit_log)
+
+    await db.commit()
+
+    return {
+        "message": f"Successfully deleted '{deleted_comm_name}' and reassigned {affected_count} students to '{target_name}'.",
+        "deleted_community_id": community_id_int,
+        "deleted_community_name": deleted_comm_name,
+        "reassigned_count": affected_count,
+        "target_community_id": target_id,
+        "target_community_name": target_name
+    }
 
 @router.get("/communities", response_model=List[schemas.CommunityResponse])
 async def get_communities(db: AsyncSession = Depends(get_db_and_admin)):
-    communities_result = await db.execute(select(models.Community).order_by(models.Community.id))
+    communities_result = await db.execute(select(models.Community).order_by(models.Community.group_number.asc()))
     communities = communities_result.scalars().all()
     
     response = []
@@ -356,7 +534,7 @@ async def get_all_students(skip: int = 0, limit: int = 100, db: AsyncSession = D
         select(models.User, models.Community)
         .outerjoin(models.Community, models.User.community_id == models.Community.id)
         .filter(models.User.role == "student")
-        .order_by(models.User.name.asc().nulls_last(), models.User.student_id.asc())
+        .order_by(models.Community.group_number.asc().nulls_last(), models.User.student_id.asc())
         .offset(skip)
         .limit(limit)
     )
@@ -465,3 +643,13 @@ async def get_admin_notifications(limit: int = 50, db: AsyncSession = Depends(ge
         })
         
     return notifications
+
+@router.get("/activity", response_model=List[schemas.AuditLogResponse])
+async def get_activity_logs(limit: int = 100, db: AsyncSession = Depends(get_db_and_admin)):
+    result = await db.execute(
+        select(models.AuditLog)
+        .order_by(models.AuditLog.timestamp.desc())
+        .limit(limit)
+    )
+    return result.scalars().all()
+

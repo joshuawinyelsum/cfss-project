@@ -140,7 +140,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Navigation */}
-        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1 no-scrollbar">
           <NavSection title="MAIN" />
           <NavItem href="/admin" icon={LayoutDashboard} label="Dashboard" active={pathname === '/admin'} pathname={pathname} />
           <NavItem href="/admin/students" icon={Users} label="Students" pathname={pathname} />
@@ -155,7 +155,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           <NavSection title="SYSTEM" />
           <NavItem href="/admin/settings" icon={Settings} label="Settings" pathname={pathname} />
-          <NavItem href="/admin/notifications" icon={Activity} label="Activity Logs" pathname={pathname} />
+          <NavItem href="/admin/activity" icon={Activity} label="Activity Logs" pathname={pathname} />
+          <NavItem href="/admin/notifications" icon={Bell} label="Notifications" pathname={pathname} />
         </div>
 
         {/* User Profile */}

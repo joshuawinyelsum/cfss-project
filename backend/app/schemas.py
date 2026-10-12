@@ -313,3 +313,30 @@ class FieldFeatureResponse(FieldFeatureBase):
 
     class Config:
         from_attributes = True
+
+class CommunityDeleteReassignRequest(BaseModel):
+    admin_password: str
+    strategy: str  # "REASSIGN_EXISTING" | "CREATE_REPLACEMENT"
+    target_community_id: Optional[int] = None
+    replacement_community: Optional[CommunityCreate] = None
+
+class CommunityDeleteReassignResponse(BaseModel):
+    message: str
+    deleted_community_id: int
+    deleted_community_name: str
+    reassigned_count: int
+    target_community_id: int
+    target_community_name: str
+
+class AuditLogResponse(BaseModel):
+    id: int
+    action: str
+    user_id: Optional[str] = None
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    metadata_payload: Optional[Dict[str, Any]] = None
+    trace_id: Optional[str] = None
+    timestamp: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

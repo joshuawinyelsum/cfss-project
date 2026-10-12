@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import or_, func
 from sqlalchemy.future import select
 from datetime import timedelta
 
@@ -11,7 +12,8 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 @router.post("/student/login", response_model=schemas.Token)
 async def student_login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(models.User).filter(models.User.student_id == form_data.username.upper()))
+    clean_id = (form_data.username or "").strip().upper()
+    result = await db.execute(select(models.User).filter(models.User.student_id == clean_id))
     user = result.scalars().first()
     
     if not user or user.role != "student" or not auth.verify_password(form_data.password, user.password_hash):
@@ -29,8 +31,20 @@ async def student_login(form_data: OAuth2PasswordRequestForm = Depends(), db: As
 
 @router.post("/admin/login", response_model=schemas.Token)
 async def admin_login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+    raw_identifier = (form_data.username or "").strip()
+    if not raw_identifier:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect admin credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     result = await db.execute(select(models.User).filter(
-        models.User.student_id == form_data.username.upper(), models.User.role == "admin"
+        models.User.role == "admin",
+        or_(
+            func.upper(models.User.student_id) == raw_identifier.upper(),
+            func.lower(models.User.email) == raw_identifier.lower()
+        )
     ))
     user = result.scalars().first()
 

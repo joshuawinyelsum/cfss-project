@@ -10,7 +10,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert } from '@/components/ui/alert';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable, { applyPlugin } from 'jspdf-autotable';
+
+if (typeof window !== 'undefined') {
+  try {
+    applyPlugin(jsPDF);
+  } catch {
+    // Plugin already registered
+  }
+}
 
 export default function AdminDashboard() {
   const { user, token, logout } = useAdminAuthStore();
@@ -127,7 +135,7 @@ export default function AdminDashboard() {
         ['Total Surveys Submitted', surveys.length]
       ];
       
-      doc.autoTable({
+      autoTable(doc, {
         startY: 50,
         head: [['Metric', 'Value']],
         body: statsData,
