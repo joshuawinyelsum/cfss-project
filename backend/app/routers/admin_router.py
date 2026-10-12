@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import func
-from typing import List
+from sqlalchemy import func, update, delete, or_, and_
+from typing import List, Optional, Dict, Any
+from datetime import datetime, timezone, timedelta
 
 from app import schemas, models, auth
 from app.database import get_db
@@ -346,6 +347,28 @@ async def update_community(community_id: str, comm_update: schemas.CommunityCrea
         "spatial_metadata": community.spatial_metadata
     }
 
+@router.get("/communities/{community_id}/students")
+async def get_community_students(community_id: int, db: AsyncSession = Depends(get_db_and_admin)):
+    result = await db.execute(
+        select(models.User)
+        .where(models.User.community_id == community_id, models.User.role == "student")
+        .order_by(models.User.name.asc())
+    )
+    students = result.scalars().all()
+    return [
+        {
+            "id": u.id,
+            "student_id": u.student_id,
+            "name": u.name,
+            "email": u.email or "",
+            "program": u.program or "",
+            "level": u.level,
+            "gender": u.gender or "",
+            "phone_number": u.phone_number or "",
+        }
+        for u in students
+    ]
+
 
 
 @router.post("/logout")
@@ -405,6 +428,27 @@ async def update_registration_setting(
     await db.refresh(settings)
     return settings
 
+@router.put("/settings/survey-collection", response_model=schemas.SettingsResponse)
+async def update_survey_collection_setting(
+    request: schemas.SurveyCollectionToggleRequest,
+    admin: models.User = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    await verify_admin_password(db, request.admin_password, current_admin=admin)
+
+    result = await db.execute(select(models.SystemSettings).limit(1))
+    settings = result.scalars().first()
+    
+    if not settings:
+        settings = models.SystemSettings()
+        db.add(settings)
+        
+    settings.survey_enabled = request.survey_enabled
+    
+    await db.commit()
+    await db.refresh(settings)
+    return settings
+
 @router.post("/change-password")
 async def change_admin_password(
     payload: schemas.AdminChangePasswordRequest,
@@ -438,12 +482,48 @@ async def get_settings(db: AsyncSession = Depends(get_db_and_admin)):
 
 @router.get("/surveys/stats", response_model=schemas.AdminSurveyStatsResponse)
 async def get_survey_stats(db: AsyncSession = Depends(get_db_and_admin)):
-    # Sync writes to SurveyRecord; only submitted records are collected data.
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    seven_days_ago = now - timedelta(days=7)
+    thirty_days_ago = now - timedelta(days=30)
+
+    # Total submitted surveys
     total_result = await db.execute(
         select(func.count(models.SurveyRecord.id)).where(models.SurveyRecord.status == "SUBMITTED")
     )
     total_surveys = total_result.scalar() or 0
-    
+
+    # Total drafts
+    drafts_result = await db.execute(
+        select(func.count(models.SurveyRecord.id)).where(models.SurveyRecord.status == "DRAFT")
+    )
+    total_drafts = drafts_result.scalar() or 0
+
+    # Period counts
+    today_res = await db.execute(
+        select(func.count(models.SurveyRecord.id)).where(
+            models.SurveyRecord.status == "SUBMITTED",
+            models.SurveyRecord.submitted_at >= today_start
+        )
+    )
+    submitted_today = today_res.scalar() or 0
+
+    seven_days_res = await db.execute(
+        select(func.count(models.SurveyRecord.id)).where(
+            models.SurveyRecord.status == "SUBMITTED",
+            models.SurveyRecord.submitted_at >= seven_days_ago
+        )
+    )
+    submitted_last_7_days = seven_days_res.scalar() or 0
+
+    thirty_days_res = await db.execute(
+        select(func.count(models.SurveyRecord.id)).where(
+            models.SurveyRecord.status == "SUBMITTED",
+            models.SurveyRecord.submitted_at >= thirty_days_ago
+        )
+    )
+    submitted_last_30_days = thirty_days_res.scalar() or 0
+
     # By community
     by_comm_query = (
         select(models.Community.name, func.count(models.SurveyRecord.id))
@@ -457,20 +537,69 @@ async def get_survey_stats(db: AsyncSession = Depends(get_db_and_admin)):
         {"community_name": name, "count": count}
         for name, count in by_comm_result.all()
     ]
-    
+
+    # By type
+    by_type_query = (
+        select(models.SurveyRecord.survey_type, func.count(models.SurveyRecord.id))
+        .where(models.SurveyRecord.status == "SUBMITTED")
+        .group_by(models.SurveyRecord.survey_type)
+        .order_by(models.SurveyRecord.survey_type)
+    )
+    by_type_result = await db.execute(by_type_query)
+    by_type = [
+        {"survey_type": stype, "count": count}
+        for stype, count in by_type_result.all()
+    ]
+
     return {
         "total_surveys": total_surveys,
-        "by_community": by_community
+        "by_community": by_community,
+        "by_type": by_type,
+        "submitted_today": submitted_today,
+        "submitted_last_7_days": submitted_last_7_days,
+        "submitted_last_30_days": submitted_last_30_days,
+        "total_drafts": total_drafts
     }
 
 @router.get("/surveys", response_model=List[schemas.AdminSurveyListResponse])
-async def get_all_surveys(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db_and_admin)):
+async def get_all_surveys(
+    skip: int = 0,
+    limit: int = 100,
+    community_id: Optional[int] = None,
+    survey_type: Optional[str] = None,
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+    db: AsyncSession = Depends(get_db_and_admin)
+):
     query = (
         select(models.SurveyRecord, models.User, models.Community)
         .join(models.User, models.SurveyRecord.created_by_student_id == models.User.id)
         .join(models.Community, models.SurveyRecord.community_id == models.Community.id)
-        .where(models.SurveyRecord.status == "SUBMITTED")
-        .order_by(models.SurveyRecord.submitted_at.desc().nulls_last(), models.SurveyRecord.created_at.desc())
+    )
+
+    if status:
+        query = query.where(models.SurveyRecord.status == status.upper())
+    else:
+        query = query.where(models.SurveyRecord.status == "SUBMITTED")
+
+    if community_id is not None:
+        query = query.where(models.SurveyRecord.community_id == community_id)
+
+    if survey_type:
+        query = query.where(func.upper(models.SurveyRecord.survey_type) == survey_type.upper())
+
+    if search and search.strip():
+        search_pattern = f"%{search.strip()}%"
+        query = query.where(
+            or_(
+                models.User.name.ilike(search_pattern),
+                models.User.student_id.ilike(search_pattern),
+                models.Community.name.ilike(search_pattern)
+            )
+        )
+
+    query = (
+        query.order_by(models.SurveyRecord.submitted_at.desc().nulls_last(), models.SurveyRecord.created_at.desc())
         .offset(skip)
         .limit(limit)
     )
@@ -499,7 +628,7 @@ async def get_survey(survey_id: str, db: AsyncSession = Depends(get_db_and_admin
         select(models.SurveyRecord, models.User, models.Community)
         .join(models.User, models.SurveyRecord.created_by_student_id == models.User.id)
         .join(models.Community, models.SurveyRecord.community_id == models.Community.id)
-        .where(models.SurveyRecord.id == survey_id, models.SurveyRecord.status == "SUBMITTED")
+        .where(models.SurveyRecord.id == survey_id, models.SurveyRecord.status != "DELETED")
     )
     result = await db.execute(query)
     row = result.first()
@@ -643,6 +772,39 @@ async def get_admin_notifications(limit: int = 50, db: AsyncSession = Depends(ge
         })
         
     return notifications
+
+@router.patch("/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: int, db: AsyncSession = Depends(get_db_and_admin)):
+    result = await db.execute(select(models.AdminNotification).where(models.AdminNotification.id == notification_id))
+    notif = result.scalars().first()
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    notif.is_read = True
+    await db.commit()
+    return {"message": "Notification marked as read", "id": notification_id}
+
+@router.delete("/notifications/{notification_id}")
+async def delete_notification(notification_id: int, db: AsyncSession = Depends(get_db_and_admin)):
+    result = await db.execute(select(models.AdminNotification).where(models.AdminNotification.id == notification_id))
+    notif = result.scalars().first()
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    await db.delete(notif)
+    await db.commit()
+    return {"message": "Notification dismissed", "id": notification_id}
+
+@router.delete("/notifications")
+async def clear_all_notifications(db: AsyncSession = Depends(get_db_and_admin)):
+    await db.execute(delete(models.AdminNotification))
+    await db.commit()
+    return {"message": "All notifications cleared"}
+
+@router.post("/notifications/mark-all-read")
+async def mark_all_notifications_read(db: AsyncSession = Depends(get_db_and_admin)):
+    await db.execute(update(models.AdminNotification).values(is_read=True))
+    await db.commit()
+    return {"message": "All notifications marked as read"}
+
 
 @router.get("/activity", response_model=List[schemas.AuditLogResponse])
 async def get_activity_logs(limit: int = 100, db: AsyncSession = Depends(get_db_and_admin)):

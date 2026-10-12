@@ -66,24 +66,24 @@ export default function MyGroupPage() {
       </div>
 
       {/* Header */}
-      <div className="bg-surface rounded-xl shadow-sm border border-border-strong p-6">
+      <div className="bg-surface rounded-xl shadow-xs border border-border-strong p-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center shrink-0">
-            <Users size={24} className="text-emerald-700" />
+          <div className="w-12 h-12 bg-cfss-green-soft rounded-xl flex items-center justify-center shrink-0 text-cfss-green">
+            <Users size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-primary">
-              My Group
+            <h1 className="text-xl font-bold text-primary">
+              My Fieldwork Group
               {user.group_number != null && (
-                <span className="ml-3 text-lg font-semibold text-emerald-700">
-                  GROUP {String(user.group_number).padStart(2, '0')}
+                <span className="ml-3 text-sm font-semibold px-2.5 py-1 rounded-full bg-cfss-green-soft text-cfss-green border border-cfss-green/20">
+                  Group {String(user.group_number).padStart(2, '0')}
                 </span>
               )}
             </h1>
-            <p className="text-muted mt-0.5">
-              Community: <strong className="text-primary">{user.community || 'Not assigned'}</strong>
+            <p className="text-xs text-secondary mt-1">
+              Assigned Community: <strong className="text-primary font-semibold">{user.community || 'Not assigned'}</strong>
               {!loading && members.length > 0 && (
-                <span className="ml-3 text-muted">· {members.length} member{members.length !== 1 ? 's' : ''}</span>
+                <span className="ml-2 text-muted">&bull; {members.length} registered member{members.length !== 1 ? 's' : ''}</span>
               )}
             </p>
           </div>
@@ -93,58 +93,58 @@ export default function MyGroupPage() {
       {/* States */}
       {loading && (
         <div className="flex justify-center py-16">
-          <Loader2 size={32} className="animate-spin text-emerald-600" />
+          <Loader2 size={32} className="animate-spin text-cfss-green" />
         </div>
       )}
 
       {!loading && error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex items-start gap-3">
-          <AlertCircle size={20} className="text-red-500 shrink-0 mt-0.5" />
-          <p className="text-red-700 text-sm">{error}</p>
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-start gap-3 text-xs text-red-800 dark:text-red-300">
+          <AlertCircle size={18} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+          <p>{error}</p>
         </div>
       )}
 
       {!loading && !error && members.length === 0 && (
         <div className="py-16 text-center border-2 border-dashed border-border-strong rounded-xl bg-surface">
-          <UserIcon size={40} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-muted font-medium">No group members found.</p>
-          <p className="text-sm text-muted mt-1">You may not yet be assigned to a community.</p>
+          <UserIcon size={36} className="mx-auto text-muted mb-3 opacity-50" />
+          <p className="text-sm text-primary font-semibold">No group members found</p>
+          <p className="text-xs text-secondary mt-1">You may not yet be assigned to an active fieldwork community.</p>
         </div>
       )}
 
       {/* Member Table */}
       {!loading && !error && members.length > 0 && (
-        <div className="bg-surface rounded-xl shadow-sm border border-border-strong overflow-hidden">
+        <div className="bg-surface rounded-xl shadow-xs border border-border-strong overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-page text-muted font-medium border-b border-border-strong">
+            <table className="w-full text-left text-xs whitespace-nowrap">
+              <thead className="bg-surface-elevated/60 text-secondary font-semibold border-b border-border-strong">
                 <tr>
-                  <th className="px-6 py-3 w-16">#</th>
-                  <th className="px-6 py-3">Full Name</th>
-                  <th className="px-6 py-3">Gender</th>
-                  <th className="px-6 py-3">Index Number</th>
-                  <th className="px-6 py-3">Faculty/School</th>
-                  <th className="px-6 py-3">Department</th>
-                  <th className="px-6 py-3">Phone</th>
+                  <th className="px-5 py-3 w-12 text-muted">#</th>
+                  <th className="px-5 py-3">Full Name</th>
+                  <th className="px-5 py-3">Gender</th>
+                  <th className="px-5 py-3">Student ID</th>
+                  <th className="px-5 py-3">Faculty / School</th>
+                  <th className="px-5 py-3">Program</th>
+                  <th className="px-5 py-3">Contact</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border text-secondary">
                 {members.map((member, i) => {
                   const isMe = member.id === user.id;
                   return (
-                    <tr key={member.id} className={isMe ? 'bg-emerald-50/50' : 'hover:bg-page/50 transition-colors'}>
-                      <td className="px-6 py-4 text-muted font-medium">{i + 1}</td>
-                      <td className="px-6 py-4 font-semibold text-primary">
+                    <tr key={member.id} className={isMe ? 'bg-cfss-green-soft/60 font-medium' : 'hover:bg-surface-elevated/40 transition-colors'}>
+                      <td className="px-5 py-3.5 text-muted">{i + 1}</td>
+                      <td className="px-5 py-3.5 font-semibold text-primary">
                         {member.full_name}
-                        {isMe && <span className="ml-2 text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">(You)</span>}
+                        {isMe && <span className="ml-2 text-[10px] font-bold text-cfss-green bg-cfss-green-soft border border-cfss-green/20 px-1.5 py-0.5 rounded-full">(You)</span>}
                       </td>
-                      <td className="px-6 py-4">{member.gender || '-'}</td>
-                      <td className="px-6 py-4 font-mono text-muted">{member.student_id}</td>
-                      <td className="px-6 py-4">{member.faculty || '-'}</td>
-                      <td className="px-6 py-4">{member.program || '-'}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-5 py-3.5">{member.gender || '—'}</td>
+                      <td className="px-5 py-3.5 font-mono text-muted">{member.student_id}</td>
+                      <td className="px-5 py-3.5">{member.faculty || '—'}</td>
+                      <td className="px-5 py-3.5 capitalize">{member.program || '—'}</td>
+                      <td className="px-5 py-3.5">
                         {member.phone_number ? (
-                          <a href={`tel:${member.phone_number.replace(/\s/g, '')}`} className="text-emerald-600 hover:text-emerald-700 font-medium">
+                          <a href={`tel:${member.phone_number.replace(/\s/g, '')}`} className="text-cfss-green font-semibold hover:underline">
                             {member.phone_number}
                           </a>
                         ) : (

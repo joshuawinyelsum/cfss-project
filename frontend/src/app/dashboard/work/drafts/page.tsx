@@ -194,29 +194,29 @@ export default function DraftsPage() {
         </div>
 
         {/* Flat List UI */}
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden border border-border-strong bg-surface shadow-xs">
           {records.length === 0 && !loading ? (
-            <div className="py-12 text-center bg-page">
-              <p className="text-muted mb-2">No drafts found.</p>
-              <Link href="/surveys" className="text-cfss-green hover:underline text-sm font-medium">Start a new survey</Link>
+            <div className="py-12 text-center bg-surface-elevated/20">
+              <p className="text-secondary text-xs mb-2">No active drafts found.</p>
+              <Link href="/surveys" className="text-cfss-green hover:underline text-xs font-semibold">Start a new survey &rarr;</Link>
             </div>
           ) : (
             <div className="divide-y divide-border">
               {records.map(record => (
                 <div
                   key={record.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 hover:bg-page transition-colors gap-4"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 hover:bg-surface-elevated/40 transition-colors gap-4"
                 >
                   <Link
                     href={`/surveys/${record.survey_type.toLowerCase()}/fill?id=${record.id}`}
                     className="flex-1 group cursor-pointer"
                   >
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-bold text-primary capitalize text-base">{record.survey_type.toLowerCase()} Survey</h3>
-                      <span className="text-[10px] font-bold px-2 py-0.5 bg-status-warning/10 text-status-warning rounded-full uppercase tracking-wide border border-status-warning/20">Draft</span>
+                      <h3 className="font-semibold text-primary capitalize text-sm">{record.survey_type.toLowerCase()} Survey</h3>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-full uppercase tracking-wide border border-amber-500/20">Draft</span>
                     </div>
                     
-                    <div className="flex items-center gap-4 text-sm text-muted">
+                    <div className="flex items-center gap-4 text-xs text-muted">
                       <div>
                         <span className="font-medium text-primary">{getEntityLabel(record.survey_type)}: </span>
                         <span className="font-mono text-secondary">{record.entity_id}</span>
@@ -228,10 +228,10 @@ export default function DraftsPage() {
                     </div>
                     
                     <div className="mt-3 flex items-center gap-3">
-                      <div className="w-full sm:w-48 bg-page rounded-full h-1.5 overflow-hidden">
+                      <div className="w-full sm:w-48 bg-surface-elevated border border-border rounded-full h-1.5 overflow-hidden">
                         <div className="bg-cfss-green h-1.5 rounded-full transition-all" style={{ width: `${record.progress}%` }}></div>
                       </div>
-                      <span className="text-xs font-medium text-secondary">{record.progress}%</span>
+                      <span className="text-[11px] font-semibold text-secondary">{record.progress}%</span>
                     </div>
                   </Link>
                   
@@ -239,7 +239,7 @@ export default function DraftsPage() {
                     <button
                       onClick={() => setConfirmDeleteId(record.id)}
                       disabled={deletingId === record.id}
-                      className="p-2 rounded-lg text-muted hover:text-status-error hover:bg-status-error/10 transition-colors disabled:opacity-50"
+                      className="p-2 rounded-lg text-muted hover:text-red-600 hover:bg-red-500/10 transition-colors disabled:opacity-50 cursor-pointer"
                       title="Delete draft"
                     >
                       {deletingId === record.id
@@ -249,9 +249,9 @@ export default function DraftsPage() {
                     </button>
                     <Link
                       href={`/surveys/${record.survey_type.toLowerCase()}/fill?id=${record.id}`}
-                      className="text-sm font-medium text-cfss-green flex items-center gap-1 hover:underline"
+                      className="text-xs font-semibold text-cfss-green flex items-center gap-1 hover:underline"
                     >
-                      Continue <ArrowRight size={16} />
+                      Continue <ArrowRight size={14} />
                     </Link>
                   </div>
                 </div>
@@ -279,11 +279,11 @@ export default function DraftsPage() {
 
       {/* Delete confirmation modal */}
       {confirmDeleteId && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <Card className="w-full max-w-sm p-6 border-0">
-            <h2 className="text-lg font-bold text-primary mb-2">Delete this draft?</h2>
-            <p className="text-sm text-muted mb-6">
-              This draft will be removed from your workspace. If it has already synchronized, the deletion will be queued and applied to the server when you're back online.
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100] flex items-center justify-center p-4">
+          <Card className="w-full max-w-sm p-6 border border-border-strong bg-surface shadow-2xl">
+            <h2 className="text-base font-semibold text-primary mb-2">Delete this survey draft?</h2>
+            <p className="text-xs text-secondary mb-6 leading-relaxed">
+              This draft will be permanently removed from your workspace. If it has already synchronized, the deletion will be queued and applied to the server when you are back online.
             </p>
             <div className="flex justify-end gap-3">
               <Button
@@ -297,7 +297,7 @@ export default function DraftsPage() {
                 onClick={() => handleDelete(confirmDeleteId)}
                 disabled={!!deletingId}
               >
-                Delete
+                Delete Draft
               </Button>
             </div>
           </Card>

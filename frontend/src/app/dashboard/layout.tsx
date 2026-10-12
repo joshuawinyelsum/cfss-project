@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/lib/store';
@@ -164,9 +164,10 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   
-  const [syncStatus, setSyncStatus] = useState(() =>
-    typeof navigator !== 'undefined' && !navigator.onLine ? 'Offline' : 'Online'
+  const [isOnline, setIsOnline] = useState(() =>
+    typeof navigator !== 'undefined' ? navigator.onLine : true
   );
+  const [pendingOpsCount, setPendingOpsCount] = useState<number>(0);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(() =>
     typeof window === 'undefined' ? null : localStorage.getItem('cfss_last_sync')
   );
@@ -175,28 +176,55 @@ export default function DashboardLayout({
   const [hydrated, setHydrated] = useState(false);
   const [authVerified, setAuthVerified] = useState(false);
 
+  const checkSyncStats = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const { db } = await import('@/lib/db');
+      const ops = await db.sync_operations.where('student_id').equals(user.id).toArray();
+      const pendingCount = ops.filter(op => op.status === 'PENDING' || op.status === 'FAILED').length;
+      setPendingOpsCount(pendingCount);
+    } catch {
+      // Ignored
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     if (!token || !user || user.role !== 'student') return;
 
+    checkSyncStats();
+
     const handleOnline = () => {
-      setSyncStatus('Online');
+      setIsOnline(true);
+      checkSyncStats();
       if (token) {
         setIsSyncing(true);
-        syncEngine.processQueue(token).finally(() => setIsSyncing(false));
+        syncEngine.processQueue(token).finally(() => {
+          setIsSyncing(false);
+          checkSyncStats();
+        });
       }
     };
-    const handleOffline = () => setSyncStatus('Offline');
+    const handleOffline = () => {
+      setIsOnline(false);
+      checkSyncStats();
+    };
 
     const handleSyncCompleted = () => {
       setIsSyncing(false);
       const now = new Date().toISOString();
       localStorage.setItem('cfss_last_sync', now);
       setLastSyncTime(now);
+      checkSyncStats();
+    };
+
+    const handleSyncQueued = () => {
+      checkSyncStats();
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('sync-completed', handleSyncCompleted);
+    window.addEventListener('sync-queued', handleSyncQueued);
 
     if (navigator.onLine && token) {
       const syncInitialQueue = async () => {
@@ -205,25 +233,44 @@ export default function DashboardLayout({
           await syncEngine.processQueue(token);
         } finally {
           setIsSyncing(false);
+          checkSyncStats();
         }
       };
       setTimeout(syncInitialQueue, 0);
     }
 
+    const interval = setInterval(checkSyncStats, 10000);
+
     return () => {
+      clearInterval(interval);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('sync-completed', handleSyncCompleted);
+      window.removeEventListener('sync-queued', handleSyncQueued);
     };
-  }, [user, token]);
+  }, [user, token, checkSyncStats]);
 
   useEffect(() => {
-    if (!lastSyncTime) return;
+    if (!lastSyncTime) {
+      setLastSyncText('Never');
+      return;
+    }
+    const parseSyncDate = (raw: string | null) => {
+      if (!raw) return null;
+      const num = Number(raw);
+      const d = !isNaN(num) && num > 10000000000 ? new Date(num) : new Date(raw);
+      return isNaN(d.getTime()) ? null : d;
+    };
     const updateText = () => {
       try {
-        setLastSyncText(formatDistanceToNow(new Date(lastSyncTime), { addSuffix: true }));
+        const d = parseSyncDate(lastSyncTime);
+        if (d) {
+          setLastSyncText(formatDistanceToNow(d, { addSuffix: true }));
+        } else {
+          setLastSyncText('Never');
+        }
       } catch {
-        // Ignored
+        setLastSyncText('Never');
       }
     };
     updateText();
@@ -430,30 +477,47 @@ export default function DashboardLayout({
 
         <div className="p-4 mt-auto border-t border-[#0c512e]">
           <div className="bg-surface/5 border border-white/10 rounded-xl p-4 mb-4">
-            <h3 className="text-sm font-medium text-white mb-2">Sync Status</h3>
-            <div className="flex items-center gap-2 text-xs text-emerald-100/80 mb-3">
-              <span className={`w-2 h-2 rounded-full ${syncStatus === 'Online' && !isSyncing ? 'bg-green-500' : isSyncing ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'}`}></span>
-              {isSyncing ? 'Syncing...' : syncStatus}
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-semibold text-emerald-100/90 uppercase tracking-wider">Sync State</h3>
+              <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                !isOnline 
+                  ? 'bg-red-500/20 text-red-200 border border-red-500/30' 
+                  : isSyncing 
+                  ? 'bg-amber-400/20 text-amber-200 border border-amber-400/30' 
+                  : pendingOpsCount > 0 
+                  ? 'bg-amber-400/20 text-amber-200 border border-amber-400/30' 
+                  : 'bg-emerald-500/20 text-emerald-200 border border-emerald-500/30'
+              }`}>
+                {isSyncing ? 'Syncing...' : !isOnline ? 'Offline' : pendingOpsCount > 0 ? `${pendingOpsCount} Pending` : 'All Synced'}
+              </span>
             </div>
-            <p className="text-[10px] text-emerald-100/50 mb-3">Last sync: {lastSyncText}</p>
+            
+            <p className="text-[11px] text-emerald-100/70 mb-3 flex items-center justify-between">
+              <span>Last sync:</span>
+              <span className="font-medium text-white">{lastSyncText}</span>
+            </p>
+            
             <button 
-              className={`w-full py-2 bg-surface/10 hover:bg-surface/20 border border-white/10 rounded-lg text-xs font-medium text-white transition-colors flex items-center justify-center gap-2 ${isSyncing || syncStatus === 'Offline' ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`w-full py-2 bg-surface/10 hover:bg-surface/20 border border-white/10 rounded-lg text-xs font-medium text-white transition-colors flex items-center justify-center gap-2 cursor-pointer ${isSyncing || !isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
               onClick={() => {
-                if (!isSyncing && token && syncStatus === 'Online') {
+                if (!isSyncing && token && isOnline) {
                   setIsSyncing(true);
-                  syncEngine.processQueue(token).finally(() => setIsSyncing(false));
+                  syncEngine.processQueue(token).finally(() => {
+                    setIsSyncing(false);
+                    checkSyncStats();
+                  });
                 }
               }}
-              disabled={isSyncing || syncStatus === 'Offline'}
+              disabled={isSyncing || !isOnline}
             >
               <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
-              {isSyncing ? 'Syncing...' : 'Sync Now'}
+              {isSyncing ? 'Syncing Queue...' : pendingOpsCount > 0 ? `Sync Now (${pendingOpsCount})` : 'Sync Now'}
             </button>
           </div>
 
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-300 hover:bg-red-500/20 hover:text-red-200 transition-colors w-full"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-300 hover:bg-red-500/20 hover:text-red-200 transition-colors w-full cursor-pointer"
           >
             <LogOut size={20} />
             Logout
@@ -474,12 +538,13 @@ export default function DashboardLayout({
             <span className="font-bold text-primary text-sm">CFSS Workspace</span>
           </div>
 
-          <div className="flex items-center gap-3">
-             <div className="flex items-center gap-1">
-               <span className={`w-2 h-2 rounded-full ${syncStatus === 'Online' && !isSyncing ? 'bg-green-500' : isSyncing ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'}`}></span>
+          <div className="flex items-center gap-2.5">
+             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-elevated border border-border text-[11px] text-secondary">
+               <span className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-400 animate-pulse' : !isOnline ? 'bg-red-500' : pendingOpsCount > 0 ? 'bg-amber-400' : 'bg-emerald-500'}`}></span>
+               <span>{isSyncing ? 'Syncing...' : !isOnline ? 'Offline' : pendingOpsCount > 0 ? `${pendingOpsCount} queued` : 'Synced'}</span>
              </div>
              <div className="w-8 h-8 rounded-full bg-[#093C22]/10 text-[#093C22] flex items-center justify-center font-bold text-sm shrink-0">
-                {user.full_name.charAt(0)}
+                {user.full_name?.charAt(0) || 'S'}
              </div>
           </div>
         </header>

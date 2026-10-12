@@ -110,14 +110,18 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-page p-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">CFSS Fieldwork</h1>
+        <div className="text-center mb-6">
+          <div className="w-12 h-12 bg-cfss-green text-white rounded-xl flex items-center justify-center font-bold text-xl mx-auto mb-3 shadow-xs">
+            C
+          </div>
+          <h1 className="text-xl font-bold text-primary tracking-tight">Community & Field Survey System</h1>
+          <p className="text-xs text-secondary mt-1">Student Fieldwork Research Portal</p>
         </div>
         
-        <Card>
+        <Card className="border border-border-strong bg-surface shadow-xs">
           <CardHeader>
-            <CardTitle>Student Portal</CardTitle>
-            <CardDescription>Log in to access your fieldwork tasks</CardDescription>
+            <CardTitle>Student Sign In</CardTitle>
+            <CardDescription>Enter your index credentials to access your fieldwork tasks</CardDescription>
           </CardHeader>
           <CardContent>
             {registered && (
@@ -142,13 +146,13 @@ export default function LoginPage() {
                   value={studentId}
                   onChange={(e) => setStudentId(e.target.value.toUpperCase())}
                   disabled={isLoading}
-                  placeholder="e.g. ABC/1234/5678"
+                  placeholder="e.g. CSC/0017/25"
                 />
               </div>
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <Label htmlFor="password" className="mb-0">Password</Label>
-                  <Link href="/recover-password" className="text-sm font-medium text-cfss-green hover:underline">Forgot password?</Link>
+                  <Link href="/recover-password" className="text-xs font-semibold text-cfss-green hover:underline">Forgot password?</Link>
                 </div>
                 <Input 
                   id="password"
@@ -169,9 +173,9 @@ export default function LoginPage() {
               </Button>
             </form>
           </CardContent>
-          <CardFooter className="justify-center">
-            <p className="text-sm text-gray-600">
-              Don't have an account? <Link href="/register" className="text-cfss-green font-medium hover:underline">Register here</Link>
+          <CardFooter className="justify-center border-t border-border bg-surface-elevated/40">
+            <p className="text-xs text-secondary">
+              Don&apos;t have an account? <Link href="/register" className="text-cfss-green font-semibold hover:underline">Register here</Link>
             </p>
           </CardFooter>
         </Card>

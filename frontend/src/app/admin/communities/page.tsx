@@ -6,13 +6,23 @@ import { useAdminAuthStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert } from '@/components/ui/alert';
 import dynamic from 'next/dynamic';
+import {
+  Building2,
+  Users,
+  MapPin,
+  Search,
+  Plus,
+  X,
+  Layers,
+  CheckCircle2,
+  AlertCircle
+} from 'lucide-react';
 
 const AdminCommunityMap = dynamic(() => import('@/components/AdminCommunityMap'), {
   ssr: false,
-  loading: () => <div className="h-[400px] flex items-center justify-center bg-page rounded-lg border border-border">Loading Map...</div>
+  loading: () => <div className="h-[400px] flex items-center justify-center bg-slate-50 rounded-lg border border-slate-200 text-slate-500">Loading Map...</div>
 });
 
 interface Community {
@@ -37,7 +47,7 @@ export default function AdminCommunitiesPage() {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   const [searchTerm, setSearchTerm] = useState('');
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -47,7 +57,18 @@ export default function AdminCommunitiesPage() {
 
   const [selectedCommunity, setSelectedCommunity] = useState<Community | null>(null);
   const [communityStudents, setCommunityStudents] = useState<any[]>([]);
+  const [memberSearch, setMemberSearch] = useState('');
   const [isEditingMap, setIsEditingMap] = useState(false);
+
+  const filteredMembers = useMemo(() => {
+    if (!memberSearch) return communityStudents;
+    const q = memberSearch.toLowerCase();
+    return communityStudents.filter((st: any) =>
+      String(st.name || '').toLowerCase().includes(q) ||
+      String(st.student_id || '').toLowerCase().includes(q) ||
+      String(st.program || '').toLowerCase().includes(q)
+    );
+  }, [communityStudents, memberSearch]);
 
   // Deletion state
   const [deleteTarget, setDeleteTarget] = useState<Community | null>(null);
@@ -89,28 +110,29 @@ export default function AdminCommunitiesPage() {
   }, [hydrated, token]);
 
   const filteredCommunities = useMemo(() => {
-    return communities.filter(c => 
+    return communities.filter(c =>
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.district.toLowerCase().includes(searchTerm.toLowerCase())
+      c.district.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.region.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [communities, searchTerm]);
+
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     const activeToken = token || useAdminAuthStore.getState().token;
-    if (!activeToken) {
-      setCreateError('Authentication required');
-      return;
-    }
+    if (!activeToken) return;
+
     setCreating(true);
     setCreateError('');
     try {
       await api.post('/api/admin/communities', newComm, {
         headers: { Authorization: `Bearer ${activeToken}` }
       });
-      await fetchCommunities();
       setShowCreateModal(false);
       setNewComm({ name: '', district: '', region: '', capacity: 10 });
+      setActionSuccess(`Community "${newComm.name}" created successfully.`);
+      await fetchCommunities();
     } catch (err: any) {
       console.error(err);
       setCreateError(getErrorMessage(err, 'Failed to create community'));
@@ -123,80 +145,74 @@ export default function AdminCommunitiesPage() {
     setSelectedCommunity(comm);
     setIsEditingMap(false);
     const activeToken = token || useAdminAuthStore.getState().token;
+    if (!activeToken) return;
+
     try {
-      const res = await api.get('/api/admin/students', {
+      const res = await api.get(`/api/admin/communities/${comm.id}/students`, {
         headers: { Authorization: `Bearer ${activeToken}` }
       });
-      const students = res.data.filter((s: any) => String(s.community_id) === String(comm.id));
-      setCommunityStudents(students);
+      setCommunityStudents(res.data);
     } catch (err) {
       console.error(err);
     }
   };
 
-  const handleSaveMap = async (spatialData: any, lat: number | null, lng: number | null) => {
+  const handleSaveMap = async (data: { latitude: number; longitude: number; spatial_metadata?: any }) => {
     if (!selectedCommunity) return;
     const activeToken = token || useAdminAuthStore.getState().token;
+    if (!activeToken) return;
+
     try {
-      const res = await api.put(`/api/admin/communities/${selectedCommunity.id}`, {
-        name: selectedCommunity.name,
-        district: selectedCommunity.district,
-        region: selectedCommunity.region,
-        capacity: selectedCommunity.capacity,
-        latitude: lat,
-        longitude: lng,
-        spatial_metadata: spatialData
-      }, {
+      await api.put(`/api/admin/communities/${selectedCommunity.id}`, data, {
         headers: { Authorization: `Bearer ${activeToken}` }
       });
-      // update local state
-      setCommunities(prev => prev.map(c => c.id === selectedCommunity.id ? res.data : c));
-      setSelectedCommunity(res.data);
       setIsEditingMap(false);
+      setActionSuccess(`Map coordinates updated for "${selectedCommunity.name}".`);
+      await fetchCommunities();
+      setSelectedCommunity(prev => prev ? { ...prev, ...data } : null);
     } catch (err: any) {
-      console.error("Failed to save map", err);
-      throw new Error(getErrorMessage(err, "Failed to save community boundary"));
+      alert(getErrorMessage(err, 'Failed to save spatial metadata'));
     }
   };
 
-  const handleDeleteEmpty = async () => {
-    if (!deleteTarget) return;
+  const handleSimpleDelete = async (comm: Community) => {
+    if (!confirm(`Are you sure you want to delete empty community "${comm.name}"?`)) return;
     const activeToken = token || useAdminAuthStore.getState().token;
-    setDeleteLoading(true);
-    setDeleteError('');
+    if (!activeToken) return;
+
     try {
-      await api.delete(`/api/admin/communities/${deleteTarget.id}`, {
+      await api.delete(`/api/admin/communities/${comm.id}`, {
         headers: { Authorization: `Bearer ${activeToken}` }
       });
-      setActionSuccess(`Community "${deleteTarget.name}" deleted successfully.`);
-      setDeleteModalOpen(false);
-      setDeleteTarget(null);
-      if (selectedCommunity?.id === deleteTarget.id) {
-        setSelectedCommunity(null);
-      }
+      setActionSuccess(`Community "${comm.name}" deleted successfully.`);
+      if (selectedCommunity?.id === comm.id) setSelectedCommunity(null);
       await fetchCommunities();
     } catch (err: any) {
-      setDeleteError(getErrorMessage(err, 'Failed to delete community'));
-    } finally {
-      setDeleteLoading(false);
+      alert(getErrorMessage(err, 'Failed to delete community'));
     }
   };
 
-  const handleProtectedDelete = async (e: React.FormEvent) => {
+  const handleProtectedDeleteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!deleteTarget) return;
+
     const activeToken = token || useAdminAuthStore.getState().token;
+    if (!activeToken) return;
+
     if (!adminPassword) {
-      setDeleteError('Administrator password is required to authorize this protected deletion.');
+      setDeleteError('Administrator password is required to execute deletion.');
       return;
     }
+
     setDeleteLoading(true);
     setDeleteError('');
+
     try {
       const payload: any = {
         admin_password: adminPassword,
         strategy: deleteStrategy
       };
+
       if (deleteStrategy === 'REASSIGN_EXISTING') {
         if (!targetCommunityId) {
           setDeleteError('Please select a target community for student reassignment.');
@@ -233,199 +249,246 @@ export default function AdminCommunitiesPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 animate-fade-in text-primary pb-12">
+
+      {/* Header Bar matching Reference */}
+      <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-3 border-b border-border-strong pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-primary">Communities</h1>
-          <p className="text-secondary mt-1 text-sm">Manage fieldwork locations and capacities.</p>
+          <div className="flex items-center gap-2.5">
+            <Building2 className="w-6 h-6 text-[#093C22]" />
+            <h1 className="text-2xl font-bold tracking-tight text-primary">Communities & Groups</h1>
+          </div>
+          <p className="text-sm text-secondary mt-1">
+            Manage fieldwork locations, group assignments, and student capacities.
+          </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          + Add Community
-        </Button>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#093C22] text-xs font-semibold text-white hover:bg-[#0c512e] transition-colors shadow-2xs"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Community</span>
+          </button>
+        </div>
       </div>
 
       {error && (
-        <Alert variant="destructive" className="flex items-center justify-between">
+        <Alert variant="destructive" className="flex items-center justify-between rounded-xl">
           <span>{error}</span>
           <Button variant="outline" size="sm" onClick={() => fetchCommunities()}>Retry</Button>
         </Alert>
       )}
 
       {actionSuccess && (
-        <Alert variant="success" className="flex items-center justify-between">
+        <Alert variant="success" className="flex items-center justify-between rounded-xl">
           <span>{actionSuccess}</span>
           <Button variant="ghost" size="sm" onClick={() => setActionSuccess('')}>✕</Button>
         </Alert>
       )}
 
-      {loading && communities.length === 0 ? (
-        <Card>
-          <CardContent className="p-12 text-center text-secondary">
-            <div className="inline-block w-8 h-8 border-4 border-cfss-green border-t-transparent rounded-full animate-spin mb-3"></div>
-            <p>Loading communities...</p>
-          </CardContent>
-        </Card>
-      ) : (
+      {/* Search Input Bar */}
+      <div className="bg-surface rounded-xl border border-border-strong p-4 flex flex-wrap items-center gap-3 text-xs shadow-xs">
+        <div className="relative w-full sm:w-64">
+          <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search by community or district..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 bg-page border border-border-strong rounded-lg text-primary placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[#093C22] focus:border-[#093C22] transition-colors"
+          />
+        </div>
+      </div>
 
-      <Card>
-        <CardContent className="p-4 sm:p-6">
-          <div className="mb-6">
-            <Input
-              type="text"
-              placeholder="Search by community or district name..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="max-w-md"
-            />
+      {/* Main Table */}
+      <div className="bg-surface rounded-xl border border-border-strong overflow-hidden shadow-xs">
+        {loading && communities.length === 0 ? (
+          <div className="p-16 text-center text-muted">
+            <div className="inline-block w-8 h-8 border-4 border-[#093C22] border-t-transparent rounded-full animate-spin mb-3" />
+            <p className="text-sm">Loading communities...</p>
           </div>
+        ) : filteredCommunities.length === 0 ? (
+          <div className="p-16 text-center text-muted">
+            <p className="text-base font-semibold text-primary">No communities found</p>
+            <p className="text-xs text-muted mt-1">Try adjusting your search criteria.</p>
+          </div>
+        ) : (
+          <div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-page/60 text-secondary font-semibold uppercase tracking-wider text-[11px] border-b border-border">
+                  <tr>
+                    <th className="py-3 px-4 font-semibold">Community Name</th>
+                    <th className="py-3 px-4 font-semibold w-32 whitespace-nowrap">Group</th>
+                    <th className="py-3 px-4 font-semibold">District & Region</th>
+                    <th className="py-3 px-4 font-semibold text-center">Capacity</th>
+                    <th className="py-3 px-4 font-semibold w-1/4">Allocation</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border text-primary">
+                  {filteredCommunities.map((comm) => {
+                    const isFull = comm.student_count >= comm.capacity;
+                    const progress = Math.min(100, Math.round((comm.student_count / (comm.capacity || 1)) * 100));
 
-          <div className="border border-border rounded-lg overflow-x-auto bg-surface">
-            <table className="min-w-full divide-y divide-border">
-              <thead className="bg-page">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Community</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Location</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Group</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Capacity</th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-secondary uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border bg-surface">
-                {filteredCommunities.map((comm) => {
-                  const isFull = comm.student_count >= comm.capacity;
-                  return (
-                    <tr 
-                      key={comm.id} 
-                      className="hover:bg-page cursor-pointer transition-colors"
-                      onClick={() => handleViewCommunity(comm)}
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-primary">{comm.name}</div>
-                        <div className="text-xs text-muted mt-1">{comm.student_count} assigned</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-primary">{comm.district}</div>
-                        <div className="text-xs text-secondary">{comm.region}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-cfss-green-soft text-cfss-green">
-                          {comm.group_label}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 bg-border-strong rounded-full h-1.5 overflow-hidden">
-                            <div 
-                              className={`h-full ${isFull ? 'bg-red-500' : 'bg-cfss-green'}`} 
-                              style={{ width: `${Math.min(100, (comm.student_count / comm.capacity) * 100)}%` }}
-                            ></div>
-                          </div>
-                          <span className={`text-xs font-medium ${isFull ? 'text-red-600' : 'text-secondary'}`}>
-                            {comm.slots_remaining} left
+                    return (
+                      <tr
+                        key={comm.id}
+                        className="hover:bg-page transition-colors cursor-pointer"
+                        onClick={() => handleViewCommunity(comm)}
+                      >
+                        <td className="py-3.5 px-4">
+                          <p className="font-bold text-primary leading-tight">{comm.name}</p>
+                          <p className="text-[11px] text-muted mt-0.5">{comm.student_count} students assigned</p>
+                        </td>
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-[#093C22] border border-emerald-200 whitespace-nowrap">
+                            {comm.group_label || `Group ${comm.group_number}`}
                           </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-medium" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-red-700 hover:text-red-800 hover:bg-red-50 border-red-200"
-                          onClick={() => {
-                            setDeleteTarget(comm);
-                            setDeleteStrategy('REASSIGN_EXISTING');
-                            setTargetCommunityId('');
-                            setAdminPassword('');
-                            setDeleteError('');
-                            setDeleteModalOpen(true);
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-      )}
-
-      {/* CREATE MODAL */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50">
-          <div className="bg-surface rounded-lg w-full max-w-md shadow-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-border bg-page">
-              <h2 className="text-lg font-bold text-primary">Add New Community</h2>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <p className="font-semibold text-primary">{comm.district}</p>
+                          <p className="text-[11px] text-muted">{comm.region}</p>
+                        </td>
+                        <td className="py-3.5 px-4 text-center font-semibold text-primary">
+                          {comm.capacity}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-full bg-page rounded-full h-2 overflow-hidden border border-border">
+                              <div
+                                className={`h-2 rounded-full ${isFull ? 'bg-red-500' : 'bg-[#093C22]'}`}
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+                            <span className="text-[11px] font-medium text-secondary whitespace-nowrap">
+                              {comm.slots_remaining} left
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="inline-flex items-center gap-2 justify-end">
+                            <button
+                              onClick={() => handleViewCommunity(comm)}
+                              className="px-2.5 py-1.5 text-xs font-semibold text-primary bg-surface hover:bg-page border border-border-strong rounded-lg transition-colors shadow-2xs"
+                            >
+                              Details
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (comm.student_count === 0) {
+                                  handleSimpleDelete(comm);
+                                } else {
+                                  setDeleteTarget(comm);
+                                  setDeleteStrategy('REASSIGN_EXISTING');
+                                  setTargetCommunityId('');
+                                  setAdminPassword('');
+                                  setDeleteError('');
+                                  setDeleteModalOpen(true);
+                                }
+                              }}
+                              className="px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-surface hover:bg-red-50 border border-red-200 rounded-lg transition-colors shadow-2xs"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-            
-            <form onSubmit={handleCreate} className="p-6 space-y-4">
+
+            <div className="px-5 py-3.5 bg-page/50 border-t border-border text-xs text-secondary font-medium">
+              Showing {filteredCommunities.length} of {communities.length} communities
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* CREATE COMMUNITY MODAL */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs">
+          <div className="bg-surface rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border border-border-strong animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-6 py-4 border-b border-border bg-page/50 flex items-center justify-between">
+              <h2 className="text-base font-bold text-primary">Add New Community</h2>
+              <button onClick={() => setShowCreateModal(false)} className="p-1 rounded-lg text-muted hover:text-primary hover:bg-page transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreate} className="p-6 space-y-4 text-xs">
               {createError && (
-                <Alert variant="destructive">
-                  {createError}
+                <Alert variant="destructive" className="rounded-xl">
+                  <span>{createError}</span>
                 </Alert>
               )}
-              
+
               <div>
-                <Label>Community Name</Label>
-                <Input 
-                  type="text" 
+                <Label className="text-primary font-semibold mb-1 block">Community Name</Label>
+                <Input
+                  type="text"
                   required
                   value={newComm.name}
                   onChange={e => setNewComm({...newComm, name: e.target.value})}
                   placeholder="e.g. Asuboi Community"
+                  className="text-xs bg-page border-border-strong rounded-lg text-primary placeholder:text-muted"
                 />
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label>District</Label>
-                  <Input 
-                    type="text" 
+                  <Label className="text-primary font-semibold mb-1 block">District</Label>
+                  <Input
+                    type="text"
                     required
                     value={newComm.district}
                     onChange={e => setNewComm({...newComm, district: e.target.value})}
                     placeholder="e.g. Ayensuano"
+                    className="text-xs bg-page border-border-strong rounded-lg text-primary placeholder:text-muted"
                   />
                 </div>
                 <div>
-                  <Label>Region</Label>
-                  <Input 
-                    type="text" 
+                  <Label className="text-primary font-semibold mb-1 block">Region</Label>
+                  <Input
+                    type="text"
                     required
                     value={newComm.region}
                     onChange={e => setNewComm({...newComm, region: e.target.value})}
                     placeholder="e.g. Eastern"
+                    className="text-xs bg-page border-border-strong rounded-lg text-primary placeholder:text-muted"
                   />
                 </div>
               </div>
-              
+
               <div>
-                <Label>Capacity</Label>
-                <Input 
-                  type="number" 
+                <Label className="text-primary font-semibold mb-1 block">Student Capacity</Label>
+                <Input
+                  type="number"
                   min="1"
                   required
                   value={newComm.capacity}
                   onChange={e => setNewComm({...newComm, capacity: parseInt(e.target.value) || 0})}
+                  className="text-xs bg-page border-border-strong rounded-lg text-primary"
                 />
-                <p className="text-xs text-muted mt-1">Maximum number of students allowed.</p>
+                <p className="text-[11px] text-muted mt-1">Maximum number of students permitted.</p>
               </div>
-              
-              <div className="pt-4 flex gap-3">
-                <Button 
-                  type="button" 
+
+              <div className="pt-3 flex gap-3 border-t border-border">
+                <Button
+                  type="button"
                   variant="outline"
                   onClick={() => setShowCreateModal(false)}
-                  className="flex-1"
+                  className="flex-1 text-xs rounded-lg border-border-strong text-primary hover:bg-page"
                 >
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   disabled={creating}
-                  className="flex-1"
+                  className="flex-1 bg-[#093C22] hover:bg-[#0c512e] text-white text-xs font-semibold rounded-lg shadow-2xs"
                 >
                   {creating ? 'Creating...' : 'Create Community'}
                 </Button>
@@ -435,310 +498,352 @@ export default function AdminCommunitiesPage() {
         </div>
       )}
 
-      {/* VIEW COMMUNITY DETAILS MODAL */}
+      {/* VIEW COMMUNITY DETAILS DRAWER / MODAL */}
       {selectedCommunity && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-gray-900/50 p-4 sm:p-0">
-          <div className={`bg-surface h-full shadow-2xl flex flex-col transition-all ${isEditingMap ? 'w-full max-w-4xl' : 'w-full max-w-md'}`}>
-            <div className="px-6 py-5 border-b border-border flex justify-between items-start bg-page">
+        <div className="fixed inset-0 z-50 flex justify-end bg-gray-900/60 backdrop-blur-xs p-4 sm:p-0">
+          <div className={`bg-surface h-full shadow-2xl flex flex-col transition-all border-l border-border-strong ${isEditingMap ? 'w-full max-w-4xl' : 'w-full max-w-xl'}`}>
+            {/* Drawer Header */}
+            <div className="px-6 py-5 border-b border-border flex justify-between items-start bg-page/50 shrink-0">
               <div>
-                <h2 className="text-xl font-bold text-primary">{selectedCommunity.name}</h2>
-                <div className="flex items-center gap-3 mt-1.5">
-                  <span className="bg-cfss-green-soft text-cfss-green font-bold text-xs px-2.5 py-0.5 rounded uppercase tracking-wide">
-                    {selectedCommunity.group_label}
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-[#093C22]" />
+                  <h2 className="text-lg font-bold text-primary">{selectedCommunity.name}</h2>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="bg-emerald-50 text-[#093C22] font-bold text-[11px] px-2.5 py-0.5 rounded-full border border-emerald-200">
+                    {selectedCommunity.group_label || `Group ${selectedCommunity.group_number}`}
                   </span>
-                  <span className="text-sm font-medium text-secondary">
+                  <span className="text-xs text-secondary">
                     {selectedCommunity.district}, {selectedCommunity.region}
                   </span>
                 </div>
               </div>
-              <Button variant="ghost" onClick={() => setSelectedCommunity(null)}>
-                X
-              </Button>
+              <button
+                onClick={() => setSelectedCommunity(null)}
+                className="p-1.5 rounded-lg text-muted hover:text-primary hover:bg-page transition-colors"
+                aria-label="Close details"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            
+
             {isEditingMap ? (
               <div className="flex-1 p-6 overflow-hidden flex flex-col">
-                <AdminCommunityMap 
-                  community={selectedCommunity} 
-                  onSave={handleSaveMap} 
-                  onCancel={() => setIsEditingMap(false)} 
+                <AdminCommunityMap
+                  community={selectedCommunity}
+                  onSave={handleSaveMap}
+                  onCancel={() => setIsEditingMap(false)}
                 />
               </div>
             ) : (
-              <>
-                <div className="p-6 border-b border-border">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bold text-primary">Capacity Status</h3>
-                    <span className="text-sm font-bold text-primary">{selectedCommunity.student_count} / {selectedCommunity.capacity}</span>
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs">
+                {/* Section 1: Placement & Capacity Metrics */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-secondary text-xs uppercase tracking-wider">
+                      Placement & Capacity Status
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                      selectedCommunity.student_count >= selectedCommunity.capacity
+                        ? 'bg-red-50 text-red-700 border border-red-200'
+                        : 'bg-emerald-50 text-[#093C22] border border-emerald-200'
+                    }`}>
+                      {selectedCommunity.student_count >= selectedCommunity.capacity ? 'At Capacity' : 'Slots Available'}
+                    </span>
                   </div>
-                  <div className="w-full bg-border-strong rounded-full h-2 overflow-hidden mb-2">
-                    <div 
-                      className={`h-full rounded-full transition-all ${selectedCommunity.student_count >= selectedCommunity.capacity ? 'bg-red-500' : 'bg-cfss-green'}`}
-                      style={{ width: `${Math.min(100, (selectedCommunity.student_count / selectedCommunity.capacity) * 100)}%` }}
-                    />
-                  </div>
-                  <p className="text-xs font-medium text-secondary">{selectedCommunity.slots_remaining} slots remaining</p>
-                  
-                  <div className="mt-6 pt-6 border-t border-border">
-                    <div className="flex justify-between items-center mb-2">
-                      <h3 className="font-bold text-primary">Geographic Boundary</h3>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setIsEditingMap(true)}>
-                          {(selectedCommunity as any).spatial_metadata ? 'Edit Map' : 'Set Map'}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-red-700 hover:text-red-800 hover:bg-red-50 border-red-200"
-                          onClick={() => {
-                            setDeleteTarget(selectedCommunity);
-                            setDeleteStrategy('REASSIGN_EXISTING');
-                            setTargetCommunityId('');
-                            setAdminPassword('');
-                            setDeleteError('');
-                            setDeleteModalOpen(true);
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div className="p-3.5 bg-page rounded-xl border border-border">
+                      <span className="text-muted block text-[10px] font-semibold uppercase tracking-wider">Group Number</span>
+                      <span className="text-sm font-bold text-primary mt-0.5 block">Group {selectedCommunity.group_number || 1}</span>
                     </div>
-                    {(selectedCommunity as any).spatial_metadata ? (
-                       <div className="text-xs text-secondary mt-1 flex gap-4">
-                         <span><span className="font-semibold">Area:</span> {((selectedCommunity as any).spatial_metadata?.properties?.area_sqm / 10000).toFixed(2)} ha</span>
-                         {selectedCommunity.latitude && <span><span className="font-semibold">Center:</span> {selectedCommunity.latitude.toFixed(4)}, {selectedCommunity.longitude?.toFixed(4)}</span>}
-                       </div>
-                    ) : (
-                      <p className="text-xs text-muted mt-1">No spatial boundary defined for this community.</p>
-                    )}
+                    <div className="p-3.5 bg-page rounded-xl border border-border">
+                      <span className="text-muted block text-[10px] font-semibold uppercase tracking-wider">Enrolled</span>
+                      <span className="text-sm font-bold text-primary mt-0.5 block">{selectedCommunity.student_count} Students</span>
+                    </div>
+                    <div className="p-3.5 bg-page rounded-xl border border-border">
+                      <span className="text-muted block text-[10px] font-semibold uppercase tracking-wider">Max Capacity</span>
+                      <span className="text-sm font-bold text-primary mt-0.5 block">{selectedCommunity.capacity} Slots</span>
+                    </div>
+                    <div className="p-3.5 bg-page rounded-xl border border-border">
+                      <span className="text-muted block text-[10px] font-semibold uppercase tracking-wider">Available</span>
+                      <span className="text-sm font-bold text-[#093C22] mt-0.5 block">{selectedCommunity.slots_remaining} Left</span>
+                    </div>
+                  </div>
+
+                  {/* Visual Capacity Bar */}
+                  <div className="p-3.5 bg-page rounded-xl border border-border space-y-1.5">
+                    <div className="flex justify-between text-[11px] text-secondary font-medium">
+                      <span>Occupancy Utilization</span>
+                      <span className="font-semibold text-primary">
+                        {Math.min(100, Math.round((selectedCommunity.student_count / (selectedCommunity.capacity || 1)) * 100))}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-surface rounded-full h-2 overflow-hidden border border-border">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          selectedCommunity.student_count >= selectedCommunity.capacity ? 'bg-red-500' : 'bg-[#093C22]'
+                        }`}
+                        style={{ width: `${Math.min(100, (selectedCommunity.student_count / (selectedCommunity.capacity || 1)) * 100)}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
-                
-                <div className="flex-1 overflow-y-auto p-6 bg-page">
-                  <h3 className="font-bold text-primary mb-4 flex items-center gap-2">
-                    Assigned Students ({communityStudents.length})
-                  </h3>
-                  
+
+                {/* Section 2: Geographical & Spatial Information */}
+                <div className="space-y-3">
+                  <span className="font-semibold text-secondary text-xs uppercase tracking-wider block">
+                    Geographic & Field Boundary
+                  </span>
+                  <div className="p-4 bg-page rounded-xl border border-border flex items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 font-semibold text-primary">
+                        <MapPin className="w-4 h-4 text-[#093C22]" />
+                        <span>{selectedCommunity.district}, {selectedCommunity.region} Region</span>
+                      </div>
+                      <div className="text-[11px] text-muted">
+                        {selectedCommunity.latitude && selectedCommunity.longitude
+                          ? `Coordinates: ${selectedCommunity.latitude.toFixed(5)}, ${selectedCommunity.longitude.toFixed(5)}`
+                          : 'Spatial boundary coordinates not set'}
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setIsEditingMap(true)} className="shrink-0 text-xs rounded-lg border-border-strong">
+                      Edit Map
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Section 3: Assigned Student Members Roster */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-secondary text-xs uppercase tracking-wider">
+                      Assigned Students ({communityStudents.length})
+                    </span>
+                    <span className="text-[11px] text-muted">Enrolled Members</span>
+                  </div>
+
+                  {communityStudents.length > 3 && (
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Search assigned members..."
+                        value={memberSearch}
+                        onChange={(e) => setMemberSearch(e.target.value)}
+                        className="w-full pl-9 pr-3 py-1.5 bg-page border border-border-strong rounded-lg text-xs text-primary placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[#093C22]"
+                      />
+                    </div>
+                  )}
+
                   {communityStudents.length === 0 ? (
-                    <div className="text-center py-8 text-secondary text-sm">
-                      No students assigned to this community yet.
+                    <div className="p-8 text-center text-muted italic bg-page rounded-xl border border-border">
+                      No students are currently allocated to this community group.
+                    </div>
+                  ) : filteredMembers.length === 0 ? (
+                    <div className="p-6 text-center text-muted text-xs bg-page rounded-xl border border-border">
+                      No members match search query "{memberSearch}".
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      {communityStudents.map(student => (
-                        <div key={student.id} className="bg-surface p-4 rounded border border-border shadow-sm flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-page border border-border text-primary flex items-center justify-center font-bold text-xs shrink-0">
-                            {student.name.substring(0,2).toUpperCase()}
+                    <div className="divide-y divide-border border border-border rounded-xl overflow-hidden max-h-60 overflow-y-auto">
+                      {filteredMembers.map((st) => (
+                        <div key={st.id} className="p-3 bg-surface hover:bg-page flex justify-between items-center transition-colors">
+                          <div className="min-w-0 pr-3">
+                            <p className="font-semibold text-primary truncate">{st.name}</p>
+                            <p className="text-[11px] text-muted font-mono">{st.student_id}</p>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-primary truncate">{student.name}</p>
-                            <p className="text-xs text-secondary truncate">{student.student_id} • {student.program}</p>
-                          </div>
+                          <span className="text-[11px] text-secondary shrink-0 font-medium">{st.program || 'Student'}</span>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* DELETE MODAL (EMPTY COMMUNITY) */}
-      {deleteModalOpen && deleteTarget && deleteTarget.student_count === 0 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50">
-          <div className="bg-surface rounded-lg w-full max-w-md shadow-lg overflow-hidden border border-border">
-            <div className="px-6 py-4 border-b border-border bg-page">
-              <h2 className="text-lg font-bold text-primary">Delete Community</h2>
-            </div>
-            <div className="p-6 space-y-4">
-              {deleteError && <Alert variant="destructive">{deleteError}</Alert>}
-              <p className="text-sm text-secondary">
-                Are you sure you want to delete <strong className="text-primary">{deleteTarget.name}</strong> ({deleteTarget.group_label})?
-              </p>
-              <p className="text-xs text-muted">
-                This community has no assigned students and will be permanently removed.
-              </p>
-              <div className="pt-4 flex gap-3">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => { setDeleteModalOpen(false); setDeleteTarget(null); }}
-                  className="flex-1"
-                  disabled={deleteLoading}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  type="button" 
-                  variant="default"
-                  onClick={handleDeleteEmpty}
-                  disabled={deleteLoading}
-                  className="flex-1 bg-red-700 hover:bg-red-800 text-white"
-                >
-                  {deleteLoading ? 'Deleting...' : 'Delete Community'}
-                </Button>
               </div>
+            )}
+
+
+            <div className="p-4 border-t border-border bg-page/50 flex justify-between">
+              <Button
+                variant="destructive"
+                size="sm"
+                className="rounded-lg text-xs"
+                onClick={() => {
+                  if (selectedCommunity.student_count === 0) {
+                    handleSimpleDelete(selectedCommunity);
+                  } else {
+                    setDeleteTarget(selectedCommunity);
+                    setDeleteStrategy('REASSIGN_EXISTING');
+                    setTargetCommunityId('');
+                    setAdminPassword('');
+                    setDeleteError('');
+                    setDeleteModalOpen(true);
+                  }
+                }}
+              >
+                Delete Community
+              </Button>
+              <Button variant="outline" size="sm" className="rounded-lg text-xs border-border-strong" onClick={() => setSelectedCommunity(null)}>
+                Close
+              </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* PROTECTED DELETE MODAL (POPULATED COMMUNITY) */}
-      {deleteModalOpen && deleteTarget && deleteTarget.student_count > 0 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50">
-          <div className="bg-surface rounded-lg w-full max-w-lg shadow-xl overflow-hidden border border-border">
-            <div className="px-6 py-4 border-b border-border bg-amber-50/50">
-              <h2 className="text-lg font-bold text-amber-900">Protected Deletion — {deleteTarget.name}</h2>
-              <p className="text-xs text-amber-700 mt-0.5">
-                This community currently has <strong className="font-bold">{deleteTarget.student_count}</strong> assigned student(s).
-              </p>
+      {/* PROTECTED DELETION & REASSIGNMENT MODAL */}
+      {deleteModalOpen && deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs">
+          <div className="bg-surface rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-border-strong animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-6 py-4 border-b border-border bg-red-50/60 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-red-700">Protected Community Deletion</h3>
+              <button onClick={() => setDeleteModalOpen(false)} className="p-1 rounded-lg text-muted hover:text-primary hover:bg-page transition-colors">
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            <form onSubmit={handleProtectedDelete} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-              {deleteError && <Alert variant="destructive">{deleteError}</Alert>}
+            <form onSubmit={handleProtectedDeleteSubmit} className="p-6 space-y-4 text-xs">
+              {deleteError && (
+                <Alert variant="destructive" className="rounded-xl">
+                  <span>{deleteError}</span>
+                </Alert>
+              )}
+
+              <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs">
+                Community <strong>"{deleteTarget.name}"</strong> has <strong>{deleteTarget.student_count}</strong> assigned students. You must reassign them to prevent orphaned records.
+              </div>
 
               <div>
-                <Label className="text-sm font-semibold text-primary">Select Reassignment Strategy</Label>
-                <div className="grid grid-cols-2 gap-3 mt-2">
-                  <button
-                    type="button"
-                    onClick={() => setDeleteStrategy('REASSIGN_EXISTING')}
-                    className={`p-3 rounded-lg border text-left text-xs transition-colors ${
-                      deleteStrategy === 'REASSIGN_EXISTING'
-                        ? 'border-cfss-green bg-cfss-green-soft text-cfss-green font-bold ring-1 ring-cfss-green'
-                        : 'border-border text-secondary hover:bg-page'
-                    }`}
-                  >
-                    <div className="font-semibold">Reassign Existing</div>
-                    <div className="text-[11px] text-muted mt-0.5">Transfer students to an existing community with capacity</div>
-                  </button>
+                <Label className="font-semibold text-primary block mb-1.5">Student Reassignment Strategy</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-colors ${
+                    deleteStrategy === 'REASSIGN_EXISTING'
+                      ? 'border-[#093C22] bg-emerald-50 text-[#093C22] font-bold'
+                      : 'border-border text-secondary hover:bg-page'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="strategy"
+                      checked={deleteStrategy === 'REASSIGN_EXISTING'}
+                      onChange={() => setDeleteStrategy('REASSIGN_EXISTING')}
+                      className="sr-only"
+                    />
+                    <span>Reassign to Existing</span>
+                  </label>
 
-                  <button
-                    type="button"
-                    onClick={() => setDeleteStrategy('CREATE_REPLACEMENT')}
-                    className={`p-3 rounded-lg border text-left text-xs transition-colors ${
-                      deleteStrategy === 'CREATE_REPLACEMENT'
-                        ? 'border-cfss-green bg-cfss-green-soft text-cfss-green font-bold ring-1 ring-cfss-green'
-                        : 'border-border text-secondary hover:bg-page'
-                    }`}
-                  >
-                    <div className="font-semibold">Create Replacement</div>
-                    <div className="text-[11px] text-muted mt-0.5">Create a new community and move students immediately</div>
-                  </button>
+                  <label className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-colors ${
+                    deleteStrategy === 'CREATE_REPLACEMENT'
+                      ? 'border-[#093C22] bg-emerald-50 text-[#093C22] font-bold'
+                      : 'border-border text-secondary hover:bg-page'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="strategy"
+                      checked={deleteStrategy === 'CREATE_REPLACEMENT'}
+                      onChange={() => setDeleteStrategy('CREATE_REPLACEMENT')}
+                      className="sr-only"
+                    />
+                    <span>Create Replacement</span>
+                  </label>
                 </div>
               </div>
 
               {deleteStrategy === 'REASSIGN_EXISTING' ? (
                 <div>
-                  <Label htmlFor="targetCommunity">Destination Community</Label>
+                  <Label className="font-semibold text-primary block mb-1">Target Community</Label>
                   <select
-                    id="targetCommunity"
                     value={targetCommunityId}
                     onChange={(e) => setTargetCommunityId(e.target.value)}
                     required
-                    className="w-full mt-1.5 px-3 py-2 text-sm border border-border rounded-lg bg-surface text-primary"
+                    className="w-full bg-page border border-border-strong text-xs rounded-lg px-3 py-2 text-primary focus:outline-none focus:ring-2 focus:ring-[#093C22]"
                   >
-                    <option value="">-- Choose destination community --</option>
-                    {communities
-                      .filter((c) => c.id !== deleteTarget.id)
-                      .map((c) => {
-                        const hasCapacity = c.slots_remaining >= deleteTarget.student_count;
-                        return (
-                          <option key={c.id} value={c.id} disabled={!hasCapacity}>
-                            {c.name} ({c.group_label}) — {c.slots_remaining} slots remaining {hasCapacity ? '' : `(Needs ${deleteTarget.student_count})`}
-                          </option>
-                        );
-                      })}
+                    <option value="">Select destination community...</option>
+                    {communities.filter(c => c.id !== deleteTarget.id).map(c => (
+                      <option key={c.id} value={c.id} disabled={c.slots_remaining < deleteTarget.student_count}>
+                        {c.name} ({c.group_label}) — {c.slots_remaining} slots free {c.slots_remaining < deleteTarget.student_count ? '(Insufficient capacity)' : ''}
+                      </option>
+                    ))}
                   </select>
                 </div>
               ) : (
-                <div className="space-y-3 bg-page p-4 rounded-lg border border-border">
-                  <h4 className="text-xs font-bold text-primary uppercase tracking-wide">Replacement Community Details</h4>
+                <div className="space-y-3 p-3.5 bg-page rounded-xl border border-border">
                   <div>
-                    <Label>Community Name</Label>
+                    <Label className="font-semibold text-primary block mb-1">Replacement Name</Label>
                     <Input
                       type="text"
                       required
                       value={replacementComm.name}
-                      onChange={(e) => setReplacementComm({ ...replacementComm, name: e.target.value })}
-                      placeholder="e.g. Asuboi North"
+                      onChange={e => setReplacementComm({...replacementComm, name: e.target.value})}
+                      placeholder="e.g. New Tamale Community"
+                      className="text-xs bg-surface border-border-strong rounded-lg"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label>District</Label>
-                      <Input
-                        type="text"
-                        required
-                        value={replacementComm.district}
-                        onChange={(e) => setReplacementComm({ ...replacementComm, district: e.target.value })}
-                        placeholder="District"
-                      />
-                    </div>
-                    <div>
-                      <Label>Region</Label>
-                      <Input
-                        type="text"
-                        required
-                        value={replacementComm.region}
-                        onChange={(e) => setReplacementComm({ ...replacementComm, region: e.target.value })}
-                        placeholder="Region"
-                      />
-                    </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      type="text"
+                      required
+                      value={replacementComm.district}
+                      onChange={e => setReplacementComm({...replacementComm, district: e.target.value})}
+                      placeholder="District"
+                      className="text-xs bg-surface border-border-strong rounded-lg"
+                    />
+                    <Input
+                      type="text"
+                      required
+                      value={replacementComm.region}
+                      onChange={e => setReplacementComm({...replacementComm, region: e.target.value})}
+                      placeholder="Region"
+                      className="text-xs bg-surface border-border-strong rounded-lg"
+                    />
                   </div>
                   <div>
-                    <Label>Capacity (Minimum: {deleteTarget.student_count})</Label>
                     <Input
                       type="number"
                       min={deleteTarget.student_count}
                       required
                       value={replacementComm.capacity}
-                      onChange={(e) => setReplacementComm({ ...replacementComm, capacity: parseInt(e.target.value) || deleteTarget.student_count })}
+                      onChange={e => setReplacementComm({...replacementComm, capacity: parseInt(e.target.value) || 0})}
+                      placeholder={`Capacity (min ${deleteTarget.student_count})`}
+                      className="text-xs bg-surface border-border-strong rounded-lg"
                     />
                   </div>
                 </div>
               )}
 
               <div>
-                <Label htmlFor="adminPassword">Administrator Password Confirmation</Label>
+                <Label className="font-semibold text-primary block mb-1">
+                  Administrator Password Re-authentication
+                </Label>
                 <Input
-                  id="adminPassword"
                   type="password"
                   required
                   value={adminPassword}
                   onChange={(e) => setAdminPassword(e.target.value)}
-                  placeholder="Enter your administrator password"
-                  className="mt-1.5"
+                  placeholder="Enter active admin password to confirm"
+                  className="text-xs bg-page border-border-strong rounded-lg text-primary"
                 />
-                <p className="text-[11px] text-muted mt-1">
-                  Required to authorize sensitive student reassignment and permanent record deletion.
-                </p>
               </div>
 
-              <div className="pt-4 flex gap-3 border-t border-border">
+              <div className="pt-3 flex gap-3 border-t border-border">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => { setDeleteModalOpen(false); setDeleteTarget(null); setAdminPassword(''); }}
-                  className="flex-1"
-                  disabled={deleteLoading}
+                  onClick={() => setDeleteModalOpen(false)}
+                  className="flex-1 text-xs rounded-lg border-border-strong text-primary hover:bg-page"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   disabled={deleteLoading}
-                  className="flex-1 bg-red-700 hover:bg-red-800 text-white"
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg shadow-2xs"
                 >
-                  {deleteLoading ? 'Processing...' : 'Authorize & Execute'}
+                  {deleteLoading ? 'Executing Reassignment...' : 'Confirm & Delete'}
                 </Button>
               </div>
             </form>
           </div>
         </div>
       )}
+
     </div>
   );
 }

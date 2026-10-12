@@ -8,20 +8,18 @@ import Link from 'next/link';
 import { FileEdit, CheckSquare, AlertCircle, ArrowRight } from 'lucide-react';
 
 export default function WorkWorkspacePage() {
-  const { user, token } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token);
   
   const [draftCount, setDraftCount] = useState<number>(0);
   const [submittedCount, setSubmittedCount] = useState<number>(0);
   const [needAttentionCount, setNeedAttentionCount] = useState<number>(0);
-  
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!token || !user) return;
-    let isMounted = true;
+    if (!token || !user?.id) return;
+    let active = true;
     
     const loadWorkspaceData = async () => {
-      setLoading(true);
       try {
         // 1. Get local data
         const localSurveys = await db.surveys.where('student_id').equals(user.id as number).toArray();
@@ -33,7 +31,7 @@ export default function WorkWorkspacePage() {
         
         // 2. Try fetching server data for recent submitted records
         let serverRecent: LocalSurvey[] = [];
-        if (navigator.onLine) {
+        if (typeof navigator !== 'undefined' && navigator.onLine) {
           try {
              const res = await api.get('/api/student/surveys/dashboard/stats', { 
                headers: { Authorization: `Bearer ${token}` }
@@ -41,7 +39,7 @@ export default function WorkWorkspacePage() {
              if (res.data?.recent_surveys) {
                 serverRecent = res.data.recent_surveys as LocalSurvey[];
              }
-          } catch(e) {
+          } catch (e) {
              console.warn("Could not fetch server workspace stats", e);
           }
         }
@@ -54,85 +52,75 @@ export default function WorkWorkspacePage() {
            }
         });
 
-        if (isMounted) {
+        if (active) {
            setDraftCount(localDrafts.length);
            setSubmittedCount(allSubmitted.length);
            setNeedAttentionCount(localPending.length);
         }
       } catch (e) {
         console.error("Workspace load error:", e);
-      } finally {
-        if (isMounted) setLoading(false);
       }
     };
     
     loadWorkspaceData();
     
-    return () => { isMounted = false; };
-  }, [user, token]);
+    return () => { 
+      active = false; 
+    };
+  }, [user?.id, token]);
 
   if (!user) return null;
 
   return (
     <div>
-
-
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="h-40 bg-surface rounded-xl animate-pulse border border-border-strong"></div>
-          <div className="h-40 bg-surface rounded-xl animate-pulse border border-border-strong"></div>
-          <div className="h-40 bg-surface rounded-xl animate-pulse border border-border-strong"></div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
           {/* Drafts Card */}
-          <Link href="/dashboard/work/drafts" className="group block bg-surface border border-border-strong rounded-xl p-6 hover:border-[#093C22] hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-[#093C22] focus:ring-offset-2">
+          <Link href="/dashboard/work/drafts" className="group block bg-surface border border-border-strong rounded-xl p-6 hover:border-cfss-green hover:shadow-xs transition-all focus:outline-none focus:ring-2 focus:ring-cfss-green/20">
             <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 rounded-lg bg-[#093C22]/10 flex items-center justify-center text-[#093C22]">
+              <div className="w-10 h-10 rounded-lg bg-cfss-green-soft flex items-center justify-center text-cfss-green">
                 <FileEdit size={20} />
               </div>
               <span className="text-3xl font-bold text-primary">{draftCount}</span>
             </div>
-            <h2 className="text-lg font-bold text-primary mb-1">Drafts</h2>
-            <p className="text-sm text-muted mb-6">Surveys you&apos;re still working on.</p>
-            <div className="flex items-center text-sm font-medium text-[#093C22] group-hover:underline">
-              Continue <ArrowRight size={16} className="ml-1 transition-transform group-hover:translate-x-1" />
+            <h2 className="text-base font-semibold text-primary mb-1">In-Progress Drafts</h2>
+            <p className="text-xs text-secondary mb-6">Surveys you are currently collecting in the field.</p>
+            <div className="flex items-center text-xs font-semibold text-cfss-green group-hover:underline">
+              Continue Drafts <ArrowRight size={14} className="ml-1 transition-transform group-hover:translate-x-1" />
             </div>
           </Link>
 
           {/* Submitted Card */}
-          <Link href="/dashboard/work/submitted" className="group block bg-surface border border-border-strong rounded-xl p-6 hover:border-[#093C22] hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-[#093C22] focus:ring-offset-2">
+          <Link href="/dashboard/work/submitted" className="group block bg-surface border border-border-strong rounded-xl p-6 hover:border-cfss-green hover:shadow-xs transition-all focus:outline-none focus:ring-2 focus:ring-cfss-green/20">
             <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 rounded-lg bg-[#093C22]/10 flex items-center justify-center text-[#093C22]">
+              <div className="w-10 h-10 rounded-lg bg-cfss-green-soft flex items-center justify-center text-cfss-green">
                 <CheckSquare size={20} />
               </div>
               <span className="text-3xl font-bold text-primary">{submittedCount}</span>
             </div>
-            <h2 className="text-lg font-bold text-primary mb-1">Submitted</h2>
-            <p className="text-sm text-muted mb-6">Surveys you&apos;ve sent for review.</p>
-            <div className="flex items-center text-sm font-medium text-[#093C22] group-hover:underline">
-              View <ArrowRight size={16} className="ml-1 transition-transform group-hover:translate-x-1" />
+            <h2 className="text-base font-semibold text-primary mb-1">Submitted Records</h2>
+            <p className="text-xs text-secondary mb-6">Completed surveys uploaded or staged for university review.</p>
+            <div className="flex items-center text-xs font-semibold text-cfss-green group-hover:underline">
+              View Submitted <ArrowRight size={14} className="ml-1 transition-transform group-hover:translate-x-1" />
             </div>
           </Link>
 
           {/* Need Attention Card */}
-          <Link href="/dashboard/work/attention" className="group block bg-surface border border-border-strong rounded-xl p-6 hover:border-amber-500 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2">
+          <Link href="/dashboard/work/attention" className="group block bg-surface border border-border-strong rounded-xl p-6 hover:border-amber-500/50 hover:shadow-xs transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/20">
             <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+              <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400">
                 <AlertCircle size={20} />
               </div>
               <span className="text-3xl font-bold text-primary">{needAttentionCount}</span>
             </div>
-            <h2 className="text-lg font-bold text-primary mb-1">Need Attention</h2>
-            <p className="text-sm text-muted mb-6">Work that needs your attention.</p>
-            <div className="flex items-center text-sm font-medium text-amber-700 group-hover:underline">
-              Review <ArrowRight size={16} className="ml-1 transition-transform group-hover:translate-x-1" />
+            <h2 className="text-base font-semibold text-primary mb-1">Sync & Activity Diagnostics</h2>
+            <p className="text-xs text-secondary mb-6">Offline queue items requiring synchronization or review.</p>
+            <div className="flex items-center text-xs font-semibold text-amber-600 dark:text-amber-400 group-hover:underline">
+              Review Queue <ArrowRight size={14} className="ml-1 transition-transform group-hover:translate-x-1" />
             </div>
           </Link>
 
         </div>
-      )}
     </div>
   );
 }

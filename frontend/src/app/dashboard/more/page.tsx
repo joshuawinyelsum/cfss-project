@@ -18,23 +18,23 @@ export default function MorePage() {
         <p className="text-sm text-muted mt-1">Secondary functions and settings</p>
       </div>
 
-      <div className="bg-surface border border-border-strong rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-surface border border-border-strong rounded-xl overflow-hidden shadow-xs">
         {menuItems.map((item, index) => (
           <Link
             key={item.name}
             href={item.href}
-            className={`flex items-center p-4 hover:bg-page transition-colors ${
+            className={`flex items-center p-4 hover:bg-surface-elevated/40 transition-colors ${
               index !== menuItems.length - 1 ? 'border-b border-border' : ''
             }`}
           >
-            <div className="w-10 h-10 rounded-full bg-[#093C22]/10 flex items-center justify-center shrink-0 mr-4">
-              <item.icon size={20} className="text-[#093C22]" />
+            <div className="w-10 h-10 rounded-xl bg-cfss-green-soft flex items-center justify-center shrink-0 mr-4 text-cfss-green">
+              <item.icon size={20} />
             </div>
             <div className="flex-1">
-              <h3 className="text-sm font-medium text-primary">{item.name}</h3>
-              <p className="text-xs text-muted mt-0.5">{item.description}</p>
+              <h3 className="text-sm font-semibold text-primary">{item.name}</h3>
+              <p className="text-xs text-secondary mt-0.5">{item.description}</p>
             </div>
-            <ChevronRight size={20} className="text-muted" />
+            <ChevronRight size={18} className="text-muted" />
           </Link>
         ))}
       </div>

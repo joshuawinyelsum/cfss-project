@@ -52,9 +52,15 @@ export default function StudentDashboard() {
   const { user, token, logout } = useAuthStore();
   const router = useRouter();
   
-  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
+    total_surveys: 0,
+    draft_surveys: 0,
+    submitted_surveys: 0,
+    pending_sync: 0,
+    recent_surveys: [],
+  });
   const [communityStats, setCommunityStats] = useState<CommunityStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<'auth' | 'server' | 'no-local-data' | null>(null);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
 
@@ -65,7 +71,19 @@ export default function StudentDashboard() {
         .where('student_id').equals(user.id as number)
         .filter(s => s.status !== 'DELETED')
         .toArray();
-      if (all.length === 0) return null;
+      if (all.length === 0) {
+        return {
+          total_surveys: 0,
+          draft_surveys: 0,
+          submitted_surveys: 0,
+          pending_sync: 0,
+          synced_surveys: 0,
+          failed_sync: 0,
+          last_activity: null,
+          recent_surveys: [],
+          _isLocal: true,
+        };
+      }
       const drafts = all.filter(s => s.status === 'DRAFT');
       const submitted = all.filter(s => s.status === 'SUBMITTED');
       const pendingOps = await db.sync_operations
@@ -208,32 +226,32 @@ export default function StudentDashboard() {
 
       {/* Offline banner */}
       {isOfflineMode && !loading && (
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-          <WifiOff size={16} className="shrink-0 text-amber-600" />
-          <span>Offline — showing data saved on this device. Changes will sync when you&apos;re back online.</span>
+        <div className="flex items-center gap-2 px-4 py-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs font-medium text-amber-800 dark:text-amber-300">
+          <WifiOff size={16} className="shrink-0 text-amber-600 dark:text-amber-400" />
+          <span>Offline mode active &bull; Displaying local data saved on this device. Changes will synchronize automatically when connection is restored.</span>
         </div>
       )}
 
       {/* Error states */}
       {error === 'no-local-data' && !loading && (
-        <div className="bg-page p-10 rounded-xl border border-border-strong flex flex-col items-center justify-center text-center gap-3">
+        <div className="bg-surface p-10 rounded-xl border border-border-strong flex flex-col items-center justify-center text-center gap-3">
           <WifiOff className="w-10 h-10 text-muted opacity-40" />
-          <h3 className="font-semibold text-primary">You&apos;re offline</h3>
-          <p className="text-sm text-muted max-w-xs">
-            No local data is available yet. Connect to the internet to load your workspace.
+          <h3 className="font-semibold text-primary">No Local Data Available</h3>
+          <p className="text-xs text-secondary max-w-xs">
+            Connect to the internet to initialize and sync your student workspace.
           </p>
         </div>
       )}
 
       {error === 'server' && !loading && (
-        <div className="bg-red-50 p-6 rounded-lg border border-red-100 flex flex-col items-center justify-center text-center">
-          <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
-          <h3 className="text-red-800 font-medium">Server error</h3>
+        <div className="bg-red-500/10 p-6 rounded-xl border border-red-500/30 flex flex-col items-center justify-center text-center">
+          <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400 mb-2" />
+          <h3 className="text-red-800 dark:text-red-300 font-semibold text-sm">Server connection error</h3>
           <button 
             onClick={loadData}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+            className="mt-4 px-4 py-2 bg-cfss-green text-white rounded-lg hover:bg-cfss-green-hover transition-colors text-xs font-semibold cursor-pointer shadow-xs"
           >
-            Retry
+            Retry Connection
           </button>
         </div>
       )}
@@ -268,10 +286,10 @@ export default function StudentDashboard() {
             
             {/* Recent Activity */}
             <section className="lg:col-span-2 bg-surface rounded-xl border border-border-strong flex flex-col overflow-hidden">
-              <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-page/50">
-                <h2 className="text-base font-bold text-primary">Recent Activity</h2>
-                <Link href="/dashboard/work/drafts" className="text-sm font-medium text-[#093C22] hover:underline">
-                  View Drafts
+              <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-surface-elevated/40">
+                <h2 className="text-sm font-semibold text-primary">Recent Activity</h2>
+                <Link href="/dashboard/work/drafts" className="text-xs font-semibold text-cfss-green hover:underline">
+                  View Drafts &rarr;
                 </Link>
               </div>
               <div className="divide-y divide-border">
@@ -280,35 +298,37 @@ export default function StudentDashboard() {
                     <Link 
                       href={`/surveys/${survey.survey_type.toLowerCase()}/${survey.status === 'SUBMITTED' ? 'view' : 'fill'}?id=${survey.id}`}
                       key={survey.id} 
-                      className="flex items-center gap-4 p-4 hover:bg-page transition-colors group cursor-pointer"
+                      className="flex items-center gap-4 p-4 hover:bg-surface-elevated/50 transition-colors group cursor-pointer"
                     >
-                      <div className="w-10 h-10 rounded-full bg-page flex items-center justify-center text-secondary shrink-0">
-                        {survey.survey_type === 'HOUSEHOLD' ? <Home size={20} /> : 
-                         survey.survey_type === 'HEALTH' ? <Heart size={20} /> :
-                         survey.survey_type === 'EDUCATION' ? <Book size={20} /> :
-                         <ClipboardList size={20} />}
+                      <div className="w-9 h-9 rounded-lg bg-cfss-green-soft text-cfss-green flex items-center justify-center shrink-0">
+                        {survey.survey_type === 'HOUSEHOLD' ? <Home size={18} /> : 
+                         survey.survey_type === 'HEALTH' ? <Heart size={18} /> :
+                         survey.survey_type === 'EDUCATION' ? <Book size={18} /> :
+                         <ClipboardList size={18} />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-primary truncate">
+                        <h4 className="text-xs font-semibold text-primary truncate">
                           {survey.survey_type} Survey #{survey.entity_id || survey.id.slice(0, 8)}
                         </h4>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase ${
-                            survey.status === 'SUBMITTED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold tracking-wide uppercase border ${
+                            survey.status === 'SUBMITTED' 
+                              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20' 
+                              : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20'
                           }`}>
                             {survey.status}
                           </span>
-                          <span className="text-xs text-muted">
+                          <span className="text-[11px] text-muted">
                             {survey.updated_at ? formatDistanceToNow(new Date(survey.updated_at), { addSuffix: true }) : ''}
                           </span>
                         </div>
                       </div>
-                      <ChevronRight size={18} className="text-gray-300 group-hover:text-muted transition-colors" />
+                      <ChevronRight size={16} className="text-muted group-hover:text-primary transition-colors" />
                     </Link>
                   ))
                 ) : (
                   <div className="p-8 text-center">
-                    <p className="text-sm text-muted">No recent activity.</p>
+                    <p className="text-xs text-secondary">No recent survey activity.</p>
                   </div>
                 )}
               </div>

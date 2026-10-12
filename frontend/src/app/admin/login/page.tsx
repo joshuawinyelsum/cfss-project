@@ -5,11 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAdminAuthStore } from '@/lib/store';
 import { api, getErrorMessage } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert } from '@/components/ui/alert';
 
 export default function AdminLoginPage() {
   const [username, setUsername] = useState('');
@@ -65,11 +60,10 @@ export default function AdminLoginPage() {
           };
         }
       } catch (meErr) {
-        console.warn('Could not fetch admin me profile, using defaults', meErr);
+        console.warn('Could not fetch admin profile, using default profile', meErr);
       }
       
       setAuth(token, adminProfile);
-      
       router.push('/admin');
     } catch (err: any) {
       const msg = getErrorMessage(err, 'Incorrect admin credentials');
@@ -79,61 +73,87 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-page p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">CFSS Fieldwork</h1>
+    <div className="min-h-screen flex flex-col justify-center items-center bg-[#F8FAFC] p-4 text-slate-800">
+      <div className="w-full max-w-sm space-y-6">
+        {/* Institutional Title */}
+        <div className="text-center space-y-1">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">CFSS Fieldwork System</h1>
+          <p className="text-xs text-slate-500">
+            Administrator Portal
+          </p>
         </div>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Admin Portal</CardTitle>
-            <CardDescription>Administrator Access Only</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {error && (
-              <Alert variant="destructive" className="mb-4">
-                {error}
-              </Alert>
-            )}
-            
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <Label htmlFor="username">Username</Label>
-                <Input 
-                  id="username"
-                  type="text" 
-                  required 
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  disabled={isLoading}
-                  placeholder="Enter username"
-                />
-              </div>
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <Label htmlFor="password" className="mb-0">Password</Label>
-                </div>
-                <Input 
-                  id="password"
-                  type="password" 
-                  required 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={isLoading}
-                  placeholder="••••••••"
-                />
-              </div>
-              <Button 
-                type="submit"
+
+        {/* Login Card */}
+        <div className="bg-white rounded border border-slate-200 p-6 space-y-5">
+          <div className="border-b border-slate-100 pb-3">
+            <h2 className="text-sm font-semibold text-slate-900">Sign in to Admin Console</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Enter administrative credentials to access system management.
+            </p>
+          </div>
+
+          {error && (
+            <div className="p-3 rounded border border-red-200 bg-red-50 text-red-700 text-xs font-medium animate-fade-in">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label htmlFor="username" className="block text-xs font-medium text-slate-700 mb-1">
+                Admin Username
+              </label>
+              <input 
+                id="username"
+                type="text" 
+                required 
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 disabled={isLoading}
-                className="w-full mt-2"
-              >
-                {isLoading ? 'Signing In...' : 'Sign In'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+                placeholder="admin"
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#093C22]"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-xs font-medium text-slate-700 mb-1">
+                Password
+              </label>
+              <input 
+                id="password"
+                type="password" 
+                required 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                placeholder="••••••••"
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#093C22]"
+              />
+            </div>
+
+            <button 
+              type="submit"
+              disabled={isLoading || !username || !password}
+              className="w-full mt-1 py-2 px-4 bg-[#093C22] hover:bg-[#072f1a] text-white font-medium text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? "Authenticating..." : "Sign In to Admin Console"}
+            </button>
+          </form>
+
+          <div className="pt-3 border-t border-slate-100 text-center text-2xs text-slate-400">
+            <span>Encrypted session • Role-based access enforced</span>
+          </div>
+        </div>
+
+        {/* Link to student portal */}
+        <div className="text-center">
+          <Link 
+            href="/login" 
+            className="text-xs text-slate-500 hover:text-slate-800 hover:underline"
+          >
+            ← Switch to Student Fieldwork Portal
+          </Link>
+        </div>
       </div>
     </div>
   );

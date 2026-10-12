@@ -143,6 +143,10 @@ class RegistrationToggleRequest(BaseModel):
     registration_enabled: bool
     admin_password: str
 
+class SurveyCollectionToggleRequest(BaseModel):
+    survey_enabled: bool
+    admin_password: str
+
 
 class AdminChangePasswordRequest(BaseModel):
     current_password: str
@@ -190,9 +194,18 @@ class AdminSurveyStatsCommunity(BaseModel):
     community_name: str
     count: int
 
+class AdminSurveyStatsType(BaseModel):
+    survey_type: str
+    count: int
+
 class AdminSurveyStatsResponse(BaseModel):
     total_surveys: int
     by_community: List[AdminSurveyStatsCommunity]
+    by_type: Optional[List[AdminSurveyStatsType]] = []
+    submitted_today: Optional[int] = 0
+    submitted_last_7_days: Optional[int] = 0
+    submitted_last_30_days: Optional[int] = 0
+    total_drafts: Optional[int] = 0
 
 class Token(BaseModel):
     access_token: str

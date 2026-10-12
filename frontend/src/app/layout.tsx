@@ -30,8 +30,40 @@ export default function RootLayout({
     <html
       lang="en"
       className="h-full antialiased font-sans"
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function() {
+              try {
+                var isDark = false;
+                var isAdmin = window.location.pathname.indexOf('/admin') === 0;
+                var storageKey = isAdmin ? 'cfss-admin-auth-storage' : 'cfss-auth-storage';
+                var raw = localStorage.getItem(storageKey);
+                var theme = 'light';
+                if (raw) {
+                  var parsed = JSON.parse(raw);
+                  if (parsed && parsed.state && parsed.state.theme) {
+                    theme = parsed.state.theme;
+                  }
+                }
+                if (theme === 'dark') {
+                  isDark = true;
+                } else if (theme === 'system') {
+                  isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                }
+                if (isDark) {
+                  document.documentElement.classList.add('dark');
+                } else {
+                  document.documentElement.classList.remove('dark');
+                }
+              } catch (e) {}
+            })();`,
+          }}
+        />
+      </head>
+      <body className="min-h-full flex flex-col bg-page text-primary">
         <ThemeProvider>
           {children}
         </ThemeProvider>

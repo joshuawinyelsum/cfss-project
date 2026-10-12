@@ -40,9 +40,19 @@ export default function SyncPage() {
           synced: syncedList.length
         });
         
+        const parseSyncDate = (raw: string | null) => {
+          if (!raw) return null;
+          const num = Number(raw);
+          const d = !isNaN(num) && num > 10000000000 ? new Date(num) : new Date(raw);
+          return isNaN(d.getTime()) ? null : d;
+        };
+
         const lastSync = localStorage.getItem('cfss_last_sync');
         if (lastSync) {
-          setLastSyncText(new Date(parseInt(lastSync)).toLocaleString());
+          const parsed = parseSyncDate(lastSync);
+          if (parsed) {
+            setLastSyncText(parsed.toLocaleString());
+          }
         }
       } catch(e) {}
     };
@@ -96,7 +106,7 @@ export default function SyncPage() {
       }
 
       await syncEngine.processQueue(token);
-      localStorage.setItem('cfss_last_sync', Date.now().toString());
+      localStorage.setItem('cfss_last_sync', new Date().toISOString());
     } finally {
       setIsSyncing(false);
     }
@@ -135,7 +145,7 @@ export default function SyncPage() {
       }
       await db.surveys.update(item.id, { sync_status: 'pending', sync_error: undefined });
       await syncEngine.processQueue(token);
-      localStorage.setItem('cfss_last_sync', Date.now().toString());
+      localStorage.setItem('cfss_last_sync', new Date().toISOString());
       setSelectedItem(null); // Close modal
     } finally {
       setIsSyncing(false);
@@ -174,16 +184,16 @@ export default function SyncPage() {
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <Card className="p-4 border-0 shadow-sm">
-          <div className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-1">Pending</div>
+        <Card className="p-4 border border-border-strong bg-surface shadow-xs">
+          <div className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-1">Pending</div>
           <div className="text-3xl font-bold text-primary">{stats.pending}</div>
         </Card>
-        <Card className="p-4 border-0 shadow-sm">
-          <div className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">Failed</div>
+        <Card className="p-4 border border-border-strong bg-surface shadow-xs">
+          <div className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wider mb-1">Failed</div>
           <div className="text-3xl font-bold text-primary">{stats.failed}</div>
         </Card>
-        <Card className="p-4 border-0 shadow-sm">
-          <div className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Synced</div>
+        <Card className="p-4 border border-border-strong bg-surface shadow-xs">
+          <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">Synced</div>
           <div className="text-3xl font-bold text-primary">{stats.synced}</div>
         </Card>
       </div>
@@ -191,16 +201,16 @@ export default function SyncPage() {
       <div className="space-y-8">
         {failedItems.length > 0 && (
           <section>
-             <h2 className="text-sm font-bold text-red-600 uppercase tracking-wider mb-3 flex items-center gap-2"><XCircle size={16}/> Failed Synchronization</h2>
-             <Card className="overflow-hidden divide-y divide-border border-red-100">
+             <h2 className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wider mb-3 flex items-center gap-2"><XCircle size={15}/> Failed Synchronization</h2>
+             <Card className="overflow-hidden divide-y divide-border border-red-200 dark:border-red-900/40">
                {failedItems.map((item) => (
-                 <div key={item.id} onClick={() => setSelectedItem(item)} className="p-4 flex items-center justify-between hover:bg-red-50 cursor-pointer transition-colors bg-white">
+                 <div key={item.id} onClick={() => setSelectedItem(item)} className="p-4 flex items-center justify-between hover:bg-surface-elevated cursor-pointer transition-colors bg-surface">
                    <div>
-                     <h3 className="text-sm font-bold text-primary capitalize">{item.survey_type.toLowerCase()} Survey</h3>
-                     <p className="text-xs text-secondary mt-1">ID: <span className="font-mono">{item.id.slice(0,8)}</span></p>
+                     <h3 className="text-sm font-semibold text-primary capitalize">{item.survey_type.toLowerCase()} Survey</h3>
+                     <p className="text-xs text-muted mt-1">ID: <span className="font-mono">{item.id.slice(0,8)}</span></p>
                    </div>
                    <div className="flex items-center gap-4">
-                     <span className="text-xs font-bold px-2 py-1 bg-red-100 text-red-700 rounded-md border border-red-200">Failed</span>
+                     <span className="text-xs font-medium px-2 py-0.5 bg-red-500/10 text-red-700 dark:text-red-400 rounded-md border border-red-500/30">Failed</span>
                      <ArrowRight size={16} className="text-muted" />
                    </div>
                  </div>
@@ -211,16 +221,16 @@ export default function SyncPage() {
 
         {pendingItems.length > 0 && (
           <section>
-             <h2 className="text-sm font-bold text-amber-600 uppercase tracking-wider mb-3 flex items-center gap-2"><Clock size={16}/> Pending Operations</h2>
-             <Card className="overflow-hidden divide-y divide-border border-amber-100">
+             <h2 className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-3 flex items-center gap-2"><Clock size={15}/> Pending Operations</h2>
+             <Card className="overflow-hidden divide-y divide-border border-amber-200 dark:border-amber-900/40">
                {pendingItems.map((item) => (
-                 <div key={item.id} onClick={() => setSelectedItem(item)} className="p-4 flex items-center justify-between hover:bg-amber-50 cursor-pointer transition-colors bg-white">
+                 <div key={item.id} onClick={() => setSelectedItem(item)} className="p-4 flex items-center justify-between hover:bg-surface-elevated cursor-pointer transition-colors bg-surface">
                    <div>
-                     <h3 className="text-sm font-bold text-primary capitalize">{item.survey_type.toLowerCase()} Survey</h3>
-                     <p className="text-xs text-secondary mt-1">ID: <span className="font-mono">{item.id.slice(0,8)}</span></p>
+                     <h3 className="text-sm font-semibold text-primary capitalize">{item.survey_type.toLowerCase()} Survey</h3>
+                     <p className="text-xs text-muted mt-1">ID: <span className="font-mono">{item.id.slice(0,8)}</span></p>
                    </div>
                    <div className="flex items-center gap-4">
-                     <span className="text-xs font-bold px-2 py-1 bg-amber-100 text-amber-700 rounded-md border border-amber-200">Pending</span>
+                     <span className="text-xs font-medium px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-md border border-amber-500/30">Pending</span>
                      <ArrowRight size={16} className="text-muted" />
                    </div>
                  </div>
@@ -231,17 +241,17 @@ export default function SyncPage() {
 
         {historyItems.length > 0 && (
           <section>
-             <h2 className="text-sm font-bold text-emerald-700 uppercase tracking-wider mb-3 flex items-center gap-2"><CheckCircle size={16}/> Recent Activity</h2>
+             <h2 className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider mb-3 flex items-center gap-2"><CheckCircle size={15}/> Recent Activity</h2>
              <Card className="overflow-hidden divide-y divide-border">
                {historyItems.map((item) => (
-                 <div key={item.id} onClick={() => setSelectedItem(item)} className="p-4 flex items-center justify-between hover:bg-page cursor-pointer transition-colors bg-white">
+                 <div key={item.id} onClick={() => setSelectedItem(item)} className="p-4 flex items-center justify-between hover:bg-surface-elevated cursor-pointer transition-colors bg-surface">
                    <div>
-                     <h3 className="text-sm font-bold text-primary capitalize">{item.survey_type.toLowerCase()} Survey</h3>
-                     <p className="text-xs text-secondary mt-1">ID: <span className="font-mono">{item.id.slice(0,8)}</span></p>
+                     <h3 className="text-sm font-semibold text-primary capitalize">{item.survey_type.toLowerCase()} Survey</h3>
+                     <p className="text-xs text-muted mt-1">ID: <span className="font-mono">{item.id.slice(0,8)}</span></p>
                    </div>
                    <div className="flex items-center gap-4">
                      <span className="text-xs font-medium text-muted">{new Date(item.updated_at).toLocaleString()}</span>
-                     <ArrowRight size={16} className="text-gray-300" />
+                     <ArrowRight size={16} className="text-muted" />
                    </div>
                  </div>
                ))}
@@ -260,41 +270,41 @@ export default function SyncPage() {
       
       {/* Detail Modal */}
       {selectedItem && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <Card className="w-full max-w-md overflow-hidden flex flex-col border-0">
-            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-page">
-              <h2 className="font-bold text-primary">Record Details</h2>
-              <button onClick={() => setSelectedItem(null)} className="p-2 -mr-2 text-muted hover:text-primary transition-colors">
-                <X size={20} />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100] flex items-center justify-center p-4">
+          <Card className="w-full max-w-md overflow-hidden flex flex-col border border-border-strong bg-surface shadow-2xl">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-surface-elevated/40">
+              <h2 className="font-semibold text-primary">Record Details</h2>
+              <button onClick={() => setSelectedItem(null)} className="p-2 -mr-2 text-muted hover:text-primary transition-colors cursor-pointer">
+                <X size={18} />
               </button>
             </div>
             
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-3 gap-2 text-sm">
-                <div className="text-muted font-medium">Type:</div>
-                <div className="col-span-2 font-bold text-primary capitalize">{selectedItem.survey_type.toLowerCase()} Survey</div>
+                <div className="text-secondary font-medium">Type:</div>
+                <div className="col-span-2 font-semibold text-primary capitalize">{selectedItem.survey_type.toLowerCase()} Survey</div>
                 
-                <div className="text-muted font-medium">ID:</div>
-                <div className="col-span-2 font-mono text-xs bg-page px-2 py-1 rounded inline-block text-secondary">{selectedItem.id}</div>
+                <div className="text-secondary font-medium">ID:</div>
+                <div className="col-span-2 font-mono text-xs bg-surface-elevated border border-border px-2 py-1 rounded inline-block text-secondary">{selectedItem.id}</div>
                 
-                <div className="text-muted font-medium mt-2">State:</div>
+                <div className="text-secondary font-medium mt-2">State:</div>
                 <div className="col-span-2 mt-2 flex">
                   {selectedItem.sync_status === 'failed' ? (
-                     <span className="text-xs font-bold px-2 py-1 bg-red-100 text-red-700 rounded-md border border-red-200">Failed</span>
+                     <span className="text-xs font-semibold px-2 py-0.5 bg-red-500/10 text-red-700 dark:text-red-400 rounded-md border border-red-500/30">Failed</span>
                   ) : selectedItem.sync_status === 'pending' ? (
-                     <span className="text-xs font-bold px-2 py-1 bg-amber-100 text-amber-700 rounded-md border border-amber-200">Pending Sync</span>
+                     <span className="text-xs font-semibold px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-md border border-amber-500/30">Pending Sync</span>
                   ) : (
-                     <span className="text-xs font-bold px-2 py-1 bg-emerald-100 text-emerald-700 rounded-md border border-emerald-200">Synced</span>
+                     <span className="text-xs font-semibold px-2 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 rounded-md border border-emerald-500/30">Synced</span>
                   )}
                 </div>
                 
-                <div className="text-muted font-medium mt-2">Updated:</div>
+                <div className="text-secondary font-medium mt-2">Updated:</div>
                 <div className="col-span-2 mt-2 text-primary">{new Date(selectedItem.updated_at).toLocaleString()}</div>
               </div>
 
               {selectedItem.sync_error && (
                 <Alert variant="destructive" title="Error Information">
-                  <p className="text-sm break-words mt-1">
+                  <p className="text-xs break-words mt-1">
                     {selectedItem.sync_error.includes('sqlalchemy') || selectedItem.sync_error.includes('asyncpg') || selectedItem.sync_error.includes('ProgrammingError')
                       ? 'Database synchronization error. Please check your connection and retry.'
                       : selectedItem.sync_error}
@@ -303,7 +313,7 @@ export default function SyncPage() {
               )}
             </div>
             
-            <div className="px-6 py-4 border-t border-border bg-page flex justify-end gap-3">
+            <div className="px-6 py-4 border-t border-border bg-surface-elevated/40 flex justify-end gap-3">
               <Button 
                 variant="outline"
                 onClick={() => setSelectedItem(null)}
@@ -318,7 +328,7 @@ export default function SyncPage() {
                   disabled={isSyncing}
                   className="flex items-center gap-2 bg-[#093C22] hover:bg-[#0c512e] text-white"
                 >
-                  <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
+                  <RefreshCw size={15} className={isSyncing ? "animate-spin" : ""} />
                   {isSyncing ? "Syncing..." : (selectedItem.sync_status === 'failed' ? "Retry Sync" : "Sync Now")}
                 </Button>
               )}

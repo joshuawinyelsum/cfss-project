@@ -36,13 +36,13 @@ export interface UserProfile {
 interface AuthState {
   token: string | null;
   user: UserProfile | null;
-  theme: string;
+  theme: 'light' | 'dark' | 'system';
   provisionedUsers: Record<number, ProvisioningRecord>;
   currentProvisioningStatus: ProvisioningStatus;
   setProvisioningStatus: (userId: number, status: ProvisioningStatus) => void;
   setAuth: (token: string, user: UserProfile) => void;
   logout: () => void;
-  setTheme: (theme: string) => void;
+  setTheme: (theme: 'light' | 'dark' | 'system') => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -71,7 +71,7 @@ export const useAuthStore = create<AuthState>()(
         // Data isolation is enforced at query time via student_id.
         // This ensures unsynchronized offline fieldwork is not destroyed on logout.
       },
-      setTheme: (theme: string) => set({ theme }),
+      setTheme: (theme: 'light' | 'dark' | 'system') => set({ theme }),
     }),
     {
       name: 'cfss-auth-storage', // STUDENT ONLY
@@ -102,7 +102,7 @@ export const useAdminAuthStore = create<AuthState>()(
       logout: () => {
         set({ token: null, user: null });
       },
-      setTheme: (theme: string) => set({ theme }),
+      setTheme: (theme: 'light' | 'dark' | 'system') => set({ theme }),
     }),
     {
       name: 'cfss-admin-auth-storage', // ADMIN ONLY

@@ -48,3 +48,10 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# visual audit artifacts
+/screenshots_audit/
+/screenshots_student_audit/
+screenshot_audit.js
+student_visual_audit.js
+

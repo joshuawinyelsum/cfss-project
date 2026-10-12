@@ -179,6 +179,84 @@ async def get_active_whitelist_entries(db: AsyncSession = Depends(get_db_and_adm
     rows = result.mappings().all()
     return {"entries": [dict(r) for r in rows]}
 
+@router.get("/whitelist/summary")
+async def get_whitelist_summary(db: AsyncSession = Depends(get_db_and_admin)):
+    from sqlalchemy import text
+    # 1. Total uploaded files and active files
+    files_res = await db.execute(text("""
+        SELECT COUNT(*) as total_files,
+               COALESCE(SUM(CASE WHEN status = 'ACTIVE' THEN 1 ELSE 0 END), 0) as active_files
+        FROM whitelists
+        WHERE status != 'DELETED'
+    """))
+    files_row = files_res.mappings().first()
+    total_files = files_row["total_files"] or 0
+    active_files = files_row["active_files"] or 0
+
+    # 2. Expected registrations across all non-deleted files (unique student_id count to avoid double-counting)
+    total_students_res = await db.execute(text("""
+        SELECT COUNT(DISTINCT we.student_id) as total_unique_students,
+               COUNT(we.id) as total_raw_entries
+        FROM whitelist_entries we
+        JOIN whitelists w ON we.whitelist_id = w.id
+        WHERE w.status != 'DELETED' AND we.student_id IS NOT NULL AND we.student_id != '';
+    """))
+    total_students_row = total_students_res.mappings().first()
+    expected_registrations = total_students_row["total_unique_students"] or 0
+    total_raw_entries = total_students_row["total_raw_entries"] or 0
+
+    # 3. Expected registrations from active files (unique student_id count in active whitelists)
+    active_students_res = await db.execute(text("""
+        SELECT COUNT(DISTINCT we.student_id) as active_unique_students,
+               COUNT(we.id) as active_raw_entries
+        FROM whitelist_entries we
+        JOIN whitelists w ON we.whitelist_id = w.id
+        WHERE w.status = 'ACTIVE' AND we.student_id IS NOT NULL AND we.student_id != '';
+    """))
+    active_students_row = active_students_res.mappings().first()
+    active_expected_registrations = active_students_row["active_unique_students"] or 0
+    active_raw_entries = active_students_row["active_raw_entries"] or 0
+
+    # 4. Registered students matching non-deleted whitelists
+    reg_students_res = await db.execute(text("""
+        SELECT COUNT(DISTINCT u.student_id) as registered_count
+        FROM users u
+        JOIN whitelist_entries we ON UPPER(u.student_id) = UPPER(we.student_id)
+        JOIN whitelists w ON we.whitelist_id = w.id
+        WHERE u.role = 'student' AND w.status != 'DELETED' AND we.student_id IS NOT NULL AND we.student_id != '';
+    """))
+    reg_students_row = reg_students_res.mappings().first()
+    registered_students = reg_students_row["registered_count"] or 0
+
+    # 5. Registered students matching active whitelists
+    active_reg_res = await db.execute(text("""
+        SELECT COUNT(DISTINCT u.student_id) as active_reg_count
+        FROM users u
+        JOIN whitelist_entries we ON UPPER(u.student_id) = UPPER(we.student_id)
+        JOIN whitelists w ON we.whitelist_id = w.id
+        WHERE u.role = 'student' AND w.status = 'ACTIVE' AND we.student_id IS NOT NULL AND we.student_id != '';
+    """))
+    active_reg_row = active_reg_res.mappings().first()
+    active_registered_students = active_reg_row["active_reg_count"] or 0
+
+    awaiting_registration = max(0, expected_registrations - registered_students)
+    active_awaiting_registration = max(0, active_expected_registrations - active_registered_students)
+
+    return {
+        "total_files": total_files,
+        "active_files": active_files,
+        "expected_students": expected_registrations,
+        "expected_registrations": expected_registrations,
+        "registered_students": registered_students,
+        "awaiting_registration": awaiting_registration,
+        "active_expected_students": active_expected_registrations,
+        "active_expected_registrations": active_expected_registrations,
+        "active_registered_students": active_registered_students,
+        "active_awaiting_registration": active_awaiting_registration,
+        "total_raw_entries": total_raw_entries,
+        "active_raw_entries": active_raw_entries
+    }
+
 @router.get("/whitelist/{id}")
 async def get_whitelist_entries(id: int, page: int = 1, limit: int = 50, db: AsyncSession = Depends(get_db_and_admin)):
     offset = (page - 1) * limit

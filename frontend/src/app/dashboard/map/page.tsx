@@ -184,13 +184,13 @@ export default function MapPage() {
 
   return (
     <div className="flex flex-col h-full bg-page relative">
-      <div className="bg-surface border-b border-border-strong px-4 py-3 shrink-0 flex items-center justify-between z-10 relative shadow-sm">
+      <div className="bg-surface border-b border-border-strong px-4 py-3 shrink-0 flex items-center justify-between z-10 relative shadow-xs">
         <div>
-          <h1 className="font-bold text-gray-900">Community Map</h1>
-          <p className="text-xs text-gray-500 flex items-center gap-1">
+          <h1 className="font-bold text-primary text-sm">Community Field Map</h1>
+          <p className="text-xs text-secondary flex items-center gap-1">
             {community.name}
             {isOffline && (
-              <span className="inline-flex items-center gap-1 text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded ml-2">
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded ml-2">
                 <WifiOff size={10} />
                 Offline
               </span>
@@ -198,19 +198,19 @@ export default function MapPage() {
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <button 
              onClick={() => setEditMode(!editMode)}
-             className={`text-xs px-3 py-1.5 rounded-md shadow-sm font-medium flex items-center gap-1 transition-colors ${editMode ? 'bg-amber-100 text-amber-800 hover:bg-amber-200' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}
+             className={`text-xs px-3 py-1.5 rounded-lg shadow-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${editMode ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30' : 'bg-surface text-primary hover:bg-surface-elevated border border-border-strong'}`}
           >
-            {editMode ? <><MapPin size={14} /> Exit Editing</> : <><Edit3 size={14} /> Edit Boundary</>}
+            {editMode ? <><MapPin size={13} /> Exit Editing</> : <><Edit3 size={13} /> Edit Boundary</>}
           </button>
 
           {features.length > 0 && (
             <select 
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="text-xs border-gray-300 rounded-md shadow-sm focus:border-[#093C22] focus:ring-[#093C22] py-1.5 pl-2 pr-6"
+              className="text-xs border border-border-strong rounded-lg shadow-xs bg-surface text-primary focus:border-cfss-green focus:ring-1 focus:ring-cfss-green py-1.5 pl-2.5 pr-6 cursor-pointer"
             >
               {featureTypes.map(ft => (
                 <option key={ft} value={ft}>
@@ -225,11 +225,11 @@ export default function MapPage() {
       <div className="flex-1 relative z-0">
         {!hasLocation && features.length === 0 && !editMode ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-surface">
-            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4 border border-gray-100">
-              <MapPin size={32} className="text-gray-300" />
+            <div className="w-14 h-14 bg-surface-elevated rounded-xl flex items-center justify-center mb-3 border border-border">
+              <MapPin size={28} className="text-muted" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">No mapped data yet</h3>
-            <p className="text-sm text-gray-500 max-w-md">No field features collected yet. Go to Collect to start your fieldwork, or click Edit Boundary to draw the community extent.</p>
+            <h3 className="text-base font-bold text-primary mb-1">No mapped features recorded</h3>
+            <p className="text-xs text-secondary max-w-sm">No field features collected yet. Go to Collect to start your fieldwork, or click Edit Boundary to outline the community territory.</p>
           </div>
         ) : (
           <StudentMap 

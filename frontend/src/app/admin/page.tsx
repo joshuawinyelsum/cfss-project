@@ -1,37 +1,90 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAdminAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { downloadExport } from '@/lib/export';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Alert } from '@/components/ui/alert';
-import jsPDF from 'jspdf';
-import autoTable, { applyPlugin } from 'jspdf-autotable';
+import Link from 'next/link';
+import {
+  Users,
+  Sliders,
+  Building2,
+  AlertCircle,
+  BarChart3,
+  ArrowRight,
+  RefreshCw,
+  Clock,
+  CheckCircle2,
+  FileText,
+  FileCheck,
+  Layers,
+  ExternalLink
+} from 'lucide-react';
 
-if (typeof window !== 'undefined') {
-  try {
-    applyPlugin(jsPDF);
-  } catch {
-    // Plugin already registered
-  }
+interface Student {
+  id: string | number;
+  student_id: string;
+  name: string;
+  faculty?: string;
+  program?: string;
+  community_id?: number | null;
+  community_name?: string | null;
+  group_number?: number | null;
 }
 
-export default function AdminDashboard() {
-  const { user, token, logout } = useAdminAuthStore();
+interface Community {
+  id: number;
+  name: string;
+  capacity?: number;
+  current_count?: number;
+  district?: string;
+  region?: string;
+  group_number?: number;
+}
+
+interface WhitelistSummary {
+  total_files: number;
+  active_files: number;
+  expected_students?: number;
+  expected_registrations: number;
+  registered_students?: number;
+  awaiting_registration?: number;
+  active_expected_students?: number;
+  active_expected_registrations: number;
+  active_registered_students?: number;
+  active_awaiting_registration?: number;
+}
+
+interface SurveyStats {
+  total_surveys: number;
+  total_drafts?: number;
+  submitted_today?: number;
+  submitted_last_7_days?: number;
+  submitted_last_30_days?: number;
+  by_community?: { community_name: string; count: number }[];
+  by_type?: { survey_type: string; count: number }[];
+}
+
+interface AuditLog {
+  id: number;
+  action: string;
+  user_id?: string | null;
+  metadata_payload?: Record<string, any> | null;
+  timestamp?: string | null;
+}
+
+export default function AdminDashboardPage() {
+  const { user, token } = useAdminAuthStore();
   const router = useRouter();
 
-  const [communities, setCommunities] = useState<any[]>([]);
-  const [surveys, setSurveys] = useState<any[]>([]);
-  const [settings, setSettings] = useState({ registration_open: false });
-  const [newCommName, setNewCommName] = useState('');
-  const [newCommCap, setNewCommCap] = useState(10);
-  const [students, setStudents] = useState<any[]>([]);
-  const [exporting, setExporting] = useState(false);
-  const [syncStats, setSyncStats] = useState({ total: 0, synced: 0, pending: 0, failed: 0 });
+  const [communities, setCommunities] = useState<Community[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [whitelistSummary, setWhitelistSummary] = useState<WhitelistSummary | null>(null);
+  const [surveyStats, setSurveyStats] = useState<SurveyStats | null>(null);
+  const [activityLogs, setActivityLogs] = useState<AuditLog[]>([]);
+  const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [currentDateTime, setCurrentDateTime] = useState('');
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -39,500 +92,565 @@ export default function AdminDashboard() {
       return;
     }
 
-    // Polling setup for live updates
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentDateTime(now.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }));
+    };
+    updateTime();
+
     fetchData();
-    const interval = setInterval(fetchData, 5000);
+    const interval = setInterval(fetchData, 15000);
     return () => clearInterval(interval);
   }, [user, router, token]);
 
   const fetchData = async () => {
-    if (!token) return;
+    const activeToken = token || useAdminAuthStore.getState().token;
+    if (!activeToken) return;
     try {
-      const opts = { headers: { Authorization: `Bearer ${token}` } };
-      const [commRes, survRes, setRes, studRes, syncRes] = await Promise.all([
+      const opts = { headers: { Authorization: `Bearer ${activeToken}` } };
+      const [commRes, setRes, studRes, wlRes, survRes, actRes] = await Promise.allSettled([
         api.get('/api/admin/communities', opts),
-        api.get('/api/admin/surveys', opts),
         api.get('/api/admin/settings', opts),
         api.get('/api/admin/students', opts),
-        api.get('/api/admin/sync/overview', opts)
+        api.get('/api/admin/whitelist/summary', opts),
+        api.get('/api/admin/surveys/stats', opts),
+        api.get('/api/admin/activity', opts)
       ]);
-      setCommunities(commRes.data);
-      setSurveys(survRes.data);
-      setSettings(setRes.data);
-      setStudents(studRes.data);
-      setSyncStats(syncRes.data);
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
-  const handleToggleRegistration = async () => {
-    try {
-      const newVal = !settings.registration_open;
-      await api.put('/api/admin/settings',
-        { registration_open: newVal },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setSettings({ ...settings, registration_open: newVal });
-    } catch (e) {
-      console.error(e);
-      alert("Failed to update settings");
-    }
-  };
-
-  const handleCreateCommunity = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await api.post('/api/admin/communities',
-        { name: newCommName, capacity: newCommCap },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setNewCommName('');
-      fetchData();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleExportStudents = async () => {
-    try {
-      setExporting(true);
-      await downloadExport('/admin/export/students', 'students_export.csv', token!);
-    } catch (e) {
-      alert("Export failed. Check server.");
+      if (commRes.status === 'fulfilled') setCommunities(commRes.value.data || []);
+      if (setRes.status === 'fulfilled') setRegistrationOpen(Boolean(setRes.value.data?.registration_open));
+      if (studRes.status === 'fulfilled') setStudents(studRes.value.data || []);
+      if (wlRes.status === 'fulfilled') setWhitelistSummary(wlRes.value.data || null);
+      if (survRes.status === 'fulfilled') setSurveyStats(survRes.value.data || null);
+      if (actRes.status === 'fulfilled') setActivityLogs(actRes.value.data || []);
+    } catch {
+      // ignore
     } finally {
-      setExporting(false);
+      setLoading(false);
     }
   };
 
-  const handleExportSurveys = async () => {
-    try {
-      setExporting(true);
-      await downloadExport('/admin/export/surveys', 'surveys_export.csv', token!);
-    } catch (e) {
-      alert("Export failed. Check server.");
-    } finally {
-      setExporting(false);
-    }
-  };
+  // Authoritative operational figures
+  const metrics = useMemo(() => {
+    const regStudents = whitelistSummary?.registered_students ?? students.length;
+    const expStudents = whitelistSummary?.expected_students ?? whitelistSummary?.expected_registrations ?? 0;
+    const awaitingReg = whitelistSummary?.awaiting_registration ?? Math.max(0, expStudents - regStudents);
+    const progressPct = expStudents > 0 ? Math.round((regStudents / expStudents) * 100) : (regStudents > 0 ? 100 : 0);
+    const totalComms = communities.length;
+    const totalSurveys = surveyStats?.total_surveys ?? 0;
+    const assignedCount = students.filter(s => s.community_id || s.community_name).length;
+    const unassignedCount = Math.max(0, students.length - assignedCount);
 
-  const handleExportReportsPDF = () => {
-    try {
-      setExporting(true);
-      const doc = new (jsPDF as any)();
-      doc.setFontSize(18);
-      doc.text('CFSS Admin Dashboard Report', 14, 22);
-      
-      doc.setFontSize(11);
-      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 30);
-      
-      doc.setFontSize(14);
-      doc.text('Overview Statistics', 14, 45);
-      
-      const statsData = [
-        ['Total Students', students.length],
-        ['Total Communities', communities.length],
-        ['Total Surveys Submitted', surveys.length]
-      ];
-      
-      autoTable(doc, {
-        startY: 50,
-        head: [['Metric', 'Value']],
-        body: statsData,
-        headStyles: { fillColor: [41, 128, 185] }
-      });
-      
-      doc.save(`cfss_admin_report_${new Date().toISOString().split('T')[0]}.pdf`);
-    } catch (e) {
-      alert("Failed to generate PDF report.");
-    } finally {
-      setExporting(false);
-    }
-  };
+    return {
+      registeredStudents: regStudents,
+      expectedStudents: expStudents,
+      awaitingRegistration: awaitingReg,
+      progressPct,
+      totalCommunities: totalComms,
+      totalSurveys,
+      assignedCount,
+      unassignedCount
+    };
+  }, [whitelistSummary, students, communities, surveyStats]);
 
-  // Whitelist upload handled in separate page
+  // Survey instrument breakdown
+  const surveyTypeBreakdown = useMemo(() => {
+    const defaultTypes = ['HOUSEHOLD', 'EDUCATION', 'HEALTH', 'GOVERNANCE'];
+    const total = surveyStats?.total_surveys || 1;
+    return defaultTypes.map((t) => {
+      const match = surveyStats?.by_type?.find(item => item.survey_type.toUpperCase() === t);
+      const count = match?.count || 0;
+      return {
+        type: t,
+        label: t.charAt(0) + t.slice(1).toLowerCase(),
+        count,
+        pct: Math.round((count / total) * 100)
+      };
+    });
+  }, [surveyStats]);
+
+  // Faculty distribution
+  const facultyDistribution = useMemo(() => {
+    const counts: Record<string, number> = {};
+    students.forEach(s => {
+      const f = s.faculty || 'General Sciences';
+      counts[f] = (counts[f] || 0) + 1;
+    });
+    const total = students.length || 1;
+    return Object.entries(counts).map(([name, count]) => ({
+      name,
+      count,
+      pct: Math.round((count / total) * 100)
+    })).sort((a, b) => b.count - a.count);
+  }, [students]);
+
+  // Students requiring placement
+  const studentsNeedingAttention = useMemo(() => {
+    return students.filter(s => !s.community_id && !s.community_name).slice(0, 5);
+  }, [students]);
 
   if (!user) return null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 text-primary animate-fade-in pb-12">
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="p-6 flex items-center gap-5">
-          <div className="p-4 bg-cfss-green-soft text-cfss-green rounded-xl">
-             <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+      {/* Title & Date Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 border-b border-border-strong pb-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-primary">Institutional Administration Dashboard</h1>
+          <p className="text-sm text-secondary mt-1">
+            Real-time status of student registration intake, fieldwork allocation, and community survey collection.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-secondary">
+          <div className="flex items-center gap-1.5 font-medium">
+            <Clock className="w-3.5 h-3.5 text-muted" />
+            <span>{currentDateTime}</span>
           </div>
-          <div>
-            <p className="text-sm font-semibold text-muted mb-1">Total Students</p>
-            <p className="text-3xl font-bold text-primary">{students.length}</p>
-            <p className="text-xs text-muted font-medium flex items-center gap-1 mt-1">
-              Total registered
-            </p>
-          </div>
-        </Card>
-
-        <Card className="p-6 flex items-center gap-5">
-          <div className="p-4 bg-cfss-green-soft text-cfss-green rounded-xl">
-             <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-muted mb-1">Total Surveys</p>
-            <p className="text-3xl font-bold text-primary">{surveys.length}</p>
-            <p className="text-xs text-muted font-medium flex items-center gap-1 mt-1">
-              Total submitted
-            </p>
-          </div>
-        </Card>
-
-        <Card className="p-6 flex items-center gap-5">
-          <div className="p-4 bg-cfss-green-soft text-cfss-green rounded-xl">
-             <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m3-4h1m-1 4h1m-5 8h5" /></svg>
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-muted mb-1">Total Communities</p>
-            <p className="text-3xl font-bold text-primary">{communities.length}</p>
-            <p className="text-xs text-muted font-medium flex items-center gap-1 mt-1">
-              Active communities
-            </p>
-          </div>
-        </Card>
-
-        <Card className="p-6 flex items-center gap-5">
-          <div className={`p-4 rounded-xl ${settings.registration_open ? 'bg-status-warning/10 text-status-warning' : 'bg-status-error/10 text-status-error'}`}>
-             <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-muted mb-1">Registration Status</p>
-            <p className={`text-2xl font-bold ${settings.registration_open ? 'text-status-success' : 'text-status-error'}`}>
-              {settings.registration_open ? 'OPEN' : 'CLOSED'}
-            </p>
-            <p className="text-xs text-muted font-medium flex items-center gap-1 mt-1">
-              Currently {settings.registration_open ? 'accepting' : 'not accepting'} students
-            </p>
-          </div>
-        </Card>
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            className="p-1.5 rounded-lg text-secondary hover:text-primary hover:bg-surface border border-transparent hover:border-border-strong transition-colors"
+            title="Refresh statistics"
+            aria-label="Refresh statistics"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
 
-      {/* Main Grid: 70% / 30% */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-
-        {/* LEFT COLUMN (70%) */}
-        <div className="xl:col-span-2 space-y-8">
-
-          {/* System Sync Overview */}
-          <Card className="overflow-hidden">
-            <div className="px-6 py-5 border-b border-border flex justify-between items-center bg-page">
-              <h2 className="text-lg font-bold text-primary flex items-center gap-2">
-                <svg className="w-5 h-5 text-cfss-green" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                System Sync Overview
-              </h2>
+      {/* Row 1: Intake & Registration Lifecycle Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Metric 1: Registered Students */}
+        <div className="bg-surface rounded-xl border border-border-strong p-5 shadow-xs hover:border-[#093C22]/30 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-secondary uppercase tracking-wider">Registered students</span>
+            <div className="w-10 h-10 rounded-lg bg-emerald-50 text-[#093C22] flex items-center justify-center shrink-0">
+              <Users className="w-5 h-5" />
             </div>
-            <div className="p-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-4 bg-page rounded-lg border border-border">
-                  <p className="text-sm font-medium text-muted mb-1">Total Surveys</p>
-                  <p className="text-2xl font-bold text-primary">{syncStats.total}</p>
+          </div>
+          <div className="text-2xl font-bold text-primary mt-2">
+            {metrics.registeredStudents.toLocaleString()}
+          </div>
+          <div className="text-xs text-secondary mt-1">
+            of <strong className="text-primary font-semibold">{metrics.expectedStudents.toLocaleString()}</strong> eligible students
+          </div>
+        </div>
+
+        {/* Metric 2: Registration Progress */}
+        <div className="bg-surface rounded-xl border border-border-strong p-5 shadow-xs hover:border-[#093C22]/30 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-secondary uppercase tracking-wider">Registration progress</span>
+            <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-sm shrink-0">
+              %
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-primary mt-2">
+            {metrics.progressPct}%
+          </div>
+          <div className="w-full bg-page rounded-full h-2 mt-2.5 overflow-hidden border border-border">
+            <div
+              className="bg-[#093C22] h-full rounded-full transition-all duration-500"
+              style={{ width: `${Math.min(100, metrics.progressPct)}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Metric 3: Outstanding Eligible */}
+        <div className="bg-surface rounded-xl border border-border-strong p-5 shadow-xs hover:border-[#093C22]/30 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-secondary uppercase tracking-wider">Awaiting registration</span>
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+              metrics.awaitingRegistration > 0 ? 'bg-amber-50 text-amber-700' : 'bg-page text-muted'
+            }`}>
+              <AlertCircle className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-primary mt-2">
+            {metrics.awaitingRegistration.toLocaleString()}
+          </div>
+          <div className="text-xs text-secondary mt-1">
+            Eligible whitelist candidates pending
+          </div>
+        </div>
+
+        {/* Metric 4: Registration Window Status */}
+        <div className="bg-surface rounded-xl border border-border-strong p-5 shadow-xs hover:border-[#093C22]/30 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-secondary uppercase tracking-wider">Registration availability</span>
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+              registrationOpen ? 'bg-emerald-50 text-[#093C22]' : 'bg-page text-muted'
+            }`}>
+              <Sliders className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-primary mt-2 flex items-center gap-2">
+            <span>{registrationOpen ? 'Open' : 'Closed'}</span>
+            <span className={`w-2.5 h-2.5 rounded-full ${registrationOpen ? 'bg-emerald-500 animate-pulse' : 'bg-muted'}`} />
+          </div>
+          <div className="text-xs text-secondary mt-1 flex items-center justify-between">
+            <span>{registrationOpen ? 'Intake gateway active' : 'Self-enrollment locked'}</span>
+            <Link href="/admin/registration" className="text-[#093C22] hover:underline font-semibold text-xs">
+              Manage →
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Row 2: Operational Data Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Metric 5: Total Communities */}
+        <div className="bg-surface rounded-xl border border-border-strong p-5 shadow-xs hover:border-[#093C22]/30 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-secondary uppercase tracking-wider">Fieldwork communities</span>
+            <div className="w-10 h-10 rounded-lg bg-page text-secondary flex items-center justify-center shrink-0">
+              <Building2 className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-primary mt-2">
+            {metrics.totalCommunities}
+          </div>
+          <div className="text-xs text-secondary mt-1">
+            Active geographical survey clusters
+          </div>
+        </div>
+
+        {/* Metric 6: Field Survey Submissions */}
+        <div className="bg-surface rounded-xl border border-border-strong p-5 shadow-xs hover:border-[#093C22]/30 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-secondary uppercase tracking-wider">Survey submissions</span>
+            <div className="w-10 h-10 rounded-lg bg-emerald-50 text-[#093C22] flex items-center justify-center shrink-0">
+              <FileCheck className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-[#093C22] mt-2">
+            {metrics.totalSurveys}
+          </div>
+          <div className="text-xs text-secondary mt-1 flex items-center justify-between">
+            <span>Submitted fieldwork records</span>
+            <Link href="/admin/surveys" className="text-[#093C22] hover:underline font-semibold text-xs">
+              View →
+            </Link>
+          </div>
+        </div>
+
+        {/* Metric 7: CV Submissions */}
+        <div className="bg-surface rounded-xl border border-border-strong p-5 shadow-xs hover:border-[#093C22]/30 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-secondary uppercase tracking-wider">CV submissions</span>
+            <div className="w-10 h-10 rounded-lg bg-page text-muted flex items-center justify-center shrink-0">
+              <FileText className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-muted mt-2 flex items-center gap-2">
+            <span>0</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-page text-muted border border-border">
+              Not configured
+            </span>
+          </div>
+          <div className="text-xs text-muted mt-1">
+            Module inactive for current session
+          </div>
+        </div>
+
+        {/* Metric 8: Group Allocation */}
+        <div className="bg-surface rounded-xl border border-border-strong p-5 shadow-xs hover:border-[#093C22]/30 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-secondary uppercase tracking-wider">Allocated to groups</span>
+            <div className="w-10 h-10 rounded-lg bg-page text-secondary flex items-center justify-center shrink-0">
+              <Layers className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-primary mt-2">
+            {metrics.assignedCount}
+          </div>
+          <div className="text-xs text-secondary mt-1">
+            <strong className="text-amber-700 font-semibold">{metrics.unassignedCount}</strong> unallocated students
+          </div>
+        </div>
+      </div>
+
+      {/* Visualizations Grid: Survey Breakdown & Community Placement */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* Survey Submissions by Type (1 col) */}
+        <div className="bg-surface rounded-xl border border-border-strong overflow-hidden shadow-xs">
+          <div className="px-5 py-4 border-b border-border bg-page/50 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileCheck className="w-4 h-4 text-[#093C22]" />
+              <h2 className="text-sm font-bold text-primary">Survey Module Submissions</h2>
+            </div>
+            <span className="text-xs font-semibold text-secondary">
+              {metrics.totalSurveys} Total
+            </span>
+          </div>
+
+          <div className="p-5 space-y-4">
+            {surveyTypeBreakdown.map((item) => (
+              <div key={item.type} className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-primary">{item.label}</span>
+                  <div className="flex items-center gap-1.5 font-mono text-[11px]">
+                    <strong className="text-primary">{item.count}</strong>
+                    <span className="text-muted">({item.pct}%)</span>
+                  </div>
                 </div>
-                <div className="p-4 bg-page rounded-lg border border-border">
-                  <p className="text-sm font-medium text-muted mb-1">Synced</p>
-                  <p className="text-2xl font-bold text-primary">{syncStats.synced}</p>
-                </div>
-                <div className="p-4 bg-page rounded-lg border border-border">
-                  <p className="text-sm font-medium text-muted mb-1">Pending Sync</p>
-                  <p className="text-2xl font-bold text-primary">{syncStats.pending}</p>
-                </div>
-                <div className="p-4 bg-page rounded-lg border border-border">
-                  <p className="text-sm font-medium text-muted mb-1">Failed Syncs</p>
-                  <p className="text-2xl font-bold text-primary">{syncStats.failed}</p>
+                <div className="h-2 bg-page rounded-full overflow-hidden border border-border">
+                  <div
+                    className="h-full bg-[#093C22] rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, item.pct)}%` }}
+                  />
                 </div>
               </div>
-            </div>
-          </Card>
+            ))}
 
-          {/* Communities Section */}
-          <Card className="overflow-hidden">
-            <div className="px-6 py-5 border-b border-border flex justify-between items-center">
-              <h2 className="text-lg font-bold text-primary flex items-center gap-2">
-                <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                Communities & Groups
-              </h2>
-              <Button variant="default" className="flex items-center gap-2 whitespace-nowrap">
-                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                 Create Community
-              </Button>
+            <div className="pt-3 border-t border-border text-xs">
+              <Link
+                href="/admin/surveys"
+                className="inline-flex items-center gap-1.5 text-[#093C22] hover:underline font-semibold"
+              >
+                <span>Explore field submissions repository</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
-            <div className="overflow-x-auto">
-              <table className="hidden md:table w-full text-sm text-left">
-                <thead className="text-muted border-b border-border bg-page">
-                  <tr>
-                    <th className="py-4 px-6 font-semibold">Community Name</th>
-                    <th className="py-4 px-6 font-semibold">Group</th>
-                    <th className="py-4 px-6 font-semibold text-center">Capacity</th>
-                    <th className="py-4 px-6 font-semibold text-center">Students</th>
-                    <th className="py-4 px-6 font-semibold w-1/4">Progress</th>
-                    <th className="py-4 px-6 font-semibold text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {communities.map(c => {
-                    const progress = Math.min(100, Math.round((c.current_count / c.max_capacity) * 100)) || 0;
-                    const barColor = progress > 90 ? 'bg-status-error' : progress > 60 ? 'bg-cfss-green' : 'bg-cfss-green';
-                    return (
-                      <tr key={c.id} className="hover:bg-page transition-colors">
-                        <td className="py-4 px-6 font-medium text-primary">{c.name}</td>
-                        <td className="py-4 px-6 text-secondary">{c.group_label}</td>
-                        <td className="py-4 px-6 text-center text-secondary">{c.max_capacity}</td>
-                        <td className="py-4 px-6 text-center font-medium text-secondary">{c.current_count}</td>
-                        <td className="py-4 px-6">
-                          <div className="flex items-center gap-3">
-                            <div className="w-full bg-border rounded-full h-2 overflow-hidden">
-                              <div className={`${barColor} h-2 rounded-full`} style={{width: `${progress}%`}}></div>
-                            </div>
-                            <span className="text-xs font-medium text-muted w-9">{progress}%</span>
-                          </div>
-                        </td>
-                        <td className="py-4 px-6 text-right">
-                          <button className="text-muted hover:text-secondary">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-              <div className="py-3 text-center border-t border-border">
-                <button className="text-sm text-cfss-green hover:text-cfss-green-hover font-medium inline-flex items-center gap-1">
-                  View all communities <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                </button>
+          </div>
+        </div>
+
+        {/* Community Placement vs Capacity (2 cols) */}
+        <div className="lg:col-span-2 bg-surface rounded-xl border border-border-strong overflow-hidden shadow-xs">
+          <div className="px-5 py-4 border-b border-border bg-page/50 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-[#093C22]" />
+              <h2 className="text-sm font-bold text-primary">Community Placement vs Capacity Quotas</h2>
+            </div>
+            <Link
+              href="/admin/communities"
+              className="inline-flex items-center gap-1 text-xs text-[#093C22] hover:underline font-semibold"
+            >
+              <span>Manage communities</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="p-5">
+            {communities.length === 0 ? (
+              <div className="py-12 text-center text-xs text-muted">
+                No fieldwork communities configured yet.
               </div>
-            </div>
-          </Card>
+            ) : (
+              <div className="space-y-4">
+                {communities.slice(0, 5).map((comm) => {
+                  const count = comm.current_count || 0;
+                  const capacity = comm.capacity || 20;
+                  const pct = Math.min(100, Math.round((count / capacity) * 100));
+                  const isFull = count >= capacity;
 
-          {/* Recent Surveys Table */}
-          <Card className="overflow-hidden">
-            <div className="px-6 py-5 border-b border-border flex justify-between items-center">
-              <h2 className="text-lg font-bold text-primary flex items-center gap-2">
-                <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
-                Recent Surveys
-              </h2>
+                  return (
+                    <div key={comm.id} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-semibold text-primary truncate">{comm.name}</span>
+                          {comm.district && (
+                            <span className="text-[11px] text-muted truncate">({comm.district})</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-semibold text-primary">{count}</span>
+                          <span className="text-muted">/</span>
+                          <span className="text-secondary font-medium">{capacity} slots</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                            isFull
+                              ? 'bg-red-50 text-red-700'
+                              : pct > 80
+                              ? 'bg-amber-50 text-amber-700'
+                              : 'bg-emerald-50 text-[#093C22]'
+                          }`}>
+                            {pct}%
+                          </span>
+                        </div>
+                      </div>
+                      {/* Comparative Progress Bar */}
+                      <div className="h-2 bg-page rounded-full overflow-hidden border border-border">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            isFull ? 'bg-red-500' : 'bg-[#093C22]'
+                          }`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Section: Registration Summary & Faculty Distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* Registration Window Information (1 col) */}
+        <div className="bg-surface rounded-xl border border-border-strong overflow-hidden shadow-xs">
+          <div className="px-5 py-4 border-b border-border bg-page/50 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-primary">Registration Intake Policy</h2>
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+              registrationOpen ? 'bg-emerald-50 text-emerald-800' : 'bg-page text-secondary border border-border'
+            }`}>
+              {registrationOpen ? 'Active' : 'Locked'}
+            </span>
+          </div>
+
+          <div className="p-5 space-y-3.5 text-xs">
+            <div>
+              <div className="text-muted">Academic Year</div>
+              <div className="text-primary font-semibold mt-0.5">2025/2026 Academic Session</div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="hidden md:table w-full text-sm text-left">
-                <thead className="bg-page text-muted border-b border-border">
-                  <tr>
-                    <th className="py-4 px-6 font-semibold">Student Name</th>
-                    <th className="py-4 px-6 font-semibold">Community</th>
-                    <th className="py-4 px-6 font-semibold">Survey Type</th>
-                    <th className="py-4 px-6 font-semibold">Date</th>
-                    <th className="py-4 px-6 font-semibold">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {surveys.slice(0, 5).map(s => {
-                    const student = students.find(st => st.id === s.user_id);
-                    const community = communities.find(c => c.id === s.community_id);
-                    const isSubmitted = s.status?.toLowerCase() === 'submitted' || s.status?.toLowerCase() === 'completed';
-                    return (
+            <div>
+              <div className="text-muted">Eligible Cohorts</div>
+              <div className="text-primary font-semibold mt-0.5">Level 200, 300, 400</div>
+            </div>
+            <div>
+              <div className="text-muted">Security Requirement</div>
+              <div className="text-primary font-semibold mt-0.5">Active whitelist roster enrollment verified</div>
+            </div>
+
+            <div className="pt-3 border-t border-border">
+              <Link
+                href="/admin/registration"
+                className="inline-flex items-center gap-1.5 text-xs text-[#093C22] hover:underline font-semibold"
+              >
+                <span>Manage registration gateway</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Students by Faculty (2 cols) */}
+        <div className="lg:col-span-2 bg-surface rounded-xl border border-border-strong overflow-hidden shadow-xs">
+          <div className="px-5 py-4 border-b border-border bg-page/50 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-primary">Students by Faculty / Department</h2>
+            <span className="text-xs text-secondary font-medium">{students.length} Total Registered</span>
+          </div>
+
+          <div className="p-5">
+            {facultyDistribution.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted">
+                No faculty distribution data available.
+              </div>
+            ) : (
+              <div className="space-y-3.5">
+                {facultyDistribution.map(f => (
+                  <div key={f.name} className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-primary font-medium">{f.name}</span>
+                      <span className="text-secondary font-semibold">{f.count} ({f.pct}%)</span>
+                    </div>
+                    <div className="h-2 bg-page rounded-full overflow-hidden border border-border">
+                      <div
+                        className="h-full bg-[#093C22] rounded-full transition-all duration-500"
+                        style={{ width: `${f.pct}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Section: Requiring Attention and Recent Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* Students Requiring Attention */}
+        <div className="bg-surface rounded-xl border border-border-strong overflow-hidden shadow-xs">
+          <div className="px-5 py-4 border-b border-border bg-page/50 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-primary">Students Requiring Group Allocation</h2>
+            <Link href="/admin/students" className="text-xs text-[#093C22] hover:underline font-semibold">
+              View all students
+            </Link>
+          </div>
+
+          <div className="p-5">
+            {studentsNeedingAttention.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted flex flex-col items-center gap-2">
+                <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                <span>All registered students currently have community allocations.</span>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="text-secondary border-b border-border">
+                      <th className="py-2.5 font-semibold">Index No.</th>
+                      <th className="py-2.5 font-semibold">Name</th>
+                      <th className="py-2.5 font-semibold">Faculty</th>
+                      <th className="py-2.5 font-semibold text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border text-primary">
+                    {studentsNeedingAttention.map(s => (
                       <tr key={s.id} className="hover:bg-page transition-colors">
-                        <td className="py-4 px-6">
-                          <div className="flex items-center gap-3">
-                             <div className="w-9 h-9 rounded-full bg-cfss-green-soft text-cfss-green flex items-center justify-center font-bold text-xs border border-cfss-green-soft shrink-0">
-                               {student?.name?.substring(0,2).toUpperCase() || 'NA'}
-                             </div>
-                             <div>
-                               <p className="font-semibold text-primary leading-tight">{student?.name || 'Unknown'}</p>
-                               <p className="text-xs text-muted">{student?.student_id}</p>
-                             </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-6">
-                           <p className="text-primary font-medium">{community?.name || 'Unknown'}</p>
-                           <p className="text-xs text-muted">{community?.group_label}</p>
-                        </td>
-                        <td className="py-4 px-6 text-secondary">{s.type}</td>
-                        <td className="py-4 px-6 text-muted text-xs whitespace-nowrap">
-                           {new Date(s.created_at).toLocaleString('en-US', {
-                              month: 'short', day: 'numeric', year: 'numeric',
-                              hour: '2-digit', minute: '2-digit'
-                           })}
-                        </td>
-                        <td className="py-4 px-6">
-                          <span className={`px-2.5 py-1 whitespace-nowrap rounded-full text-[11px] font-bold border uppercase tracking-wide ${isSubmitted ? 'bg-status-success/10 text-status-success border-status-success/20' : 'bg-status-warning/10 text-status-warning border-status-warning/20'}`}>
-                            {s.status}
+                        <td className="py-2.5 font-mono text-secondary">{s.student_id}</td>
+                        <td className="py-2.5 text-primary font-semibold">{s.name}</td>
+                        <td className="py-2.5 text-secondary">{s.faculty || '—'}</td>
+                        <td className="py-2.5 text-right">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-800">
+                            Unassigned
                           </span>
                         </td>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-              <div className="py-3 text-center border-t border-border">
-                <button className="text-sm text-cfss-green hover:text-cfss-green-hover font-medium inline-flex items-center gap-1">
-                  View all surveys <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                </button>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          </Card>
-
-          {/* Students Overview Table */}
-          <Card className="overflow-hidden">
-            <div className="px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-              <h2 className="text-lg font-bold text-primary flex items-center gap-2">
-                <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                Students Overview
-              </h2>
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <svg className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                  <Input type="text" placeholder="Search by name or ID..." className="pl-9 w-64" />
-                </div>
-                <select className="border border-border rounded-lg text-sm py-2 px-3 focus:outline-none focus:ring-1 focus:ring-cfss-green bg-surface text-primary">
-                  <option>All Programs</option>
-                  <option>Computer Science</option>
-                  <option>Information Technology</option>
-                  <option>Engineering</option>
-                </select>
-                <Button variant="outline" onClick={handleExportStudents} disabled={exporting} className="whitespace-nowrap">
-                  <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                  {exporting ? "Exporting..." : "Export CSV"}
-                </Button>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="hidden md:table w-full text-sm text-left">
-                <thead className="bg-page text-muted border-b border-border">
-                  <tr>
-                    <th className="py-4 px-6 font-semibold">Name</th>
-                    <th className="py-4 px-6 font-semibold">Student ID</th>
-                    <th className="py-4 px-6 font-semibold">Program</th>
-                    <th className="py-4 px-6 font-semibold">Level</th>
-                    <th className="py-4 px-6 font-semibold">Community</th>
-                    <th className="py-4 px-6 font-semibold">Group</th>
-                    <th className="py-4 px-6 font-semibold">Registered On</th>
-                    <th className="py-4 px-6 font-semibold">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {students.slice(0, 5).map(student => {
-                    const community = communities.find(c => c.id === student.community_id);
-                    return (
-                      <tr key={student.id} className="hover:bg-page transition-colors">
-                        <td className="py-4 px-6 font-medium text-primary">{student.name}</td>
-                        <td className="py-4 px-6 text-muted font-medium">{student.student_id}</td>
-                        <td className="py-4 px-6 text-secondary">{student.program || 'Unknown'}</td>
-                        <td className="py-4 px-6 text-secondary">{student.level}</td>
-                        <td className="py-4 px-6 text-secondary">{community?.name || 'N/A'}</td>
-                        <td className="py-4 px-6 text-secondary">{community?.group_label || 'N/A'}</td>
-                        <td className="py-4 px-6 text-muted text-xs whitespace-nowrap">N/A</td>
-                        <td className="py-4 px-6">
-                          <span className="px-2 py-1 rounded text-xs font-semibold text-cfss-green bg-status-success/10 border border-status-success/20">Active</span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-              <div className="py-4 px-6 flex justify-between items-center border-t border-border text-sm text-muted">
-                <span>Showing 1 to {Math.min(5, students.length)} of {students.length} students</span>
-                <div className="flex gap-1 items-center">
-                  <button className="w-8 h-8 flex items-center justify-center border border-border rounded text-muted hover:bg-page">&lt;</button>
-                  <button className="w-8 h-8 flex items-center justify-center border border-cfss-green bg-cfss-green text-white rounded">1</button>
-                  <button className="w-8 h-8 flex items-center justify-center border border-border rounded hover:bg-page">2</button>
-                  <button className="w-8 h-8 flex items-center justify-center border border-border rounded hover:bg-page">3</button>
-                  <span className="px-1">...</span>
-                  <button className="w-8 h-8 flex items-center justify-center border border-border rounded hover:bg-page">26</button>
-                  <button className="w-8 h-8 flex items-center justify-center border border-border rounded text-secondary hover:bg-page">&gt;</button>
-                </div>
-              </div>
-            </div>
-          </Card>
-
+            )}
+          </div>
         </div>
 
-        {/* RIGHT COLUMN (30%) */}
-        <div className="space-y-8">
+        {/* Recent Activity */}
+        <div className="bg-surface rounded-xl border border-border-strong overflow-hidden shadow-xs">
+          <div className="px-5 py-4 border-b border-border bg-page/50 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-primary">Recent Institutional Audit Log</h2>
+            <Link href="/admin/activity" className="text-xs text-[#093C22] hover:underline font-semibold">
+              View full audit log
+            </Link>
+          </div>
 
-          {/* Registration Control */}
-          <Card className="p-6">
-            <h2 className="text-lg font-bold text-primary mb-6 flex items-center gap-2">
-              <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-              Registration Control
-            </h2>
-
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                 <span className="text-sm font-semibold text-secondary">Current Status</span>
-                 <div className={`px-4 py-1.5 rounded-lg text-center font-bold text-sm ${settings.registration_open ? 'bg-status-success/10 text-status-success border border-status-success/20' : 'bg-page text-muted border border-border'}`}>
-                   {settings.registration_open ? 'OPEN' : 'CLOSED'}
-                 </div>
+          <div className="p-5">
+            {activityLogs.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted">
+                No recent administrative actions recorded.
               </div>
-
-              <div className="flex items-center justify-between">
-                 <span className="text-sm text-secondary">Registration is currently open for students.</span>
-                 <button
-                   onClick={handleToggleRegistration}
-                   className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none shrink-0 ${settings.registration_open ? 'bg-cfss-green' : 'bg-border-strong'}`}
-                 >
-                   <span className={`inline-block h-6 w-6 transform rounded-full bg-surface shadow-sm transition-transform ${settings.registration_open ? 'translate-x-7' : 'translate-x-1'}`} />
-                 </button>
-              </div>
-
-              <hr className="border-border" />
-
-              <div>
-                 <span className="text-sm font-semibold text-primary">Registration Control</span>
-                 <div className="flex items-start gap-3 border border-border rounded-lg p-3 mt-3 shadow-sm bg-page">
-                    <svg className="w-5 h-5 text-cfss-green shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                    <div>
-                      <p className="text-xs font-semibold text-primary">Open Registration</p>
-                      <p className="text-[11px] text-muted">{settings.registration_open ? 'Students can currently sign up' : 'Sign up is restricted'}</p>
+            ) : (
+              <div className="divide-y divide-border text-xs">
+                {activityLogs.slice(0, 5).map(log => (
+                  <div key={log.id} className="py-3 flex items-baseline justify-between gap-3 first:pt-0 last:pb-0">
+                    <div className="min-w-0">
+                      <span className="font-semibold text-primary">{log.action}</span>
+                      <span className="text-secondary ml-2 font-mono text-[11px]">
+                        {log.user_id ? `By User #${log.user_id}` : 'System Action'}
+                      </span>
                     </div>
-                 </div>
+                    <span className="text-[11px] text-muted font-mono shrink-0">
+                      {log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent'}
+                    </span>
+                  </div>
+                ))}
               </div>
-            </div>
-          </Card>
-
-          {/* Whitelist Management */}
-          <Card className="p-6">
-            <h2 className="text-lg font-bold text-primary mb-6 flex items-center gap-2">
-              <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-              Whitelist Management
-            </h2>
-            <p className="text-sm text-secondary mb-4">Go to the detailed whitelist management page to upload new whitelists and view history.</p>
-            <Button variant="default" className="w-full" onClick={() => router.push('/admin/whitelist')}>
-              Manage Whitelists
-            </Button>
-          </Card>
-
-          {/* Quick Actions */}
-          <Card className="p-6">
-            <h2 className="text-lg font-bold text-primary mb-6 flex items-center gap-2">
-              <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-              Quick Actions
-            </h2>
-
-            <div className="space-y-3">
-              <Button variant="outline" onClick={handleExportStudents} disabled={exporting} className="w-full justify-start text-primary">
-                 <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                 Export Students (CSV)
-              </Button>
-              <Button variant="outline" onClick={handleExportSurveys} disabled={exporting} className="w-full justify-start text-primary">
-                 <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                 Export Surveys (CSV)
-              </Button>
-              <Button variant="outline" onClick={handleExportReportsPDF} disabled={exporting} className="w-full justify-start text-primary">
-                 <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                 Export Reports (PDF)
-              </Button>
-            </div>
-          </Card>
-
+            )}
+          </div>
         </div>
-
       </div>
+
     </div>
   );
 }
-

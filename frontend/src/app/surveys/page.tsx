@@ -10,10 +10,10 @@ import Link from 'next/link';
 import { Home, Book, Heart, Building, ArrowRight, ClipboardList, FileEdit } from 'lucide-react';
 
 const SURVEY_TYPES = [
-  { id: 'HOUSEHOLD', name: 'Household Survey', icon: Home, desc: 'Collect household information within your assigned community.', classes: 'bg-emerald-50 text-emerald-600' },
-  { id: 'EDUCATION', name: 'Education Survey', icon: Book, desc: 'Assess educational facilities and accessibility.', classes: 'bg-blue-50 text-blue-600' },
-  { id: 'HEALTH', name: 'Health Survey', icon: Heart, desc: 'Collect data on health facilities and common health issues.', classes: 'bg-red-50 text-red-600' },
-  { id: 'GOVERNANCE', name: 'Governance & Infrastructure Survey', icon: Building, desc: 'Evaluate local governance and infrastructure projects.', classes: 'bg-purple-50 text-purple-600' }
+  { id: 'HOUSEHOLD', name: 'Household Survey', icon: Home, desc: 'Collect household demography, socio-economic and living conditions.' },
+  { id: 'EDUCATION', name: 'Education Survey', icon: Book, desc: 'Assess schooling facilities, enrollment, and local educational access.' },
+  { id: 'HEALTH', name: 'Health Survey', icon: Heart, desc: 'Record local public health centers, sanitation, and common health challenges.' },
+  { id: 'GOVERNANCE', name: 'Governance & Infrastructure', icon: Building, desc: 'Evaluate community leadership, civic amenities, and infrastructure.' }
 ];
 
 export default function SurveysPage() {
@@ -113,33 +113,33 @@ export default function SurveysPage() {
               const Icon = type.icon;
               
               return (
-                <div key={type.id} className="bg-surface rounded-xl shadow-sm border border-border p-6 flex flex-col hover:border-emerald-200 transition-colors">
+                <div key={type.id} className="bg-surface rounded-xl shadow-xs border border-border-strong p-6 flex flex-col hover:border-cfss-green transition-all">
                   <div className="flex items-start gap-4 mb-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${type.classes}`}>
+                    <div className="w-12 h-12 rounded-xl bg-cfss-green-soft text-cfss-green flex items-center justify-center shrink-0">
                       <Icon size={24} />
                     </div>
                     <div>
-                      <h2 className="text-lg font-bold text-primary">{type.name}</h2>
-                      <p className="text-sm text-muted mt-1">{type.desc}</p>
+                      <h2 className="text-base font-semibold text-primary">{type.name}</h2>
+                      <p className="text-xs text-secondary mt-1">{type.desc}</p>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-6 mt-2 mb-6">
+                  <div className="flex items-center gap-6 mt-2 mb-6 pt-3 border-t border-border">
                     <div className="flex items-center gap-2">
-                      <ClipboardList className="text-muted" size={16} />
-                      <span className="text-sm font-medium text-secondary">Completed: <strong className="text-primary">{typeStats.submitted}</strong></span>
+                      <ClipboardList className="text-muted" size={15} />
+                      <span className="text-xs font-medium text-secondary">Completed: <strong className="text-primary font-semibold">{typeStats.submitted}</strong></span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <FileEdit className="text-muted" size={16} />
-                      <span className="text-sm font-medium text-secondary">Drafts: <strong className="text-primary">{typeStats.drafts}</strong></span>
+                      <FileEdit className="text-muted" size={15} />
+                      <span className="text-xs font-medium text-secondary">Drafts: <strong className="text-cfss-green font-semibold">{typeStats.drafts}</strong></span>
                     </div>
                   </div>
                   
                   <Link 
                     href={`/surveys/${type.id.toLowerCase()}`}
-                    className="mt-auto w-full py-2.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold rounded-lg flex items-center justify-center gap-2 transition-colors border border-emerald-100"
+                    className="mt-auto w-full py-2.5 bg-cfss-green hover:bg-cfss-green-hover text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition-colors shadow-xs"
                   >
-                    Continue Survey <ArrowRight size={18} />
+                    Open Survey <ArrowRight size={15} />
                   </Link>
                 </div>
               );
