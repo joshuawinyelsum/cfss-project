@@ -32,7 +32,7 @@ async def student_login(form_data: OAuth2PasswordRequestForm = Depends(), db: As
 @router.post("/admin/login", response_model=schemas.Token)
 async def admin_login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     raw_identifier = (form_data.username or "").strip()
-    if not raw_identifier:
+    if not raw_identifier or not form_data.password:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect admin credentials",
@@ -41,9 +41,10 @@ async def admin_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Asyn
 
     result = await db.execute(select(models.User).filter(
         models.User.role == "admin",
+        models.User.is_active == True,
         or_(
             func.upper(models.User.student_id) == raw_identifier.upper(),
-            func.lower(models.User.email) == raw_identifier.lower()
+            func.coalesce(func.lower(models.User.email), '') == raw_identifier.lower()
         )
     ))
     user = result.scalars().first()
@@ -54,6 +55,7 @@ async def admin_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Asyn
             detail="Incorrect admin credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
 
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(

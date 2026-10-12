@@ -79,3 +79,10 @@ if _env_origins.strip():
 else:
     CORS_ORIGINS = _default_origins
 
+# Pattern matching trusted production frontend platforms (Vercel, Render) and local dev
+CORS_ORIGIN_REGEX = os.getenv(
+    "CORS_ORIGIN_REGEX",
+    r"^https://([a-zA-Z0-9-]+\.)*vercel\.app$|^https://([a-zA-Z0-9-]+\.)*onrender\.com$|^http://(localhost|127\.0\.0\.1)(:\d+)?$"
+)
+
+

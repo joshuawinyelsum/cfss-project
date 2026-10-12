@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAdminAuthStore } from '@/lib/store';
 import { api, getErrorMessage } from '@/lib/api';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function AdminLoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -66,8 +67,18 @@ export default function AdminLoginPage() {
       setAuth(token, adminProfile);
       router.push('/admin');
     } catch (err: any) {
-      const msg = getErrorMessage(err, 'Incorrect admin credentials');
-      setError(msg);
+      if (!err?.response) {
+        setError('Network error: Unable to connect to authentication server. Please check your network connection.');
+      } else if (err.response.status === 401) {
+        setError('Incorrect admin credentials');
+      } else if (err.response.status === 403) {
+        setError('Account is inactive or lacks administrator privileges.');
+      } else if (err.response.status >= 500) {
+        setError('Server error during authentication. Please try again.');
+      } else {
+        const msg = getErrorMessage(err, 'Incorrect admin credentials');
+        setError(msg);
+      }
       setIsLoading(false);
     }
   };
@@ -84,7 +95,7 @@ export default function AdminLoginPage() {
         </div>
 
         {/* Login Card */}
-        <div className="bg-white rounded border border-slate-200 p-6 space-y-5">
+        <div className="bg-white rounded border border-slate-200 p-6 space-y-5 shadow-xs">
           <div className="border-b border-slate-100 pb-3">
             <h2 className="text-sm font-semibold text-slate-900">Sign in to Admin Console</h2>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -93,7 +104,10 @@ export default function AdminLoginPage() {
           </div>
 
           {error && (
-            <div className="p-3 rounded border border-red-200 bg-red-50 text-red-700 text-xs font-medium animate-fade-in">
+            <div 
+              role="alert"
+              className="p-3 rounded border border-red-200 bg-red-50 text-red-700 text-xs font-medium animate-fade-in"
+            >
               {error}
             </div>
           )}
@@ -111,6 +125,7 @@ export default function AdminLoginPage() {
                 onChange={(e) => setUsername(e.target.value)}
                 disabled={isLoading}
                 placeholder="admin"
+                autoComplete="username"
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#093C22]"
               />
             </div>
@@ -119,22 +134,38 @@ export default function AdminLoginPage() {
               <label htmlFor="password" className="block text-xs font-medium text-slate-700 mb-1">
                 Password
               </label>
-              <input 
-                id="password"
-                type="password" 
-                required 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
-                placeholder="••••••••"
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#093C22]"
-              />
+              <div className="relative">
+                <input 
+                  id="password"
+                  type={showPassword ? "text" : "password"} 
+                  required 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isLoading}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  className="w-full px-3 py-2 pr-9 bg-white border border-slate-200 rounded text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#093C22]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <button 
               type="submit"
               disabled={isLoading || !username || !password}
-              className="w-full mt-1 py-2 px-4 bg-[#093C22] hover:bg-[#072f1a] text-white font-medium text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full mt-1 py-2 px-4 bg-[#093C22] hover:bg-[#072f1a] text-white font-medium text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {isLoading ? "Authenticating..." : "Sign In to Admin Console"}
             </button>
@@ -144,17 +175,8 @@ export default function AdminLoginPage() {
             <span>Encrypted session • Role-based access enforced</span>
           </div>
         </div>
-
-        {/* Link to student portal */}
-        <div className="text-center">
-          <Link 
-            href="/login" 
-            className="text-xs text-slate-500 hover:text-slate-800 hover:underline"
-          >
-            ← Switch to Student Fieldwork Portal
-          </Link>
-        </div>
       </div>
     </div>
   );
 }
+

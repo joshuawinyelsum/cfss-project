@@ -23,16 +23,23 @@ api.interceptors.request.use((config) => {
     const hasAuth = !!(headers && (headers.Authorization || headers.authorization));
     if (!hasAuth) {
       const url = config.url || "";
-      const isAdminRoute = url.includes("/admin") || url.startsWith("admin");
-      if (isAdminRoute) {
-        const adminToken = useAdminAuthStore.getState().token;
-        if (adminToken) {
-          config.headers.set("Authorization", `Bearer ${adminToken}`);
-        }
-      } else {
-        const studentToken = useAuthStore.getState().token;
-        if (studentToken) {
-          config.headers.set("Authorization", `Bearer ${studentToken}`);
+      const isAuthSubmission =
+        url.includes("/student/login") ||
+        url.includes("/admin/login") ||
+        url.includes("/register");
+
+      if (!isAuthSubmission) {
+        const isAdminRoute = url.includes("/admin") || url.startsWith("admin");
+        if (isAdminRoute) {
+          const adminToken = useAdminAuthStore.getState().token;
+          if (adminToken) {
+            config.headers.set("Authorization", `Bearer ${adminToken}`);
+          }
+        } else {
+          const studentToken = useAuthStore.getState().token;
+          if (studentToken) {
+            config.headers.set("Authorization", `Bearer ${studentToken}`);
+          }
         }
       }
     }
@@ -73,10 +80,16 @@ api.interceptors.response.use(
 );
 
 export const getErrorMessage = (err: unknown, fallback: string) => {
-  const axiosErr = err as { response?: { data?: { detail?: unknown } } };
+  const axiosErr = err as { response?: { data?: { detail?: unknown } }; message?: string; code?: string };
+  if (!axiosErr?.response) {
+    if (axiosErr?.code === 'ECONNABORTED') return 'Connection timed out. Please try again.';
+    if (axiosErr?.message === 'Network Error') return 'Network error: Server unreachable or CORS request blocked.';
+    return fallback;
+  }
   const detail = axiosErr.response?.data?.detail;
   if (typeof detail === 'string') return detail;
   if (Array.isArray(detail)) return (detail[0] as { msg?: string })?.msg || fallback;
   return fallback;
 };
+
 

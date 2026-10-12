@@ -13,19 +13,26 @@ from app.rate_limiter import limiter
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from app.settings import CORS_ORIGINS
+from app.settings import CORS_ORIGINS, CORS_ORIGIN_REGEX
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.database import SessionLocal
     from sqlalchemy.future import select
+    from sqlalchemy import or_, func
     from app.auth import get_password_hash
     import os
     import logging
     
     try:
         async with SessionLocal() as db:
-            result = await db.execute(select(User).filter(User.student_id == "ADMIN"))
+            result = await db.execute(select(User).filter(
+                or_(
+                    func.upper(User.student_id) == "ADMIN",
+                    User.role == "admin",
+                    func.lower(User.email) == "admin@cfss.local"
+                )
+            ))
             admin = result.scalars().first()
             
             # Secure: Only create if missing, or update if operator explicitly provides ADMIN_BOOTSTRAP_PASSWORD
@@ -35,7 +42,7 @@ async def lifespan(app: FastAPI):
                 new_admin = User(
                     student_id="ADMIN",
                     name="System Administrator",
-                    email="admin@cfss.local",
+                    email=os.getenv("ADMIN_EMAIL", "admin@cfss.local"),
                     level=0,
                     role="admin",
                     password_hash=get_password_hash(initial_pwd),
@@ -44,13 +51,26 @@ async def lifespan(app: FastAPI):
                 )
                 db.add(new_admin)
                 await db.commit()
-            elif bootstrap_pwd:
-                admin.password_hash = get_password_hash(bootstrap_pwd)
-                await db.commit()
+            else:
+                updated = False
+                if bootstrap_pwd:
+                    admin.password_hash = get_password_hash(bootstrap_pwd)
+                    updated = True
+                if admin.role != "admin":
+                    admin.role = "admin"
+                    updated = True
+                if not admin.is_active:
+                    admin.is_active = True
+                    updated = True
+                if not admin.is_verified:
+                    admin.is_verified = True
+                    updated = True
+                if not admin.email:
+                    admin.email = os.getenv("ADMIN_EMAIL", "admin@cfss.local")
+                    updated = True
+                if updated:
+                    await db.commit()
 
-            if admin and not admin.email:
-                admin.email = os.getenv("ADMIN_EMAIL", "admin@cfss.local")
-                await db.commit()
             # Ensure active_whitelist_entries view exists
             from sqlalchemy import text
             await db.execute(text("""
@@ -99,7 +119,8 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(TraceMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS, 
+    allow_origins=CORS_ORIGINS,
+    allow_origin_regex=CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
