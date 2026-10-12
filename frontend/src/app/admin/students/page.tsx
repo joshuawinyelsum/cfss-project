@@ -69,34 +69,8 @@ export default function AdminStudentsPage() {
     }
   }, [hydrated, token]);
 
-  const exportToPDF = () => {
-    const doc = new (jsPDF as any)();
-    doc.setFontSize(16);
-    doc.text('Students List', 14, 20);
-    
-    doc.setFontSize(10);
-    doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, 28);
-    
-    const tableColumn = ["Index Number", "Name", "Email", "Department", "Community", "Group"];
-    const tableRows = filteredStudents.map(student => [
-      student.student_id || 'N/A',
-      student.name || 'N/A',
-      student.email || 'N/A',
-      student.program || 'N/A',
-      student.community_name || 'N/A',
-      student.group_number || 'N/A'
-    ]);
-    
-    doc.autoTable({
-      head: [tableColumn],
-      body: tableRows,
-      startY: 35,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [41, 128, 185] }
-    });
-    
-    doc.save(`cfss_students_${new Date().toISOString().split('T')[0]}.pdf`);
-  };
+  const [exportError, setExportError] = useState('');
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   const communities = useMemo(() => {
     const comms = new Set(students.map(s => s.community_name).filter(Boolean));
@@ -112,6 +86,178 @@ export default function AdminStudentsPage() {
       return matchesSearch && matchesCommunity;
     });
   }, [students, searchTerm, communityFilter]);
+
+  const studentsByCommunity = useMemo(() => {
+    const map: Record<string, Student[]> = {};
+    filteredStudents.forEach(s => {
+      const key = s.community_name || 'Unassigned';
+      if (!map[key]) map[key] = [];
+      map[key].push(s);
+    });
+    return map;
+  }, [filteredStudents]);
+
+  const generateStudentReportPDF = () => {
+    const doc = new (jsPDF as any)({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    const margin = 14;
+
+    const primaryColor = [9, 60, 34]; // CFSS Green #093C22
+    const textColor = [30, 41, 59];
+
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    let currentY = 18;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text('COMMUNITY FIELD STUDY SYSTEM (CFSS)', margin, currentY);
+
+    currentY += 6;
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+    doc.text('Official Student Fieldwork & Community Enrollment Report', margin, currentY);
+
+    currentY += 5;
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Generated: ${dateStr} at ${timeStr} | Scope: ${communityFilter ? `Community "${communityFilter}"` : 'All Communities'} | Total Students: ${filteredStudents.length}`, margin, currentY);
+
+    currentY += 4;
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.4);
+    doc.line(margin, currentY, pageWidth - margin, currentY);
+    currentY += 6;
+
+    const communityEntries = Object.entries(studentsByCommunity);
+
+    if (communityEntries.length === 0) {
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(100, 116, 139);
+      doc.text('No student records found matching the current filter criteria.', margin, currentY + 6);
+    } else {
+      for (const [commName, groupStudents] of communityEntries) {
+        const firstStudent = groupStudents[0];
+        const groupLabel = firstStudent?.group_label || (firstStudent?.group_number ? `Group ${firstStudent.group_number}` : 'Unassigned Group');
+        const locationParts = [firstStudent?.district, firstStudent?.region].filter(Boolean);
+        const locationInfo = locationParts.length > 0 ? ` (${locationParts.join(', ')})` : '';
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text(`Community: ${commName} — ${groupLabel}${locationInfo} [${groupStudents.length} Students]`, margin, currentY);
+        currentY += 3;
+
+        const tableRows = groupStudents.map((s, idx) => [
+          String(idx + 1),
+          s.student_id || 'N/A',
+          s.name || 'N/A',
+          s.program || s.faculty || 'N/A',
+          s.gender || 'N/A',
+          s.phone_number || s.email || 'N/A',
+          groupLabel
+        ]);
+
+        (doc as any).autoTable({
+          startY: currentY,
+          head: [[
+            '#',
+            'Index No.',
+            'Full Name',
+            'Program / Faculty',
+            'Gender',
+            'Contact',
+            'Group'
+          ]],
+          body: tableRows,
+          margin: { left: margin, right: margin, top: 22, bottom: 18 },
+          showHead: 'everyPage',
+          theme: 'striped',
+          styles: {
+            fontSize: 8,
+            cellPadding: 2,
+            textColor: [30, 41, 59],
+            overflow: 'linebreak',
+            lineColor: [226, 232, 240],
+            lineWidth: 0.1
+          },
+          headStyles: {
+            fillColor: primaryColor,
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 8
+          },
+          alternateRowStyles: {
+            fillColor: [248, 250, 252]
+          },
+          columnStyles: {
+            0: { cellWidth: 8, halign: 'center' },
+            1: { cellWidth: 26, fontStyle: 'bold' },
+            2: { cellWidth: 42 },
+            3: { cellWidth: 42 },
+            4: { cellWidth: 16, halign: 'center' },
+            5: { cellWidth: 30 },
+            6: { cellWidth: 18, halign: 'center' }
+          },
+          didDrawPage: (data: any) => {
+            if (data.pageNumber > 1) {
+              doc.setFontSize(8);
+              doc.setFont('helvetica', 'normal');
+              doc.setTextColor(100, 116, 139);
+              doc.text('COMMUNITY FIELD STUDY SYSTEM (CFSS) — STUDENT ENROLLMENT REPORT', margin, 12);
+              doc.setDrawColor(226, 232, 240);
+              doc.line(margin, 14, pageWidth - margin, 14);
+            }
+          }
+        });
+
+        currentY = (doc as any).lastAutoTable.finalY + 8;
+        if (currentY > pageHeight - 30) {
+          doc.addPage();
+          currentY = 22;
+        }
+      }
+    }
+
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(148, 163, 184);
+
+      doc.setDrawColor(226, 232, 240);
+      doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+
+      doc.text('CONFIDENTIAL — OFFICIAL ADMINISTRATIVE ENROLLMENT REPORT', margin, pageHeight - 7);
+      const pageText = `Page ${i} of ${totalPages}`;
+      doc.text(pageText, pageWidth - margin - doc.getTextWidth(pageText), pageHeight - 7);
+    }
+
+    return doc;
+  };
+
+  const exportToPDF = () => {
+    try {
+      setExportError('');
+      const doc = generateStudentReportPDF();
+      doc.save(`CFSS_Students_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err: any) {
+      console.error(err);
+      setExportError(err.message || 'Failed to export PDF');
+    }
+  };
 
   const handleStudentClick = async (studentId: string) => {
     setStudentDetailsLoading(true);
@@ -137,11 +283,26 @@ export default function AdminStudentsPage() {
           <h1 className="text-2xl font-bold text-primary">Students</h1>
           <p className="text-secondary mt-1 text-sm">Manage enrolled students and community assignments.</p>
         </div>
-        <Button onClick={exportToPDF} variant="outline" className="flex items-center gap-2">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-          Export PDF
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button onClick={() => setShowPreviewModal(true)} variant="outline" className="flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            Preview Report
+          </Button>
+          <Button onClick={exportToPDF} variant="default" className="flex items-center gap-2 bg-[#093C22] hover:bg-[#0c512e] text-white">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            Export PDF
+          </Button>
+        </div>
       </div>
+
+      {exportError && (
+        <Alert variant="destructive">
+          <span>{exportError}</span>
+        </Alert>
+      )}
 
       {error && (
         <Alert variant="destructive" className="flex items-center justify-between">
@@ -328,6 +489,141 @@ export default function AdminStudentsPage() {
                   </div>
                 </>
               ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REPORT PREVIEW MODAL */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-xl w-full max-w-5xl max-h-[92vh] shadow-2xl flex flex-col overflow-hidden border border-border">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-border bg-page flex items-center justify-between shrink-0">
+              <div>
+                <h2 className="text-lg font-bold text-primary">Student Enrollment Report — Print Preview</h2>
+                <p className="text-xs text-secondary mt-0.5">A4 Administrative Document Layout</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button 
+                  onClick={() => window.print()} 
+                  variant="outline" 
+                  size="sm"
+                  className="flex items-center gap-1.5"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                  Print
+                </Button>
+                <Button 
+                  onClick={exportToPDF} 
+                  variant="default" 
+                  size="sm"
+                  className="flex items-center gap-1.5 bg-[#093C22] hover:bg-[#0c512e] text-white"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download PDF
+                </Button>
+                <Button 
+                  onClick={() => setShowPreviewModal(false)} 
+                  variant="ghost" 
+                  size="sm"
+                  className="text-secondary hover:text-primary ml-2"
+                >
+                  ✕
+                </Button>
+              </div>
+            </div>
+
+            {/* Modal Body: A4 Paper emulation */}
+            <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-gray-100 flex justify-center">
+              <div className="w-full max-w-[210mm] bg-white p-8 sm:p-12 rounded shadow-md border border-gray-200 text-gray-900 font-sans print:shadow-none print:border-none print:p-0">
+                {/* Official Header */}
+                <div className="border-b-2 border-[#093C22] pb-4 mb-6">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h1 className="text-xl font-bold tracking-tight text-[#093C22]">COMMUNITY FIELD STUDY SYSTEM (CFSS)</h1>
+                      <p className="text-sm font-semibold text-gray-700 mt-0.5">Official Student Fieldwork & Community Enrollment Report</p>
+                    </div>
+                    <div className="text-right text-xs text-gray-500">
+                      <p className="font-semibold text-gray-700">Official Report</p>
+                      <p>Date: {new Date().toLocaleDateString('en-GB')}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-gray-200 flex flex-wrap gap-4 text-xs text-gray-600">
+                    <span><strong className="text-gray-800">Filter:</strong> {communityFilter || 'All Communities'}</span>
+                    <span><strong className="text-gray-800">Total Enrolled:</strong> {filteredStudents.length} Students</span>
+                    <span><strong className="text-gray-800">Communities:</strong> {Object.keys(studentsByCommunity).length}</span>
+                  </div>
+                </div>
+
+                {/* Content: Grouped by Community */}
+                {Object.keys(studentsByCommunity).length === 0 ? (
+                  <div className="p-8 text-center text-gray-500 italic">
+                    No student records matching the selected criteria.
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {Object.entries(studentsByCommunity).map(([commName, groupStudents]) => {
+                      const firstStudent = groupStudents[0];
+                      const groupLabel = firstStudent?.group_label || (firstStudent?.group_number ? `Group ${firstStudent.group_number}` : 'Unassigned Group');
+                      const location = [firstStudent?.district, firstStudent?.region].filter(Boolean).join(', ');
+
+                      return (
+                        <div key={commName} className="break-inside-avoid">
+                          <div className="bg-gray-50 border-l-4 border-[#093C22] px-4 py-2 mb-2 flex justify-between items-center rounded-r">
+                            <div>
+                              <h3 className="text-sm font-bold text-gray-900">{commName.toUpperCase()} — {groupLabel}</h3>
+                              {location && <p className="text-xs text-gray-500">{location}</p>}
+                            </div>
+                            <span className="text-xs font-semibold px-2 py-0.5 bg-white border border-gray-200 rounded text-gray-700">
+                              {groupStudents.length} {groupStudents.length === 1 ? 'Student' : 'Students'}
+                            </span>
+                          </div>
+
+                          <div className="overflow-x-auto border border-gray-200 rounded">
+                            <table className="w-full text-left text-xs border-collapse">
+                              <thead className="bg-[#093C22] text-white">
+                                <tr>
+                                  <th className="py-2 px-2.5 font-bold w-8 text-center">#</th>
+                                  <th className="py-2 px-3 font-bold">Index No.</th>
+                                  <th className="py-2 px-3 font-bold">Student Name</th>
+                                  <th className="py-2 px-3 font-bold">Program / Faculty</th>
+                                  <th className="py-2 px-2.5 font-bold text-center">Gender</th>
+                                  <th className="py-2 px-3 font-bold">Contact</th>
+                                  <th className="py-2 px-2.5 font-bold text-center">Group</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-200">
+                                {groupStudents.map((s, idx) => (
+                                  <tr key={s.id || idx} className={idx % 2 === 1 ? 'bg-gray-50/70' : 'bg-white'}>
+                                    <td className="py-1.5 px-2.5 text-center text-gray-500">{idx + 1}</td>
+                                    <td className="py-1.5 px-3 font-mono font-bold text-gray-900">{s.student_id}</td>
+                                    <td className="py-1.5 px-3 font-medium text-gray-900">{s.name}</td>
+                                    <td className="py-1.5 px-3 text-gray-700">{s.program || s.faculty || 'N/A'}</td>
+                                    <td className="py-1.5 px-2.5 text-center text-gray-600">{s.gender || '—'}</td>
+                                    <td className="py-1.5 px-3 text-gray-600">{s.phone_number || s.email || '—'}</td>
+                                    <td className="py-1.5 px-2.5 text-center text-gray-700">{groupLabel}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Footer notes */}
+                <div className="mt-12 pt-4 border-t border-gray-200 text-[10px] text-gray-400 flex justify-between items-center">
+                  <span>CONFIDENTIAL — COMMUNITY FIELD STUDY SYSTEM</span>
+                  <span>Administrative Use Only</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

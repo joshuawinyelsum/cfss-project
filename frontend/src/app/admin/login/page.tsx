@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAdminAuthStore } from '@/lib/store';
-import { api } from '@/lib/api';
+import { api, getErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,9 +35,9 @@ export default function AdminLoginPage() {
       
       const token = res.data.access_token;
       
-      setAuth(token, {
+      let adminProfile = {
         id: null,
-        student_id: 'admin',
+        student_id: username.toUpperCase(),
         full_name: 'Administrator',
         program: 'System Admin',
         community: null,
@@ -45,21 +45,34 @@ export default function AdminLoginPage() {
         group_number: null,
         registered_at: new Date().toISOString(),
         role: 'admin'
-      });
+      };
+
+      try {
+        const meRes = await api.get('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (meRes.data) {
+          adminProfile = {
+            id: meRes.data.id,
+            student_id: meRes.data.student_id,
+            full_name: meRes.data.name || 'Administrator',
+            program: meRes.data.program || 'System Admin',
+            community: meRes.data.community_name || null,
+            community_id: meRes.data.community_id || null,
+            group_number: meRes.data.group_number || null,
+            registered_at: meRes.data.created_at || new Date().toISOString(),
+            role: meRes.data.role || 'admin'
+          };
+        }
+      } catch (meErr) {
+        console.warn('Could not fetch admin me profile, using defaults', meErr);
+      }
+      
+      setAuth(token, adminProfile);
       
       router.push('/admin');
     } catch (err: any) {
-      let msg = 'Admin login failed';
-      if (err instanceof Error) {
-        msg = err.message;
-      } else if (typeof err === 'object' && err !== null && 'response' in err) {
-        const errorResponse = err.response;
-        if (errorResponse?.data?.detail) {
-          msg = typeof errorResponse.data.detail === 'string'
-            ? errorResponse.data.detail
-            : errorResponse.data.detail[0]?.msg || msg;
-        }
-      }
+      const msg = getErrorMessage(err, 'Incorrect admin credentials');
       setError(msg);
       setIsLoading(false);
     }

@@ -63,5 +63,6 @@ async def update_settings(
         pref.theme = payload.theme
         
     await db.commit()
+    await db.refresh(pref)
     
     return {"theme": pref.theme}

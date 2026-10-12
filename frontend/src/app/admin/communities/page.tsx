@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useMemo } from 'react';
-import { api } from '@/lib/api';
+import { api, getErrorMessage } from '@/lib/api';
+import { useAdminAuthStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,6 +32,8 @@ interface Community {
 }
 
 export default function AdminCommunitiesPage() {
+  const token = useAdminAuthStore((state) => state.token);
+  const [hydrated, setHydrated] = useState(false);
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -47,20 +50,32 @@ export default function AdminCommunitiesPage() {
   const [isEditingMap, setIsEditingMap] = useState(false);
 
   useEffect(() => {
-    fetchCommunities();
+    setHydrated(true);
   }, []);
 
   const fetchCommunities = async () => {
+    const activeToken = token || useAdminAuthStore.getState().token;
+    if (!activeToken) return;
     try {
-      const res = await api.get('/api/admin/communities');
+      setLoading(true);
+      setError('');
+      const res = await api.get('/api/admin/communities', {
+        headers: { Authorization: `Bearer ${activeToken}` }
+      });
       setCommunities(res.data);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError('Failed to load communities');
+      setError(getErrorMessage(err, 'Failed to load communities'));
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (hydrated && token) {
+      fetchCommunities();
+    }
+  }, [hydrated, token]);
 
   const filteredCommunities = useMemo(() => {
     return communities.filter(c => 
@@ -71,16 +86,23 @@ export default function AdminCommunitiesPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    const activeToken = token || useAdminAuthStore.getState().token;
+    if (!activeToken) {
+      setCreateError('Authentication required');
+      return;
+    }
     setCreating(true);
     setCreateError('');
     try {
-      await api.post('/api/admin/communities', newComm);
+      await api.post('/api/admin/communities', newComm, {
+        headers: { Authorization: `Bearer ${activeToken}` }
+      });
       await fetchCommunities();
       setShowCreateModal(false);
       setNewComm({ name: '', district: '', region: '', capacity: 10 });
     } catch (err: any) {
       console.error(err);
-      setCreateError(err.response?.data?.detail || 'Failed to create community');
+      setCreateError(getErrorMessage(err, 'Failed to create community'));
     } finally {
       setCreating(false);
     }
@@ -89,9 +111,12 @@ export default function AdminCommunitiesPage() {
   const handleViewCommunity = async (comm: Community) => {
     setSelectedCommunity(comm);
     setIsEditingMap(false);
+    const activeToken = token || useAdminAuthStore.getState().token;
     try {
-      const res = await api.get('/api/admin/users/students');
-      const students = res.data.filter((s: any) => s.community_id === comm.id);
+      const res = await api.get('/api/admin/students', {
+        headers: { Authorization: `Bearer ${activeToken}` }
+      });
+      const students = res.data.filter((s: any) => String(s.community_id) === String(comm.id));
       setCommunityStudents(students);
     } catch (err) {
       console.error(err);
@@ -100,6 +125,7 @@ export default function AdminCommunitiesPage() {
 
   const handleSaveMap = async (spatialData: any, lat: number | null, lng: number | null) => {
     if (!selectedCommunity) return;
+    const activeToken = token || useAdminAuthStore.getState().token;
     try {
       const res = await api.put(`/api/admin/communities/${selectedCommunity.id}`, {
         name: selectedCommunity.name,
@@ -109,6 +135,8 @@ export default function AdminCommunitiesPage() {
         latitude: lat,
         longitude: lng,
         spatial_metadata: spatialData
+      }, {
+        headers: { Authorization: `Bearer ${activeToken}` }
       });
       // update local state
       setCommunities(prev => prev.map(c => c.id === selectedCommunity.id ? res.data : c));
@@ -116,13 +144,9 @@ export default function AdminCommunitiesPage() {
       setIsEditingMap(false);
     } catch (err: any) {
       console.error("Failed to save map", err);
-      throw new Error(err.response?.data?.detail || "Failed to save community boundary");
+      throw new Error(getErrorMessage(err, "Failed to save community boundary"));
     }
   };
-
-  if (loading) {
-    return <div className="p-8 text-center text-secondary">Loading communities...</div>;
-  }
 
   return (
     <div className="space-y-6">
@@ -137,10 +161,20 @@ export default function AdminCommunitiesPage() {
       </div>
 
       {error && (
-        <Alert variant="destructive">
-          {error}
+        <Alert variant="destructive" className="flex items-center justify-between">
+          <span>{error}</span>
+          <Button variant="outline" size="sm" onClick={() => fetchCommunities()}>Retry</Button>
         </Alert>
       )}
+
+      {loading && communities.length === 0 ? (
+        <Card>
+          <CardContent className="p-12 text-center text-secondary">
+            <div className="inline-block w-8 h-8 border-4 border-cfss-green border-t-transparent rounded-full animate-spin mb-3"></div>
+            <p>Loading communities...</p>
+          </CardContent>
+        </Card>
+      ) : (
 
       <Card>
         <CardContent className="p-4 sm:p-6">
@@ -207,6 +241,7 @@ export default function AdminCommunitiesPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* CREATE MODAL */}
       {showCreateModal && (

@@ -60,15 +60,7 @@ async def upload_whitelist(request: Request, db: AsyncSession = Depends(get_db_a
         failed = 0
         errors = []
 
-        # Transactional logic
-        # 1. Archive any currently active whitelist
-        await db.execute(
-            update(WhitelistV2)
-            .where(WhitelistV2.status == 'ACTIVE')
-            .values(status='ARCHIVED')
-        )
-        
-        # 2. Create the new ACTIVE whitelist
+        # Transactional logic: Create the new whitelist as ACTIVE without archiving others
         new_whitelist = WhitelistV2(
             name=name,
             status='ACTIVE',
@@ -209,6 +201,25 @@ async def get_whitelist_entries(id: int, page: int = 1, limit: int = 50, db: Asy
         "limit": limit
     }
 
+class WhitelistBulkUpdate(BaseModel):
+    ids: List[int]
+    status: str
+
+@router.patch("/whitelist/bulk-status")
+async def bulk_update_whitelist_status(payload: WhitelistBulkUpdate, db: AsyncSession = Depends(get_db_and_admin)):
+    if payload.status not in ['ACTIVE', 'ARCHIVED', 'DELETED']:
+        raise HTTPException(status_code=400, detail="Invalid status. Allowed: ACTIVE, ARCHIVED, DELETED")
+    if not payload.ids:
+        return {"message": "No IDs provided"}
+
+    await db.execute(
+        update(WhitelistV2)
+        .where(WhitelistV2.id.in_(payload.ids))
+        .values(status=payload.status)
+    )
+    await db.commit()
+    return {"message": f"Updated {len(payload.ids)} whitelists to {payload.status}"}
+
 @router.patch("/whitelist/{id}", response_model=WhitelistResponse)
 async def update_whitelist(id: int, payload: WhitelistUpdate, db: AsyncSession = Depends(get_db_and_admin)):
     result = await db.execute(select(WhitelistV2).where(WhitelistV2.id == id, WhitelistV2.status != 'DELETED'))
@@ -216,12 +227,8 @@ async def update_whitelist(id: int, payload: WhitelistUpdate, db: AsyncSession =
     if not whitelist:
         raise HTTPException(status_code=404, detail="Whitelist not found")
 
-    if payload.status == 'ACTIVE' and whitelist.status != 'ACTIVE':
-        await db.execute(
-            update(WhitelistV2)
-            .where(WhitelistV2.status == 'ACTIVE')
-            .values(status='ARCHIVED')
-        )
+    if payload.status not in ['ACTIVE', 'ARCHIVED', 'DELETED']:
+        raise HTTPException(status_code=400, detail="Invalid status")
     
     whitelist.status = payload.status
     await db.commit()

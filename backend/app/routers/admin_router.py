@@ -14,9 +14,11 @@ async def get_db_and_admin(db: AsyncSession = Depends(get_db), admin: models.Use
     return db
 
 
-async def verify_admin_password(db: AsyncSession, password: str):
-    result = await db.execute(select(models.User).filter(models.User.role == "admin"))
-    admin = result.scalars().first()
+async def verify_admin_password(db: AsyncSession, password: str, current_admin: models.User = None):
+    admin = current_admin
+    if admin is None:
+        result = await db.execute(select(models.User).filter(models.User.role == "admin"))
+        admin = result.scalars().first()
     if admin is None or not auth.verify_password(password, admin.password_hash):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -175,9 +177,13 @@ async def admin_logout(current_user: models.User = Depends(auth.get_current_admi
     return {"message": "Logged out successfully"}
 
 @router.put("/settings", response_model=schemas.SettingsResponse)
-async def update_settings(settings_update: schemas.SettingsUpdate, db: AsyncSession = Depends(get_db_and_admin)):
-    # Validate Admin Password for Sensitive Action
-    await verify_admin_password(db, settings_update.admin_password)
+async def update_settings(
+    settings_update: schemas.SettingsUpdate,
+    admin: models.User = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    # Validate Admin Password for Sensitive Action using the authenticated admin credential
+    await verify_admin_password(db, settings_update.admin_password, current_admin=admin)
 
     result = await db.execute(select(models.SystemSettings).limit(1))
     settings = result.scalars().first()
@@ -194,18 +200,19 @@ async def update_settings(settings_update: schemas.SettingsUpdate, db: AsyncSess
     settings.survey_deadline = settings_update.survey_deadline
     settings.allow_multiple_submissions = settings_update.allow_multiple_submissions
     settings.default_page_size = settings_update.default_page_size
-    
 
-
-        
     await db.commit()
     await db.refresh(settings)
     return settings
 
 @router.put("/settings/registration", response_model=schemas.SettingsResponse)
-async def update_registration_setting(request: schemas.RegistrationToggleRequest, db: AsyncSession = Depends(get_db_and_admin)):
-    # Validate Admin Password for Sensitive Action
-    await verify_admin_password(db, request.admin_password)
+async def update_registration_setting(
+    request: schemas.RegistrationToggleRequest,
+    admin: models.User = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    # Validate Admin Password for Sensitive Action using the authenticated admin credential
+    await verify_admin_password(db, request.admin_password, current_admin=admin)
 
     result = await db.execute(select(models.SystemSettings).limit(1))
     settings = result.scalars().first()
@@ -223,17 +230,16 @@ async def update_registration_setting(request: schemas.RegistrationToggleRequest
 @router.post("/change-password")
 async def change_admin_password(
     payload: schemas.AdminChangePasswordRequest,
-    db: AsyncSession = Depends(get_db_and_admin)
+    admin: models.User = Depends(auth.get_current_admin),
+    db: AsyncSession = Depends(get_db)
 ):
-    result = await db.execute(select(models.User).filter(models.User.role == "admin"))
-    admin = result.scalars().first()
-
-    if not admin or not auth.verify_password(payload.current_password, admin.password_hash):
+    if not auth.verify_password(payload.current_password, admin.password_hash):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
 
     admin.password_hash = auth.get_password_hash(payload.new_password)
     db.add(admin)
     await db.commit()
+    await db.refresh(admin)
 
     return {"message": "Password changed successfully"}
 

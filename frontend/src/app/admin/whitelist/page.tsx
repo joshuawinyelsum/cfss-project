@@ -35,6 +35,14 @@ export default function WhitelistUploadPage() {
   const [whitelists, setWhitelists] = useState<Whitelist[]>([]);
   const [loadingLists, setLoadingLists] = useState(true);
 
+  // Multiple lists management states
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [inspectingId, setInspectingId] = useState<number | null>(null);
+  const [inspectData, setInspectData] = useState<{ entries: any[]; total: number } | null>(null);
+  const [loadingInspect, setLoadingInspect] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -55,6 +63,69 @@ export default function WhitelistUploadPage() {
       showToast('Failed to fetch whitelists', 'error');
     } finally {
       setLoadingLists(false);
+    }
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedIds.length === whitelists.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(whitelists.map(w => w.id));
+    }
+  };
+
+  const handleToggleSelect = (id: number) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleStatus = async (id: number, currentStatus: string) => {
+    const nextStatus = currentStatus === 'ACTIVE' ? 'ARCHIVED' : 'ACTIVE';
+    try {
+      setTogglingId(id);
+      await api.patch(`/admin/whitelist/${id}`, { status: nextStatus }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      showToast(`Whitelist status updated to ${nextStatus}`, 'success');
+      fetchWhitelists();
+    } catch (err: any) {
+      showToast(err.response?.data?.detail || 'Failed to update whitelist status', 'error');
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  const handleBulkStatus = async (status: 'ACTIVE' | 'ARCHIVED') => {
+    if (selectedIds.length === 0) return;
+    try {
+      setBulkUpdating(true);
+      await api.patch('/admin/whitelist/bulk-status', { ids: selectedIds, status }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      showToast(`Updated ${selectedIds.length} whitelist(s) to ${status}`, 'success');
+      setSelectedIds([]);
+      fetchWhitelists();
+    } catch (err: any) {
+      showToast(err.response?.data?.detail || 'Bulk update failed', 'error');
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
+  const handleInspect = async (id: number) => {
+    setInspectingId(id);
+    setLoadingInspect(true);
+    try {
+      const res = await api.get(`/admin/whitelist/${id}?limit=100`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setInspectData(res.data);
+    } catch (err) {
+      showToast('Failed to load whitelist entries', 'error');
+      setInspectingId(null);
+    } finally {
+      setLoadingInspect(false);
     }
   };
 
@@ -182,7 +253,7 @@ export default function WhitelistUploadPage() {
       <div className="max-w-4xl mx-auto space-y-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Whitelist Management</h1>
-          <p className="text-gray-500 mt-2">Manage your registration whitelists. Only entries in the ACTIVE whitelist can register.</p>
+          <p className="text-gray-500 mt-2">Manage registration cohorts and classes. Multiple whitelists can be active simultaneously — students belonging to any active whitelist are eligible to register.</p>
         </div>
 
         {/* Upload Box */}
@@ -315,7 +386,34 @@ export default function WhitelistUploadPage() {
 
         {/* Existing Whitelists */}
         <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200">
-           <h2 className="text-xl font-bold text-gray-900 mb-4">Historical Whitelists</h2>
+           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+             <div>
+               <h2 className="text-xl font-bold text-gray-900">Manage Whitelists</h2>
+               <p className="text-sm text-gray-500">Multiple whitelists can be active concurrently for different cohorts or classes.</p>
+             </div>
+
+             {/* Bulk Actions Bar */}
+             {selectedIds.length > 0 && (
+               <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg text-sm">
+                 <span className="font-semibold text-blue-900">{selectedIds.length} selected</span>
+                 <button
+                   onClick={() => handleBulkStatus('ACTIVE')}
+                   disabled={bulkUpdating}
+                   className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded font-medium text-xs transition-colors disabled:opacity-50"
+                 >
+                   Activate Selected
+                 </button>
+                 <button
+                   onClick={() => handleBulkStatus('ARCHIVED')}
+                   disabled={bulkUpdating}
+                   className="px-2.5 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded font-medium text-xs transition-colors disabled:opacity-50"
+                 >
+                   Deactivate Selected
+                 </button>
+               </div>
+             )}
+           </div>
+
            {loadingLists ? (
              <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-blue-500"/></div>
            ) : (
@@ -323,6 +421,14 @@ export default function WhitelistUploadPage() {
                 <table className="w-full text-left text-sm text-gray-600">
                   <thead className="bg-gray-50 text-gray-700">
                     <tr>
+                      <th className="px-3 py-3 border-b w-8">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.length === whitelists.length && whitelists.length > 0}
+                          onChange={handleToggleSelectAll}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </th>
                       <th className="px-4 py-3 border-b">ID</th>
                       <th className="px-4 py-3 border-b">Name</th>
                       <th className="px-4 py-3 border-b">Status</th>
@@ -333,44 +439,80 @@ export default function WhitelistUploadPage() {
                   <tbody>
                     {whitelists.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="px-4 py-8 text-center text-gray-500">No whitelists found</td>
+                        <td colSpan={6} className="px-4 py-8 text-center text-gray-500">No whitelists found</td>
                       </tr>
                     ) : (
                       whitelists.map(w => (
                         <tr key={w.id} className="border-b border-gray-50 hover:bg-gray-50">
-                          <td className="px-4 py-3">#{w.id}</td>
+                          <td className="px-3 py-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(w.id)}
+                              onChange={() => handleToggleSelect(w.id)}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                          </td>
+                          <td className="px-4 py-3 font-mono text-xs text-gray-500">#{w.id}</td>
                           <td className="px-4 py-3 font-medium text-gray-900">{w.name}</td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${w.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${w.status === 'ACTIVE' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}>
                               {w.status}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-gray-500">{new Date(w.created_at).toLocaleString()}</td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-gray-500 text-xs">{new Date(w.created_at).toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right space-x-2">
+                            {/* Toggle Active/Archived */}
+                            <button
+                              onClick={() => handleToggleStatus(w.id, w.status)}
+                              disabled={togglingId === w.id}
+                              className={`inline-flex items-center text-xs font-medium px-2 py-1 rounded transition-colors ${
+                                w.status === 'ACTIVE'
+                                  ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
+                                  : 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
+                              }`}
+                            >
+                              {togglingId === w.id ? (
+                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                              ) : null}
+                              {w.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                            </button>
+
+                            {/* Inspect Members */}
+                            <button
+                              onClick={() => handleInspect(w.id)}
+                              className="inline-flex items-center text-xs font-medium text-indigo-600 hover:text-indigo-800 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200"
+                              title="Inspect Members"
+                            >
+                              Inspect
+                            </button>
+
+                            {/* Export CSV */}
                             <button
                               onClick={() => handleExport(w.id)}
                               disabled={exportingId === w.id}
-                              className="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                              className="inline-flex items-center text-xs font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50"
                               title="Export CSV"
                             >
                               {exportingId === w.id ? (
-                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                               ) : (
-                                <Download className="w-4 h-4 mr-1" />
+                                <Download className="w-3.5 h-3.5 mr-1" />
                               )}
                               Export
                             </button>
+
+                            {/* Delete (only allowed if not active) */}
                             {w.status !== 'ACTIVE' && (
                               <button
                                 onClick={() => handleDelete(w.id)}
                                 disabled={deletingId === w.id}
-                                className="inline-flex items-center text-sm font-medium text-red-600 hover:text-red-800 disabled:opacity-50 ml-4"
+                                className="inline-flex items-center text-xs font-medium text-red-600 hover:text-red-800 disabled:opacity-50 ml-2"
                                 title="Delete Whitelist"
                               >
                                 {deletingId === w.id ? (
-                                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                                 ) : (
-                                  <Trash2 className="w-4 h-4 mr-1" />
+                                  <Trash2 className="w-3.5 h-3.5 mr-1" />
                                 )}
                                 Delete
                               </button>
@@ -386,6 +528,80 @@ export default function WhitelistUploadPage() {
         </div>
 
       </div>
+
+      {/* INSPECTION MODAL */}
+      {inspectingId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[85vh] shadow-2xl flex flex-col overflow-hidden border border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Whitelist #{inspectingId} Members</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {inspectData ? `${inspectData.total} eligible students in this cohort` : 'Loading membership...'}
+                </p>
+              </div>
+              <button
+                onClick={() => setInspectingId(null)}
+                className="p-1 rounded text-gray-400 hover:text-gray-600 text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              {loadingInspect ? (
+                <div className="flex justify-center p-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                </div>
+              ) : !inspectData || inspectData.entries.length === 0 ? (
+                <div className="text-center py-12 text-gray-500 text-sm">
+                  No member records found for this whitelist.
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-gray-200 rounded">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-gray-50 text-gray-700">
+                      <tr>
+                        <th className="py-2 px-3 border-b">#</th>
+                        <th className="py-2 px-3 border-b font-bold">Student ID</th>
+                        <th className="py-2 px-3 border-b font-bold">Name</th>
+                        <th className="py-2 px-3 border-b">Program</th>
+                        <th className="py-2 px-3 border-b">Faculty</th>
+                        <th className="py-2 px-3 border-b">Gender</th>
+                        <th className="py-2 px-3 border-b">Phone</th>
+                        <th className="py-2 px-3 border-b">Level</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {inspectData.entries.map((m: any, idx: number) => (
+                        <tr key={m.id || idx} className="hover:bg-gray-50">
+                          <td className="py-2 px-3 text-gray-400">{idx + 1}</td>
+                          <td className="py-2 px-3 font-mono font-bold text-gray-900">{m.student_id}</td>
+                          <td className="py-2 px-3 font-medium text-gray-900">{m.full_name || '—'}</td>
+                          <td className="py-2 px-3 text-gray-700">{m.program || '—'}</td>
+                          <td className="py-2 px-3 text-gray-700">{m.faculty || '—'}</td>
+                          <td className="py-2 px-3 text-gray-600">{m.gender || '—'}</td>
+                          <td className="py-2 px-3 text-gray-600">{m.phone_number || '—'}</td>
+                          <td className="py-2 px-3 text-gray-600">{m.level || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex justify-end">
+              <button
+                onClick={() => setInspectingId(null)}
+                className="px-4 py-1.5 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

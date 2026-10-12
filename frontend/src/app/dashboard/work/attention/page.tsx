@@ -57,9 +57,44 @@ export default function SyncPage() {
   }, [user]);
 
   const handleSyncAll = async () => {
-    if (isSyncing || !token) return;
+    if (isSyncing || !token || !user) return;
     setIsSyncing(true);
     try {
+      // Ensure all pending/failed surveys have a valid PENDING operation
+      const records = await db.surveys.where('student_id').equals(user.id as number).toArray();
+      const needSync = records.filter(r => r.sync_status === 'pending' || r.sync_status === 'failed');
+
+      for (const item of needSync) {
+        const existingOp = await db.sync_operations.where('entity_id').equals(item.id).first();
+        if (existingOp) {
+          await db.sync_operations.update(existingOp.id, {
+            status: 'PENDING',
+            retry_count: 0,
+            last_error: undefined
+          });
+        } else {
+          await db.sync_operations.add({
+            id: crypto.randomUUID(),
+            student_id: user.id as number,
+            operation_type: item.server_synced ? 'UPDATE' : 'CREATE',
+            entity_type: 'SURVEY',
+            entity_id: item.id,
+            payload: {
+              survey_type: item.survey_type,
+              status: (item.status || 'SUBMITTED').toUpperCase(),
+              field_feature_id: item.field_feature_id,
+              answers: item.answers || [],
+              submitted_at: item.submitted_at,
+              updated_at: item.updated_at
+            },
+            status: 'PENDING',
+            retry_count: 0,
+            created_at: new Date().toISOString()
+          });
+        }
+        await db.surveys.update(item.id, { sync_status: 'pending', sync_error: undefined });
+      }
+
       await syncEngine.processQueue(token);
       localStorage.setItem('cfss_last_sync', Date.now().toString());
     } finally {
@@ -68,11 +103,37 @@ export default function SyncPage() {
   };
 
   const handleSyncSingle = async (item: any) => {
-    if (!token) return;
+    if (!token || !user) return;
     setIsSyncing(true);
     try {
-      // Re-queue it if it was failed, just setting its sync_status to pending
-      await db.surveys.update(item.id, { sync_status: 'pending' });
+      const existingOp = await db.sync_operations.where('entity_id').equals(item.id).first();
+      if (existingOp) {
+        await db.sync_operations.update(existingOp.id, {
+          status: 'PENDING',
+          retry_count: 0,
+          last_error: undefined
+        });
+      } else {
+        await db.sync_operations.add({
+          id: crypto.randomUUID(),
+          student_id: user.id as number,
+          operation_type: item.server_synced ? 'UPDATE' : 'CREATE',
+          entity_type: 'SURVEY',
+          entity_id: item.id,
+          payload: {
+            survey_type: item.survey_type,
+            status: (item.status || 'SUBMITTED').toUpperCase(),
+            field_feature_id: item.field_feature_id,
+            answers: item.answers || [],
+            submitted_at: item.submitted_at,
+            updated_at: item.updated_at
+          },
+          status: 'PENDING',
+          retry_count: 0,
+          created_at: new Date().toISOString()
+        });
+      }
+      await db.surveys.update(item.id, { sync_status: 'pending', sync_error: undefined });
       await syncEngine.processQueue(token);
       localStorage.setItem('cfss_last_sync', Date.now().toString());
       setSelectedItem(null); // Close modal
@@ -233,7 +294,11 @@ export default function SyncPage() {
 
               {selectedItem.sync_error && (
                 <Alert variant="destructive" title="Error Information">
-                  <p className="text-sm font-mono break-all mt-1">{selectedItem.sync_error}</p>
+                  <p className="text-sm break-words mt-1">
+                    {selectedItem.sync_error.includes('sqlalchemy') || selectedItem.sync_error.includes('asyncpg') || selectedItem.sync_error.includes('ProgrammingError')
+                      ? 'Database synchronization error. Please check your connection and retry.'
+                      : selectedItem.sync_error}
+                  </p>
                 </Alert>
               )}
             </div>

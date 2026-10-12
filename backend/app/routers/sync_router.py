@@ -155,9 +155,21 @@ async def sync_operations(
                 survey_data = op.payload or {}
 
                 if record:
-                    # Update
                     if record.created_by_student_id != curr_user_id:
-                        raise ValueError("Not authorized to edit this survey")
+                        raise ValueError("Not authorized to access this survey")
+
+                    # Idempotent retry of CREATE operation
+                    if op.operation_type == "CREATE":
+                        results.append({
+                            "operation_id": op.operation_id,
+                            "server_id": record.id,
+                            "house_number": record.entity_id,
+                            "success": True,
+                            "action": "acknowledged"
+                        })
+                        continue
+
+                    # UPDATE operation validation
                     if record.status == "DELETED":
                         raise ValueError("Cannot update a deleted survey")
                     if record.status == "SUBMITTED":
@@ -298,12 +310,27 @@ async def sync_operations(
 
         except Exception as e:
             import traceback
+            from app.logger import logger
             tb = traceback.format_exc()
+            logger.error(f"Sync error for operation {op.operation_id}: {tb}")
             await db.rollback()
+
+            err_str = str(e)
+            if isinstance(e, ValueError):
+                safe_err = str(e)
+            elif "unique" in err_str.lower() or "integrity" in err_str.lower():
+                safe_err = "A record with this identifier already exists on the server."
+            elif "foreign key" in err_str.lower():
+                safe_err = "Referenced entity does not exist on the server."
+            elif "not found" in err_str.lower():
+                safe_err = "The requested entity was not found on the server."
+            else:
+                safe_err = "Database error during synchronization. Please retry."
+
             results.append({
                 "operation_id": op.operation_id,
                 "success": False,
-                "error": str(e)
+                "error": safe_err
             })
 
     return {"success": True, "results": results}
