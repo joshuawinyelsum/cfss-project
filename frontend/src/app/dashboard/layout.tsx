@@ -415,11 +415,11 @@ export default function DashboardLayout({
 
 
   return (
-    <div className="flex flex-1 w-full bg-page overflow-hidden font-sans">
+    <div className="flex h-screen w-full bg-page overflow-hidden font-sans">
       
       {/* Desktop Sidebar */}
       {!pathname.includes("/fill") && !pathname.includes("/view") && (
-<aside className="hidden lg:flex flex-col w-64 bg-[#093C22] shrink-0 z-10">
+        <aside className="hidden lg:flex flex-col w-64 h-screen sticky top-0 bg-[#093C22] shrink-0 z-20 border-r border-[#0c512e]">
         <div className="p-6 flex items-center gap-3 border-b border-[#0c512e]">
           <div className="w-10 h-10 bg-surface rounded-lg flex items-center justify-center shrink-0">
             <span className="text-[#093C22] font-bold text-xl">C</span>
@@ -527,7 +527,7 @@ export default function DashboardLayout({
 )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative">
         
         {/* Mobile Header */}
         <header className="lg:hidden bg-surface border-b border-border-strong h-14 flex items-center justify-between px-4 shrink-0 z-10">

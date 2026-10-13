@@ -231,35 +231,45 @@ export default function MapPage() {
   const handleSaveRoad = async (roadGeoJSON: GeoJSON.Feature) => {
     if (!community || !token) return;
     try {
-      const roadId = crypto.randomUUID();
+      const existingId = (roadGeoJSON.id as string) || (roadGeoJSON.properties?.id as string) || null;
+      const existingFeature = existingId ? features.find(f => f.id === existingId) : null;
+      const roadId = existingId || crypto.randomUUID();
       const coords = (roadGeoJSON.geometry as GeoJSON.LineString | undefined)?.coordinates || [];
       const midPoint = coords.length > 0 ? coords[Math.floor(coords.length / 2)] : [0, 0];
 
       const roadFeature: LocalFeature = {
         id: roadId,
-        student_id: user?.id as number,
+        student_id: (existingFeature?.student_id ?? user?.id) as number,
         community_id: community.id,
         feature_type: 'ROAD',
         latitude: parseFloat(midPoint[1].toFixed(6)),
         longitude: parseFloat(midPoint[0].toFixed(6)),
-        accuracy_meters: 5,
+        accuracy_meters: existingFeature?.accuracy_meters ?? 5,
         metadata_json: {
-          label: (roadGeoJSON.properties?.label as string) || 'Field Access Road / Path',
-          category: roadGeoJSON.properties?.category || 'LOCAL_ROAD',
-          notes: roadGeoJSON.properties?.notes || '',
+          ...(existingFeature?.metadata_json || {}),
+          label: (roadGeoJSON.properties?.label as string) || (existingFeature?.metadata_json?.label as string) || 'Field Access Road / Path',
+          category: roadGeoJSON.properties?.category || (existingFeature?.metadata_json?.category as string) || 'LOCAL_ROAD',
+          notes: roadGeoJSON.properties?.notes !== undefined ? roadGeoJSON.properties.notes : (existingFeature?.metadata_json?.notes || ''),
           length_km: roadGeoJSON.properties?.length_km,
           geometry: roadGeoJSON.geometry,
           provenance: 'MANUALLY_MAPPED'
         },
         sync_status: 'pending',
-        created_at: new Date().toISOString(),
+        created_at: existingFeature?.created_at || new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
       await db.features.put(roadFeature);
-      setFeatures(prev => [...prev, roadFeature]);
+      setFeatures(prev => {
+        const exists = prev.some(f => f.id === roadId);
+        if (exists) {
+          return prev.map(f => f.id === roadId ? roadFeature : f);
+        }
+        return [...prev, roadFeature];
+      });
 
-      await syncEngine.queueOperation('CREATE', 'FEATURE', roadId, roadFeature as unknown as Record<string, unknown>, token);
+      const opType = existingFeature ? 'UPDATE' : 'CREATE';
+      await syncEngine.queueOperation(opType, 'FEATURE', roadId, roadFeature as unknown as Record<string, unknown>, token);
     } catch (e) {
       alert("Failed to save road feature: " + getErrorMessage(e, "Error"));
     }

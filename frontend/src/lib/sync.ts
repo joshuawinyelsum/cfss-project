@@ -55,10 +55,20 @@ export const syncEngine = {
          await db.sync_operations.update(orphan.id, { status: 'PENDING' });
       }
 
-      const userOperations = await db.sync_operations.where('student_id').equals(userId).toArray();
+      const userOperations: SyncOperation[] = await db.sync_operations.where('student_id').equals(userId).toArray();
+      const typePriority: Record<string, number> = {
+        'COMMUNITY': 1,
+        'FEATURE': 2,
+        'SURVEY': 3
+      };
       const queueItems = userOperations
-        .filter(op => op.status === 'PENDING' || op.status === 'FAILED')
-        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        .filter((op: SyncOperation) => op.status === 'PENDING' || op.status === 'FAILED')
+        .sort((a: SyncOperation, b: SyncOperation) => {
+          const pA = typePriority[a.entity_type] || 99;
+          const pB = typePriority[b.entity_type] || 99;
+          if (pA !== pB) return pA - pB;
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        });
 
       if (queueItems.length === 0) {
         this.isSyncing = false;
@@ -248,7 +258,15 @@ export const syncEngine = {
           payload.sync_status = 'pending';
           payload.updated_at = new Date().toISOString();
           if (operationType === 'UPDATE') {
-            await (store as any).update(targetId, payload);
+            const existing = await (store as any).get(targetId);
+            if (existing) {
+              await (store as any).update(targetId, payload);
+            } else {
+              if (entityType === 'COMMUNITY' && !payload.id) {
+                (payload as any).id = targetId;
+              }
+              await (store as any).put(payload);
+            }
           } else {
             if (entityType === 'COMMUNITY' && !payload.id) {
               (payload as any).id = targetId;

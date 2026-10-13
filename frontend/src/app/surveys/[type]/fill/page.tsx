@@ -338,6 +338,7 @@ function QuestionnaireContent() {
         submitted_at: submittedAt
       };
 
+      await db.surveys.put(payload);
       await syncEngine.queueOperation(opType, 'SURVEY', record.id, payload, token);
 
       setHasUnsavedChanges(false);

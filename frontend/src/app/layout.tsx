@@ -63,7 +63,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col bg-page text-primary">
+      <body className="h-full flex flex-col bg-page text-primary antialiased">
         <ThemeProvider>
           {children}
         </ThemeProvider>

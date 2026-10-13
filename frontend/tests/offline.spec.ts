@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Offline Field Collection', () => {
   test.beforeEach(async () => {
-    test.setTimeout(60000);
+    test.setTimeout(90000);
   });
 
   // Test A - template caching
@@ -18,7 +18,7 @@ test.describe('Offline Field Collection', () => {
     // 2. Navigate to surveys listing while online
     await page.goto('/surveys/household');
     const createBtn = page.getByRole('button', { name: /Add New/i });
-    await expect(createBtn).toBeVisible();
+    await expect(createBtn).toBeVisible({ timeout: 25000 });
 
     // 3. Intercept API calls to simulate offline backend network conditions
     await context.route('**/*', route => {

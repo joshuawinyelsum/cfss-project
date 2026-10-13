@@ -8,6 +8,7 @@ import {
   Marker,
   Popup,
   Polyline,
+  CircleMarker,
   useMapEvents,
   FeatureGroup,
   useMap
@@ -35,6 +36,7 @@ import {
   Plus,
   Check,
   Undo2,
+  Redo2,
   Info,
   ChevronDown,
   ChevronUp,
@@ -83,7 +85,7 @@ if (typeof window !== 'undefined' && L && L.DomUtil) {
   };
 }
 
-export type MapStyle = 'streets' | 'satellite' | 'hybrid' | 'terrain';
+export type MapStyle = 'streets' | 'satellite' | 'hybrid' | 'terrain' | 'b_w';
 
 // Road categories and styling
 export const ROAD_CATEGORIES = [
@@ -94,82 +96,94 @@ export const ROAD_CATEGORIES = [
   { id: 'OTHER', label: 'Other Route', description: 'Locally identified path', color: '#7c3aed', weight: 3, dashArray: '5, 5' }
 ] as const;
 
-export const getRoadVisuals = (category: string) => {
-  const found = ROAD_CATEGORIES.find(c => c.id === category?.toUpperCase());
-  return found || ROAD_CATEGORIES[1];
+export const getRoadVisuals = (category: string, isBW?: boolean) => {
+  const found = ROAD_CATEGORIES.find(c => c.id === category?.toUpperCase()) || ROAD_CATEGORIES[1];
+  if (isBW) {
+    if (found.id === 'MAJOR_ROAD') return { ...found, color: '#000000', weight: 4.5, dashArray: undefined };
+    if (found.id === 'LOCAL_ROAD') return { ...found, color: '#27272a', weight: 3.5, dashArray: undefined };
+    if (found.id === 'ACCESS_ROAD') return { ...found, color: '#52525b', weight: 3, dashArray: '6, 4' };
+    if (found.id === 'FOOTPATH') return { ...found, color: '#71717a', weight: 2.5, dashArray: '3, 4' };
+    return { ...found, color: '#52525b', weight: 2.5, dashArray: '5, 5' };
+  }
+  return found;
 };
 
 // Accessible Feature Symbology with embedded SVG icons
 export const getFeatureVisuals = (type: string) => {
-  switch (type.toUpperCase()) {
-    case 'HOUSEHOLD':
-      return {
-        color: '#093C22',
-        label: 'Household',
-        iconSvg: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`
-      };
-    case 'EDUCATION':
-      return {
-        color: '#1d4ed8',
-        label: 'Education Facility',
-        iconSvg: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>`
-      };
-    case 'HEALTH':
-      return {
-        color: '#dc2626',
-        label: 'Health / Clinic',
-        iconSvg: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M12 5v14"/></svg>`
-      };
-    case 'GOVERNANCE':
-      return {
-        color: '#7e22ce',
-        label: 'Governance / Palace',
-        iconSvg: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>`
-      };
-    case 'CHURCH':
-    case 'RELIGIOUS':
-    case 'WORSHIP':
-      return {
-        color: '#d97706',
-        label: 'Place of Worship',
-        iconSvg: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H7M18 10H6"/></svg>`
-      };
-    case 'WATER':
-      return {
-        color: '#0284c7',
-        label: 'Water Point',
-        iconSvg: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>`
-      };
-    case 'ROAD':
-      return {
-        color: '#ea580c',
-        label: 'Road / Path',
-        iconSvg: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>`
-      };
-    default:
-      return {
-        color: '#475569',
-        label: 'Field Landmark',
-        iconSvg: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`
-      };
+  const norm = (type || '').toUpperCase();
+  if (norm.includes('HEALTH') || norm.includes('HOSPITAL') || norm.includes('CLINIC') || norm.includes('DISPENSARY')) {
+    return {
+      color: '#dc2626',
+      label: 'Health / Clinic / Hospital',
+      iconSvg: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20"/></svg>`
+    };
   }
+  if (norm.includes('EDUCATION') || norm.includes('SCHOOL') || norm.includes('COLLEGE') || norm.includes('ACADEMY')) {
+    return {
+      color: '#1d4ed8',
+      label: 'Education Facility',
+      iconSvg: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>`
+    };
+  }
+  if (norm.includes('GOVERNANCE') || norm.includes('PALACE') || norm.includes('CHIEF') || norm.includes('CIVIC') || norm.includes('ADMIN')) {
+    return {
+      color: '#7e22ce',
+      label: 'Governance / Palace',
+      iconSvg: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>`
+    };
+  }
+  if (norm.includes('HOUSEHOLD') || norm.includes('RESIDENCE') || norm.includes('HOME')) {
+    return {
+      color: '#093C22',
+      label: 'Household',
+      iconSvg: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`
+    };
+  }
+  if (norm.includes('CHURCH') || norm.includes('MOSQUE') || norm.includes('RELIGIOUS') || norm.includes('WORSHIP')) {
+    return {
+      color: '#d97706',
+      label: 'Place of Worship',
+      iconSvg: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H7M18 10H6"/></svg>`
+    };
+  }
+  if (norm.includes('WATER') || norm.includes('BOREHOLE') || norm.includes('WELL')) {
+    return {
+      color: '#0284c7',
+      label: 'Water Point',
+      iconSvg: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>`
+    };
+  }
+  if (norm.includes('ROAD') || norm.includes('PATH') || norm.includes('TRACK')) {
+    return {
+      color: '#ea580c',
+      label: 'Road / Path',
+      iconSvg: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>`
+    };
+  }
+  return {
+    color: '#475569',
+    label: 'Field Landmark',
+    iconSvg: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`
+  };
 };
 
-const createFeatureIcon = (type: string, isSubmitted: boolean) => {
+const createFeatureIcon = (type: string, isSubmitted: boolean, isBW?: boolean) => {
   const { color, iconSvg } = getFeatureVisuals(type);
   const opacity = isSubmitted ? '1' : '0.85';
-  const border = isSubmitted ? '2px solid #ffffff' : '2px dashed #fef08a';
+  const border = isBW ? '2px solid #ffffff' : (isSubmitted ? '2px solid #ffffff' : '2px dashed #fef08a');
+  const bgColor = isBW ? '#000000' : color;
+  const shadow = isBW ? '0 0 0 1.5px #000000, 0 3px 8px rgba(0,0,0,0.5)' : '0 3px 8px rgba(0,0,0,0.4)';
 
   return L.divIcon({
     className: 'custom-feature-pin',
     html: `
       <div style="
-        background-color: ${color};
+        background-color: ${bgColor};
         width: 26px;
         height: 26px;
         border-radius: 8px;
         border: ${border};
-        box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+        box-shadow: ${shadow};
         opacity: ${opacity};
         display: flex;
         align-items: center;
@@ -246,13 +260,39 @@ function MapInstanceBridge({ onMapReady }: { onMapReady: (map: L.Map | null) => 
   return null;
 }
 
-function MapInteractions({ onMapClick }: { onMapClick: (latlng: L.LatLng) => void }) {
+function MapInteractions({
+  onMapClick,
+  onMouseMove
+}: {
+  onMapClick: (latlng: L.LatLng) => void;
+  onMouseMove?: (latlng: L.LatLng) => void;
+}) {
   useMapEvents({
     click(e) {
       onMapClick(e.latlng);
     },
+    mousemove(e) {
+      if (onMouseMove) {
+        onMouseMove(e.latlng);
+      }
+    }
   });
   return null;
+}
+
+export interface SelectedFeatureInfo {
+  id: string; // 'boundary' or feature.id
+  type: 'BOUNDARY' | 'ROAD' | 'FEATURE';
+  title: string;
+  category?: string;
+  geojson?: GeoJSON.Feature | GeoJSON.GeoJsonObject | null;
+  lengthKm?: string;
+  lengthMeters?: number;
+  vertexCount?: number;
+  notes?: string;
+  surveyId?: string;
+  accuracy?: string;
+  coordinates?: string;
 }
 
 interface StudentMapProps {
@@ -300,7 +340,6 @@ export default function StudentMap({
   const savedBoundaryBackup = useRef<GeoJSON.Feature | GeoJSON.GeoJsonObject | null>(initialBoundary);
   const [isDrawingBoundary, setIsDrawingBoundary] = useState(false);
   const [isEditingBoundary, setIsEditingBoundary] = useState(false);
-  const [boundaryVertexCount, setBoundaryVertexCount] = useState(0);
   const [boundaryValidationError, setBoundaryValidationError] = useState<string | null>(null);
   const [savingBoundary, setSavingBoundary] = useState(false);
   const [hasUnsavedBoundary, setHasUnsavedBoundary] = useState(false);
@@ -308,30 +347,41 @@ export default function StudentMap({
   // Road Drawing State
   const [selectedRoadCategory, setSelectedRoadCategory] = useState<string>('LOCAL_ROAD');
   const [isDrawingRoad, setIsDrawingRoad] = useState(false);
-  const [roadVertexCount, setRoadVertexCount] = useState(0);
   const [pendingRoadGeoJSON, setPendingRoadGeoJSON] = useState<GeoJSON.Feature | null>(null);
   const [roadModalOpen, setRoadModalOpen] = useState(false);
   const [roadName, setRoadName] = useState('');
   const [roadNotes, setRoadNotes] = useState('');
   const [savingRoad, setSavingRoad] = useState(false);
 
-  // Inspector State
-  const [inspectedFeature, setInspectedFeature] = useState<{
-    id?: string;
-    type: 'FEATURE' | 'ROAD' | 'BOUNDARY';
-    title: string;
-    category?: string;
-    surveyId?: string;
-    coordinates?: string;
-    accuracy?: string;
-    stats?: string;
-    notes?: string;
+  // Natural Drawing Vertices & Live Preview Engine
+  const [drawingVertices, setDrawingVertices] = useState<[number, number][]>([]);
+  const [redoVertices, setRedoVertices] = useState<[number, number][]>([]);
+  const [hoverLatLng, setHoverLatLng] = useState<[number, number] | null>(null);
+
+  // Selected Feature & Detailed Measurement State
+  const [selectedFeature, setSelectedFeature] = useState<SelectedFeatureInfo | null>(null);
+
+  // Road Editing State (Interactive Draggable Vertices)
+  const [isEditingRoad, setIsEditingRoad] = useState(false);
+  const [editingRoadId, setEditingRoadId] = useState<string | null>(null);
+  const [editingRoadVertices, setEditingRoadVertices] = useState<[number, number][]>([]);
+  const savedRoadBackup = useRef<[number, number][] | null>(null);
+
+  // True Community Export Preview State
+  const [exportPreviewDataUrl, setExportPreviewDataUrl] = useState<string | null>(null);
+  const [exportInteriorStats, setExportInteriorStats] = useState<{
+    featuresCount: number;
+    roadsCount: number;
+    features: LocalFeature[];
   } | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
 
   // UI state
   const [showLegend, setShowLegend] = useState(true);
   const [showReportModal, setShowReportModal] = useState(false);
   const [tileError, setTileError] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const featureGroupRef = useRef<L.FeatureGroup>(null);
@@ -339,6 +389,7 @@ export default function StudentMap({
 
   const handleMapReady = useCallback((map: L.Map | null) => {
     mapInstanceRef.current = map;
+    setMapReady(Boolean(map));
   }, []);
 
   // Update backup when community boundary prop changes
@@ -450,33 +501,49 @@ export default function StudentMap({
     }
   }, []);
 
-  // Load Initial Boundary into FeatureGroup
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    if (!map || !featureGroupRef.current || boundaryLayersInit.current) return;
-    if (initialBoundary) {
-      boundaryLayersInit.current = true;
-      try {
-        featureGroupRef.current.clearLayers();
-        const layer = L.geoJSON(initialBoundary as GeoJSON.GeoJsonObject, {
-          style: {
-            color: '#093C22',
-            weight: 3,
-            opacity: 0.9,
-            fillColor: '#093C22',
-            fillOpacity: 0.15
-          }
+  // Render Boundary into FeatureGroup with click selection and style synchronization
+  const renderBoundaryToGroup = useCallback((geojson: GeoJSON.Feature | GeoJSON.GeoJsonObject | null) => {
+    if (!featureGroupRef.current) return;
+    featureGroupRef.current.clearLayers();
+    if (!geojson) return;
+    const isBW = mapStyle === 'b_w';
+    const isSelected = selectedFeature?.id === 'boundary';
+    try {
+      const layer = L.geoJSON(geojson as GeoJSON.GeoJsonObject, {
+        style: {
+          color: isBW ? '#000000' : (isSelected ? '#047857' : '#093C22'),
+          weight: isSelected ? 4 : 3,
+          opacity: 0.95,
+          fillColor: isBW ? '#000000' : '#093C22',
+          fillOpacity: isSelected ? 0.25 : (isBW ? 0.08 : 0.15),
+          dashArray: isBW ? '6, 4' : undefined
+        }
+      });
+      layer.eachLayer((l) => {
+        l.on('click', (e) => {
+          L.DomEvent.stopPropagation(e);
+          setSelectedFeature({
+            id: 'boundary',
+            type: 'BOUNDARY',
+            title: `${community.name} Boundary`,
+            category: 'COMMUNITY_BOUNDARY',
+            geojson: geojson
+          });
         });
-        layer.eachLayer((l) => {
-          featureGroupRef.current?.addLayer(l);
-        });
-      } catch (err) {
-        console.warn("Failed to load initial boundary layer", err);
-      }
+        featureGroupRef.current?.addLayer(l);
+      });
+    } catch (err) {
+      console.warn("Failed to render boundary layer", err);
     }
-  }, [initialBoundary]);
+  }, [community.name, mapStyle, selectedFeature?.id]);
 
-  // Geoman Programmatic Event Bindings
+  useEffect(() => {
+    if (mapReady && !isEditingBoundary) {
+      renderBoundaryToGroup(boundaryGeoJSON);
+    }
+  }, [mapReady, boundaryGeoJSON, isEditingBoundary, renderBoundaryToGroup]);
+
+  // Geoman Programmatic Event Bindings for Vertex Editing Mode
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -490,44 +557,6 @@ export default function StudentMap({
       // ignore
     }
 
-    const handleCreate = (e: { layer: L.Layer }) => {
-      const layer = e.layer;
-
-      if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
-        // Road LineString Created
-        const lineGeo = (layer as L.Polyline).toGeoJSON();
-        setPendingRoadGeoJSON(lineGeo);
-        setRoadModalOpen(true);
-        // Remove raw line from map, will be rendered by React Polyline
-        map.removeLayer(layer);
-        setIsDrawingRoad(false);
-        setRoadVertexCount(0);
-        return;
-      }
-
-      if (layer instanceof L.Polygon) {
-        // Community Polygon Created
-        featureGroupRef.current?.addLayer(layer);
-        const newGeo = extractGeoJSONFromLayers();
-        const validation = validatePolygon(newGeo);
-        setBoundaryValidationError(validation.error || null);
-        setBoundaryGeoJSON(newGeo);
-        setHasUnsavedBoundary(true);
-        setIsDrawingBoundary(false);
-        setBoundaryVertexCount(0);
-      }
-    };
-
-    const handleVertexAdded = () => {
-      setBoundaryVertexCount(prev => prev + 1);
-      setRoadVertexCount(prev => prev + 1);
-    };
-
-    const handleVertexRemoved = () => {
-      setBoundaryVertexCount(prev => Math.max(0, prev - 1));
-      setRoadVertexCount(prev => Math.max(0, prev - 1));
-    };
-
     const handleEdit = () => {
       const updatedGeo = extractGeoJSONFromLayers();
       const validation = validatePolygon(updatedGeo);
@@ -536,14 +565,10 @@ export default function StudentMap({
       setHasUnsavedBoundary(true);
     };
 
-    map.on('pm:create', handleCreate);
-    map.on('pm:vertexadded', handleVertexAdded);
-    map.on('pm:vertexremoved', handleVertexRemoved);
+    map.on('pm:edit', handleEdit);
 
     return () => {
-      map.off('pm:create', handleCreate);
-      map.off('pm:vertexadded', handleVertexAdded);
-      map.off('pm:vertexremoved', handleVertexRemoved);
+      map.off('pm:edit', handleEdit);
       try {
         if ((map as unknown as { pm?: { disableDraw: () => void; disableGlobalEditMode: () => void } }).pm) {
           (map as unknown as { pm: { disableDraw: () => void; disableGlobalEditMode: () => void } }).pm.disableDraw();
@@ -591,56 +616,195 @@ export default function StudentMap({
     }
   }, [boundaryGeoJSON, onMetricsChange, validatePolygon]);
 
-  // Start Drawing Boundary
-  const startDrawBoundary = useCallback(() => {
-    const map = mapInstanceRef.current;
-    if (!map) return;
+  // Geodesic Vertex Count for Selected Boundary
+  const boundaryVertexCount = useMemo(() => {
+    if (!boundaryGeoJSON) return 0;
     try {
-      (map as unknown as { pm: { enableDraw: (shape: string, opts: Record<string, unknown>) => void } }).pm.enableDraw('Polygon', {
-        snappable: true,
-        snapDistance: 15,
-        allowSelfIntersection: true,
-        finishOn: 'dblclick'
-      });
-      setIsDrawingBoundary(true);
-      setBoundaryVertexCount(0);
-      setBoundaryValidationError(null);
-    } catch (e) {
-      console.warn("Could not start polygon drawing", e);
+      const coords = turf.coordAll(boundaryGeoJSON as any);
+      return coords.length;
+    } catch {
+      return 0;
     }
-  }, []);
+  }, [boundaryGeoJSON]);
 
-  // Finish Boundary Drawing
-  const finishDrawBoundary = useCallback(() => {
-    const map = mapInstanceRef.current;
-    if (!map) return;
-    try {
-      const drawInstance = (map as unknown as { pm: { Draw: { Polygon?: { _finishShape?: () => void } } } }).pm.Draw.Polygon;
-      if (drawInstance && drawInstance._finishShape) {
-        drawInstance._finishShape();
+  // Live Geodesic Calculations for In-flight Drawing and Road Editing
+  const liveDrawingMetrics = useMemo(() => {
+    if (isDrawingBoundary && drawingVertices.length >= 3) {
+      try {
+        const ringCoords: [number, number][] = drawingVertices.map(v => [v[1], v[0]]);
+        ringCoords.push([drawingVertices[0][1], drawingVertices[0][0]]);
+        const poly = turf.polygon([ringCoords]);
+        const areaM2 = turf.area(poly);
+        const perimKm = turf.length(poly, { units: 'kilometers' });
+        return {
+          type: 'BOUNDARY' as const,
+          ha: (areaM2 / 10000).toFixed(2),
+          sqKm: (areaM2 / 1000000).toFixed(3),
+          sqMeters: Math.round(areaM2).toLocaleString(),
+          perimeterKm: perimKm.toFixed(2),
+          perimeterMeters: Math.round(perimKm * 1000).toLocaleString(),
+          vertexCount: drawingVertices.length
+        };
+      } catch {
+        return null;
       }
-    } catch {
-      // ignore
+    }
+    if (isDrawingRoad && drawingVertices.length >= 2) {
+      try {
+        const lineCoords: [number, number][] = drawingVertices.map(v => [v[1], v[0]]);
+        const line = turf.lineString(lineCoords);
+        const lenKm = turf.length(line, { units: 'kilometers' });
+        return {
+          type: 'ROAD' as const,
+          lenKm: lenKm.toFixed(2),
+          lenMeters: Math.round(lenKm * 1000),
+          vertexCount: drawingVertices.length
+        };
+      } catch {
+        return null;
+      }
+    }
+    if (isEditingRoad && editingRoadVertices.length >= 2) {
+      try {
+        const lineCoords: [number, number][] = editingRoadVertices.map(v => [v[1], v[0]]);
+        const line = turf.lineString(lineCoords);
+        const lenKm = turf.length(line, { units: 'kilometers' });
+        return {
+          type: 'ROAD' as const,
+          lenKm: lenKm.toFixed(2),
+          lenMeters: Math.round(lenKm * 1000),
+          vertexCount: editingRoadVertices.length
+        };
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }, [isDrawingBoundary, isDrawingRoad, isEditingRoad, drawingVertices, editingRoadVertices]);
+
+  // Natural Drawing Actions: Undo, Redo, Cancel
+  const handleUndo = useCallback(() => {
+    if (drawingVertices.length === 0) return;
+    const last = drawingVertices[drawingVertices.length - 1];
+    setDrawingVertices(prev => prev.slice(0, -1));
+    setRedoVertices(prev => [...prev, last]);
+    setBoundaryValidationError(null);
+  }, [drawingVertices]);
+
+  const handleRedo = useCallback(() => {
+    if (redoVertices.length === 0) return;
+    const next = redoVertices[redoVertices.length - 1];
+    setRedoVertices(prev => prev.slice(0, -1));
+    setDrawingVertices(prev => [...prev, next]);
+    setBoundaryValidationError(null);
+  }, [redoVertices]);
+
+  const handleCancelDrawing = useCallback(() => {
+    setDrawingVertices([]);
+    setRedoVertices([]);
+    setHoverLatLng(null);
+    setIsDrawingBoundary(false);
+    setIsDrawingRoad(false);
+    setBoundaryValidationError(null);
+    if (mapInstanceRef.current) {
+      try {
+        mapInstanceRef.current.doubleClickZoom.enable();
+      } catch {
+        // ignore
+      }
     }
   }, []);
 
-  // Cancel Drawing Boundary
-  const cancelDrawBoundary = useCallback(() => {
-    const map = mapInstanceRef.current;
-    if (!map) return;
-    try {
-      (map as unknown as { pm: { disableDraw: () => void } }).pm.disableDraw();
-      setIsDrawingBoundary(false);
-      setBoundaryVertexCount(0);
-    } catch {
-      // ignore
+  // Start Drawing Boundary (Natural polygon, no proximity auto-closing, no silent snapping)
+  const startDrawBoundary = useCallback(() => {
+    setIsDrawingBoundary(true);
+    setIsDrawingRoad(false);
+    setDrawingVertices([]);
+    setRedoVertices([]);
+    setHoverLatLng(null);
+    setBoundaryValidationError(null);
+    if (mapInstanceRef.current) {
+      try {
+        mapInstanceRef.current.doubleClickZoom.disable();
+      } catch {
+        // ignore
+      }
     }
   }, []);
 
-  // Enable Boundary Vertex Edit Mode
+  // Finish Boundary Drawing (Explicit finish, >=3 vertices, turf self-intersection check, MultiPolygon support)
+  const finishDrawBoundary = useCallback(() => {
+    if (drawingVertices.length < 3) {
+      setBoundaryValidationError("A boundary requires at least 3 distinct vertices to form a closed polygon.");
+      return;
+    }
+    // GeoJSON Polygon coordinates are [lng, lat]
+    const ringCoords: [number, number][] = drawingVertices.map(v => [v[1], v[0]]);
+    // Close the ring with vertex 0
+    ringCoords.push([drawingVertices[0][1], drawingVertices[0][0]]);
+
+    const candidatePolygon = turf.polygon([ringCoords], {
+      area_type: "COMMUNITY_BOUNDARY",
+      provenance: "MANUALLY_MAPPED"
+    });
+
+    const kinks = turf.kinks(candidatePolygon);
+    if (kinks.features && kinks.features.length > 0) {
+      setBoundaryValidationError(`Boundary has self-intersections at ${kinks.features.length} point(s). Please undo or adjust vertices so edges do not cross.`);
+      // CRITICAL: DO NOT DESTROY UNCOMMITTED VERTICES! User can press Undo to adjust.
+      return;
+    }
+
+    let finalGeoJSON: GeoJSON.Feature;
+    if (!boundaryGeoJSON) {
+      finalGeoJSON = candidatePolygon;
+    } else {
+      const existingGeom = (boundaryGeoJSON as any).geometry;
+      if (existingGeom && existingGeom.type === 'Polygon') {
+        finalGeoJSON = turf.multiPolygon([existingGeom.coordinates, [ringCoords]], {
+          area_type: "MULTI_POLYGON_COMMUNITY",
+          provenance: "MANUALLY_MAPPED"
+        });
+      } else if (existingGeom && existingGeom.type === 'MultiPolygon') {
+        finalGeoJSON = turf.multiPolygon([...existingGeom.coordinates, [ringCoords]], {
+          area_type: "MULTI_POLYGON_COMMUNITY",
+          provenance: "MANUALLY_MAPPED"
+        });
+      } else {
+        finalGeoJSON = candidatePolygon;
+      }
+    }
+
+    setBoundaryGeoJSON(finalGeoJSON);
+    setHasUnsavedBoundary(true);
+    setBoundaryValidationError(null);
+    setDrawingVertices([]);
+    setRedoVertices([]);
+    setHoverLatLng(null);
+    setIsDrawingBoundary(false);
+    if (mapInstanceRef.current) {
+      try {
+        mapInstanceRef.current.doubleClickZoom.enable();
+      } catch {
+        // ignore
+      }
+    }
+
+    renderBoundaryToGroup(finalGeoJSON);
+    setSelectedFeature({
+      id: 'boundary',
+      type: 'BOUNDARY',
+      title: `${community.name} Boundary`,
+      category: 'COMMUNITY_BOUNDARY',
+      geojson: finalGeoJSON
+    });
+  }, [drawingVertices, boundaryGeoJSON, community.name, renderBoundaryToGroup]);
+
+  // Enable Boundary Vertex Edit Mode (with Snapshot Backup)
   const startEditBoundary = useCallback(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
+    savedBoundaryBackup.current = boundaryGeoJSON ? JSON.parse(JSON.stringify(boundaryGeoJSON)) : null;
     try {
       (map as unknown as { pm: { enableGlobalEditMode: (opts?: Record<string, unknown>) => void } }).pm.enableGlobalEditMode({
         snappable: true,
@@ -650,9 +814,9 @@ export default function StudentMap({
     } catch (e) {
       console.warn("Could not start vertex editing", e);
     }
-  }, []);
+  }, [boundaryGeoJSON]);
 
-  // Stop Boundary Vertex Edit Mode
+  // Stop Boundary Vertex Edit Mode (Commit vertex edits)
   const stopEditBoundary = useCallback(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -664,41 +828,32 @@ export default function StudentMap({
       setBoundaryValidationError(validation.error || null);
       setBoundaryGeoJSON(updated);
       setHasUnsavedBoundary(true);
+      renderBoundaryToGroup(updated);
+      setSelectedFeature(prev => prev && prev.id === 'boundary' ? { ...prev, geojson: updated } : prev);
     } catch (e) {
       console.warn("Could not stop vertex editing", e);
     }
-  }, [extractGeoJSONFromLayers, validatePolygon]);
+  }, [extractGeoJSONFromLayers, validatePolygon, renderBoundaryToGroup]);
 
-  // Cancel Boundary Edits (Restore Original Backup)
+  // Cancel Boundary Edits (Restore Original Backup Snapshot)
   const cancelEditBoundary = useCallback(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
     try {
       (map as unknown as { pm: { disableGlobalEditMode: () => void } }).pm.disableGlobalEditMode();
       setIsEditingBoundary(false);
-      featureGroupRef.current?.clearLayers();
-      if (savedBoundaryBackup.current) {
-        const layer = L.geoJSON(savedBoundaryBackup.current as GeoJSON.GeoJsonObject, {
-          style: {
-            color: '#093C22',
-            weight: 3,
-            opacity: 0.9,
-            fillColor: '#093C22',
-            fillOpacity: 0.15
-          }
-        });
-        layer.eachLayer((l) => featureGroupRef.current?.addLayer(l));
-      }
+      renderBoundaryToGroup(savedBoundaryBackup.current);
       setBoundaryGeoJSON(savedBoundaryBackup.current);
       setHasUnsavedBoundary(false);
       setBoundaryValidationError(null);
+      setSelectedFeature(prev => prev && prev.id === 'boundary' ? { ...prev, geojson: savedBoundaryBackup.current } : prev);
     } catch {
       // ignore
     }
-  }, []);
+  }, [renderBoundaryToGroup]);
 
   // Clear / Delete Boundary
-  const handleClearBoundary = useCallback(() => {
+  const handleClearBoundary = useCallback(async () => {
     if (!confirm('Are you sure you want to delete the community boundary? This will reset the territorial coverage for this community.')) {
       return;
     }
@@ -706,10 +861,144 @@ export default function StudentMap({
     setBoundaryGeoJSON(null);
     setHasUnsavedBoundary(true);
     setBoundaryValidationError(null);
-    if (onSaveBoundary) {
-      onSaveBoundary(null);
+    if (selectedFeature?.id === 'boundary') {
+      setSelectedFeature(null);
     }
-  }, [onSaveBoundary]);
+    if (onSaveBoundary) {
+      await onSaveBoundary(null);
+    }
+  }, [onSaveBoundary, selectedFeature?.id]);
+
+  // Road Selection Handler
+  const handleSelectRoad = useCallback((rf: LocalFeature) => {
+    const meta = rf.metadata_json as Record<string, unknown> | null;
+    const featureData = rf.metadata_json as unknown as GeoJSON.Feature<GeoJSON.LineString> | null;
+    const coords = featureData?.geometry?.coordinates || [];
+    const category = String(meta?.category || 'LOCAL_ROAD');
+    const visuals = getRoadVisuals(category, mapStyle === 'b_w');
+    const roadTitle = String(meta?.label || visuals.label);
+
+    setSelectedFeature({
+      id: rf.id,
+      type: 'ROAD',
+      title: roadTitle,
+      category: visuals.label,
+      lengthKm: meta?.length_km ? String(meta.length_km) : undefined,
+      lengthMeters: meta?.length_meters ? Number(meta.length_meters) : undefined,
+      vertexCount: Array.isArray(coords) ? coords.length : undefined,
+      notes: meta?.notes ? String(meta.notes) : undefined,
+      geojson: featureData
+    });
+  }, [mapStyle]);
+
+  // Start Interactive Road Vertex Editing
+  const startEditRoad = useCallback((roadId: string) => {
+    const target = roadFeatures.find(r => r.id === roadId);
+    if (!target) return;
+    const feat = target.metadata_json as unknown as GeoJSON.Feature<GeoJSON.LineString>;
+    const coords = feat?.geometry?.coordinates;
+    if (!coords || !Array.isArray(coords)) return;
+    const latLngs: [number, number][] = coords.map(c => [c[1], c[0]]);
+    setEditingRoadId(roadId);
+    setEditingRoadVertices(latLngs);
+    savedRoadBackup.current = JSON.parse(JSON.stringify(latLngs));
+    setIsEditingRoad(true);
+  }, [roadFeatures]);
+
+  // Cancel Road Vertex Editing
+  const cancelEditRoad = useCallback(() => {
+    setIsEditingRoad(false);
+    setEditingRoadId(null);
+    setEditingRoadVertices([]);
+    savedRoadBackup.current = null;
+  }, []);
+
+  // Save Road Vertex Editing
+  const saveEditRoad = useCallback(async () => {
+    if (!editingRoadId || editingRoadVertices.length < 2 || !onSaveRoad) return;
+    const orig = roadFeatures.find(r => r.id === editingRoadId);
+    if (!orig) return;
+    const lineCoords: [number, number][] = editingRoadVertices.map(v => [v[1], v[0]]);
+    const lineGeo = turf.lineString(lineCoords);
+    const lengthKm = turf.length(lineGeo, { units: 'kilometers' });
+    const origMeta = (orig.metadata_json as Record<string, unknown>) || {};
+    const updatedRoad: GeoJSON.Feature = {
+      type: 'Feature',
+      id: editingRoadId,
+      geometry: {
+        type: 'LineString',
+        coordinates: lineCoords
+      },
+      properties: {
+        ...origMeta,
+        length_km: `${lengthKm.toFixed(2)} km`,
+        length_meters: Math.round(lengthKm * 1000)
+      }
+    };
+    await onSaveRoad(updatedRoad);
+    setIsEditingRoad(false);
+    setEditingRoadId(null);
+    setEditingRoadVertices([]);
+    savedRoadBackup.current = null;
+    setSelectedFeature(prev => prev && prev.id === editingRoadId ? {
+      ...prev,
+      lengthKm: `${lengthKm.toFixed(2)} km`,
+      lengthMeters: Math.round(lengthKm * 1000),
+      vertexCount: editingRoadVertices.length,
+      geojson: updatedRoad
+    } : prev);
+  }, [editingRoadId, editingRoadVertices, onSaveRoad, roadFeatures]);
+
+  // Delete Individual Road Feature with Confirmation
+  const handleDeleteRoad = useCallback(async (roadId: string) => {
+    if (!confirm('Are you sure you want to delete this mapped road feature?')) return;
+    if (onDeleteFeature) {
+      await onDeleteFeature(roadId);
+    }
+    if (selectedFeature?.id === roadId) {
+      setSelectedFeature(null);
+    }
+    if (editingRoadId === roadId) {
+      setIsEditingRoad(false);
+      setEditingRoadId(null);
+      setEditingRoadVertices([]);
+      savedRoadBackup.current = null;
+    }
+  }, [onDeleteFeature, selectedFeature?.id, editingRoadId]);
+
+  // Clear All Drawn Features (Safeguarding Survey Points and Facilities)
+  const handleClearAllDrawings = useCallback(async () => {
+    if (!confirm('Are you sure you want to clear all drawn boundaries and routes? Survey locations and facility markers will NOT be deleted.')) {
+      return;
+    }
+    // 1. Delete boundary
+    if (boundaryGeoJSON || (featureGroupRef.current && featureGroupRef.current.getLayers().length > 0)) {
+      featureGroupRef.current?.clearLayers();
+      setBoundaryGeoJSON(null);
+      setHasUnsavedBoundary(true);
+      if (onSaveBoundary) {
+        await onSaveBoundary(null);
+      }
+    }
+    // 2. Delete all roads
+    if (onDeleteFeature) {
+      for (const rf of roadFeatures) {
+        try {
+          await onDeleteFeature(rf.id);
+        } catch (err) {
+          console.warn('Failed to delete road:', err);
+        }
+      }
+    }
+    // 3. Reset states
+    setSelectedFeature(null);
+    setIsEditingRoad(false);
+    setEditingRoadId(null);
+    setEditingRoadVertices([]);
+    savedRoadBackup.current = null;
+    setIsEditingBoundary(false);
+    setDrawingVertices([]);
+  }, [boundaryGeoJSON, onSaveBoundary, onDeleteFeature, roadFeatures]);
 
   // Commit Boundary Save
   const handleSaveBoundaryClick = async () => {
@@ -728,49 +1017,99 @@ export default function StudentMap({
     }
   };
 
-  // Start Drawing Road / Pathway
+  // Start Drawing Road / Pathway (Natural line, live preview, >=2 vertices)
   const startDrawRoad = useCallback(() => {
-    const map = mapInstanceRef.current;
-    if (!map) return;
-    try {
-      (map as unknown as { pm: { enableDraw: (shape: string, opts: Record<string, unknown>) => void } }).pm.enableDraw('Line', {
-        snappable: true,
-        snapDistance: 15,
-        finishOn: 'dblclick'
-      });
-      setIsDrawingRoad(true);
-      setRoadVertexCount(0);
-    } catch (e) {
-      console.warn("Could not start road drawing", e);
+    setIsDrawingRoad(true);
+    setIsDrawingBoundary(false);
+    setDrawingVertices([]);
+    setRedoVertices([]);
+    setHoverLatLng(null);
+    if (mapInstanceRef.current) {
+      try {
+        mapInstanceRef.current.doubleClickZoom.disable();
+      } catch {
+        // ignore
+      }
     }
   }, []);
 
   // Finish Road Drawing
   const finishDrawRoad = useCallback(() => {
-    const map = mapInstanceRef.current;
-    if (!map) return;
-    try {
-      const drawInstance = (map as unknown as { pm: { Draw: { Line?: { _finishShape?: () => void } } } }).pm.Draw.Line;
-      if (drawInstance && drawInstance._finishShape) {
-        drawInstance._finishShape();
+    if (drawingVertices.length < 2) {
+      alert("A road or pathway requires at least 2 vertices.");
+      return;
+    }
+    const lineCoords: [number, number][] = drawingVertices.map(v => [v[1], v[0]]);
+    const lineGeo = turf.lineString(lineCoords, {
+      category: selectedRoadCategory,
+      provenance: "MANUALLY_MAPPED"
+    });
+    setPendingRoadGeoJSON(lineGeo);
+    setRoadModalOpen(true);
+    setDrawingVertices([]);
+    setRedoVertices([]);
+    setHoverLatLng(null);
+    setIsDrawingRoad(false);
+    if (mapInstanceRef.current) {
+      try {
+        mapInstanceRef.current.doubleClickZoom.enable();
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
     }
-  }, []);
+  }, [drawingVertices, selectedRoadCategory]);
 
-  // Cancel Road Drawing
-  const cancelDrawRoad = useCallback(() => {
-    const map = mapInstanceRef.current;
-    if (!map) return;
-    try {
-      (map as unknown as { pm: { disableDraw: () => void } }).pm.disableDraw();
-      setIsDrawingRoad(false);
-      setRoadVertexCount(0);
-    } catch {
-      // ignore
-    }
-  }, []);
+  // Keyboard Shortcuts (Ctrl+Z: Undo, Ctrl+Y: Redo, Esc: Cancel, Enter: Finish)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z') && !e.shiftKey) {
+        e.preventDefault();
+        if (isDrawingBoundary || isDrawingRoad) {
+          handleUndo();
+        }
+      } else if (
+        ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z'))
+      ) {
+        e.preventDefault();
+        if (isDrawingBoundary || isDrawingRoad) {
+          handleRedo();
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        if (isDrawingBoundary || isDrawingRoad) {
+          handleCancelDrawing();
+        } else if (isEditingBoundary) {
+          cancelEditBoundary();
+        }
+      } else if (e.key === 'Enter') {
+        if (isDrawingBoundary && drawingVertices.length >= 3) {
+          e.preventDefault();
+          finishDrawBoundary();
+        } else if (isDrawingRoad && drawingVertices.length >= 2) {
+          e.preventDefault();
+          finishDrawRoad();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    isDrawingBoundary,
+    isDrawingRoad,
+    isEditingBoundary,
+    drawingVertices.length,
+    handleUndo,
+    handleRedo,
+    handleCancelDrawing,
+    finishDrawBoundary,
+    finishDrawRoad,
+    cancelEditBoundary
+  ]);
 
   // Save Road from Modal
   const handleSaveRoadSubmit = async () => {
@@ -801,19 +1140,155 @@ export default function StudentMap({
     }
   };
 
-  // Export Map to Image / PDF
-  const handleExport = async (format: 'png' | 'pdf') => {
-    if (!mapContainerRef.current) return;
+  // Clean Community Map Export: boundary and interior contents only, fitted with margin, clipped to polygon geometry
+  const prepareBoundaryExport = useCallback(async (format: 'preview' | 'png' | 'pdf') => {
+    const map = mapInstanceRef.current;
+    const targetNode = map ? map.getContainer() : mapContainerRef.current;
+    if (!targetNode || !map) return;
+    setIsExporting(true);
+
     try {
-      const node = mapContainerRef.current;
-      const dataUrl = await htmlToImage.toPng(node, {
-        cacheBust: true,
-        backgroundColor: '#ffffff'
+      // 1. Calculate interior stats using Turf
+      let interiorFeatures = visibleFeatures.filter(f => f.feature_type !== 'ROAD');
+      let interiorRoads = roadFeatures;
+
+      if (boundaryGeoJSON) {
+        try {
+          interiorFeatures = features.filter(f => {
+            if (f.feature_type === 'ROAD') return false;
+            try {
+              const pt = turf.point([f.longitude, f.latitude]);
+              return turf.booleanPointInPolygon(pt, boundaryGeoJSON as any);
+            } catch {
+              return true;
+            }
+          });
+          interiorRoads = roadFeatures.filter(rf => {
+            try {
+              const geom = (rf.metadata_json as any)?.geometry;
+              if (!geom) return false;
+              const line = turf.lineString(geom.coordinates);
+              return turf.booleanIntersects(line, boundaryGeoJSON as any);
+            } catch {
+              return true;
+            }
+          });
+        } catch (e) {
+          console.warn('Turf interior calculation fallback:', e);
+        }
+      }
+
+      setExportInteriorStats({
+        featuresCount: interiorFeatures.length,
+        roadsCount: interiorRoads.length,
+        features: interiorFeatures
       });
+
+      // 2. Fit map bounds to community boundary if exists
+      if (featureGroupRef.current && featureGroupRef.current.getLayers().length > 0) {
+        const bounds = featureGroupRef.current.getBounds();
+        if (bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [50, 50], animate: false });
+          await new Promise(r => setTimeout(r, 450));
+        }
+      }
+
+      // 3. Render map container without floating docks or zoom controls
+      const rawDataUrl = await htmlToImage.toPng(targetNode, {
+        cacheBust: false,
+        backgroundColor: '#ffffff',
+        filter: (node: Node) => {
+          if (node instanceof HTMLElement) {
+            if (node.classList.contains('leaflet-control-zoom')) return false;
+            if (node.classList.contains('export-exclude')) return false;
+          }
+          return true;
+        }
+      });
+
+      let finalDataUrl = rawDataUrl;
+
+      // 4. Polygon canvas clipping if boundary exists
+      if (boundaryGeoJSON) {
+        try {
+          const img = new Image();
+          img.src = rawDataUrl;
+          await new Promise((res, rej) => {
+            img.onload = res;
+            img.onerror = rej;
+          });
+
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+
+          if (ctx) {
+            const scaleX = img.width / targetNode.clientWidth;
+            const scaleY = img.height / targetNode.clientHeight;
+
+            const geom = (boundaryGeoJSON as any).geometry;
+            const ringsList: [number, number][][][] = [];
+            if (geom.type === 'Polygon') {
+              ringsList.push(geom.coordinates);
+            } else if (geom.type === 'MultiPolygon') {
+              geom.coordinates.forEach((coords: [number, number][][]) => {
+                ringsList.push(coords);
+              });
+            }
+
+            ctx.save();
+            ctx.beginPath();
+            ringsList.forEach(rings => {
+              rings.forEach(ring => {
+                ring.forEach((c: [number, number], idx: number) => {
+                  const pt = map.latLngToContainerPoint([c[1], c[0]]);
+                  const px = pt.x * scaleX;
+                  const py = pt.y * scaleY;
+                  if (idx === 0) ctx.moveTo(px, py);
+                  else ctx.lineTo(px, py);
+                });
+                ctx.closePath();
+              });
+            });
+            ctx.clip();
+            ctx.drawImage(img, 0, 0);
+            ctx.restore();
+
+            // Boundary outline stroke
+            ctx.save();
+            ctx.strokeStyle = mapStyle === 'b_w' ? '#000000' : '#093C22';
+            ctx.lineWidth = 3 * scaleX;
+            ctx.beginPath();
+            ringsList.forEach(rings => {
+              rings.forEach(ring => {
+                ring.forEach((c: [number, number], idx: number) => {
+                  const pt = map.latLngToContainerPoint([c[1], c[0]]);
+                  const px = pt.x * scaleX;
+                  const py = pt.y * scaleY;
+                  if (idx === 0) ctx.moveTo(px, py);
+                  else ctx.lineTo(px, py);
+                });
+                ctx.closePath();
+              });
+            });
+            ctx.stroke();
+            ctx.restore();
+
+            finalDataUrl = canvas.toDataURL('image/png');
+          }
+        } catch (clipErr) {
+          console.warn('Canvas clipping fallback to raw capture:', clipErr);
+        }
+      }
+
+      setExportPreviewDataUrl(finalDataUrl);
+
+      const safeName = (community?.name || 'community').toLowerCase().replace(/[^a-z0-9_-]/g, '_');
 
       if (format === 'pdf') {
         const pdf = new jsPDF({ orientation: 'landscape', format: 'a4' });
-        const props = pdf.getImageProperties(dataUrl);
+        const props = pdf.getImageProperties(finalDataUrl);
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = (props.height * pdfWidth) / props.width;
 
@@ -825,18 +1300,25 @@ export default function StudentMap({
         pdf.setTextColor(100, 116, 139);
         pdf.text(`Generated on ${new Date().toLocaleDateString()} | Area: ${areaStats?.hectares || 'N/A'} ha | Perimeter: ${areaStats?.perimeterKm || 'N/A'} km`, 14, 18);
 
-        pdf.addImage(dataUrl, 'PNG', 10, 22, pdfWidth - 20, Math.min(pdfHeight, 175));
-        pdf.save(`${community?.name || 'community'}_map_report.pdf`);
-      } else {
+        pdf.addImage(finalDataUrl, 'PNG', 10, 22, pdfWidth - 20, Math.min(pdfHeight, 175));
+        pdf.save(`${safeName}_boundary_report.pdf`);
+      } else if (format === 'png') {
         const link = document.createElement('a');
-        link.download = `${community?.name || 'community'}_map.${format}`;
-        link.href = dataUrl;
+        link.download = `${safeName}_boundary_map.png`;
+        link.href = finalDataUrl;
         link.click();
       }
-    } catch {
+    } catch (err) {
+      console.warn('Map export error:', err);
       alert('Map export completed with vector annotations. Ensure tiles have completed loading.');
+    } finally {
+      setIsExporting(false);
     }
-  };
+  }, [visibleFeatures, roadFeatures, boundaryGeoJSON, features, mapStyle, community?.name, areaStats]);
+
+  const handleExport = useCallback((format: 'png' | 'pdf') => {
+    return prepareBoundaryExport(format);
+  }, [prepareBoundaryExport]);
 
   const defaultCenter: [number, number] = (community.latitude && community.longitude)
     ? [community.latitude, community.longitude]
@@ -854,8 +1336,8 @@ export default function StudentMap({
   return (
     <div className="flex flex-col h-full relative font-sans" ref={mapContainerRef}>
 
-      {/* TOP LEFT: Map Style Switcher (Google / Apple Maps inspired) */}
-      <div className="absolute top-3 left-3 z-[1000] flex items-center bg-surface/95 backdrop-blur-md p-1 rounded-xl border border-border-strong shadow-md text-xs">
+      {/* TOP LEFT: Map Style Switcher (Google / Apple Maps inspired, offset from Leaflet zoom controls) */}
+      <div className="export-exclude absolute top-3 left-16 z-[1000] flex items-center bg-surface/95 backdrop-blur-md p-1 rounded-xl border border-border-strong shadow-md text-xs">
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => setMapStyle('streets')}
@@ -897,11 +1379,21 @@ export default function StudentMap({
           >
             Terrain
           </button>
+          <button
+            onClick={() => setMapStyle('b_w')}
+            className={`px-2.5 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+              mapStyle === 'b_w'
+                ? 'bg-[#093C22] text-white shadow-2xs'
+                : 'text-secondary hover:text-primary hover:bg-page'
+            }`}
+          >
+            B&W
+          </button>
         </div>
       </div>
 
       {/* TOP CENTER / RIGHT: Unified Action Dock */}
-      <div className="absolute top-14 sm:top-3 right-3 z-[1000] flex flex-col items-end gap-2">
+      <div className="export-exclude absolute top-14 sm:top-3 right-3 z-[1000] flex flex-col items-end gap-2">
         {/* Main Dock Header */}
         <div className="flex items-center gap-1.5 bg-surface/95 backdrop-blur-md p-1.5 rounded-xl border border-border-strong shadow-md text-xs">
           <button
@@ -945,7 +1437,10 @@ export default function StudentMap({
           <div className="h-4 w-px bg-border mx-1" />
 
           <button
-            onClick={() => setShowReportModal(true)}
+            onClick={async () => {
+              setShowReportModal(true);
+              await prepareBoundaryExport('preview');
+            }}
             data-testid="report-map-btn"
             className="px-2.5 py-1 text-secondary hover:text-primary hover:bg-page rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
             title="Official Report Map"
@@ -955,9 +1450,10 @@ export default function StudentMap({
           </button>
 
           <button
-            onClick={() => handleExport('pdf')}
+            onClick={() => handleExport('png')}
+            data-testid="export-png-btn"
             className="p-1.5 text-secondary hover:text-primary hover:bg-page rounded-lg transition-colors cursor-pointer"
-            title="Download PDF"
+            title="Download Clean Map (PNG)"
           >
             <Download size={15} />
           </button>
@@ -988,29 +1484,55 @@ export default function StudentMap({
 
             {/* In-progress Drawing Banner */}
             {isDrawingBoundary && (
-              <div className="p-2 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-800 dark:text-emerald-200 space-y-1.5">
+              <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-800 dark:text-emerald-200 space-y-2">
                 <div className="flex items-center justify-between font-semibold">
                   <span>Tracing Boundary Polygon</span>
                   <span className="font-mono bg-emerald-200/50 dark:bg-emerald-800/40 px-2 py-0.5 rounded text-[10px]">
-                    {boundaryVertexCount} vertices placed
+                    {drawingVertices.length} {drawingVertices.length === 1 ? 'vertex' : 'vertices'} placed
                   </span>
                 </div>
                 <p className="text-[10px] text-emerald-700 dark:text-emerald-300">
-                  Click/tap to place vertices (pan/zoom anytime). Double-click or click first point to close polygon.
+                  Click on map to place boundary vertices (minimum 3). Click Undo or press Ctrl+Z to step back.
                 </p>
-                <div className="flex items-center justify-end gap-1.5 pt-1">
-                  <button
-                    onClick={cancelDrawBoundary}
-                    className="px-2.5 py-1 bg-page hover:bg-surface text-secondary border border-border rounded-lg cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={finishDrawBoundary}
-                    className="px-3 py-1 bg-[#093C22] text-white rounded-lg font-semibold shadow-2xs cursor-pointer"
-                  >
-                    Finish Polygon
-                  </button>
+                <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={handleUndo}
+                      disabled={drawingVertices.length === 0}
+                      className="px-2 py-1 bg-page hover:bg-surface text-secondary border border-border rounded-lg cursor-pointer disabled:opacity-40 flex items-center gap-1 text-[11px]"
+                      title="Undo last vertex (Ctrl+Z)"
+                    >
+                      <Undo2 size={12} />
+                      <span>Undo</span>
+                    </button>
+                    <button
+                      onClick={handleRedo}
+                      disabled={redoVertices.length === 0}
+                      className="px-2 py-1 bg-page hover:bg-surface text-secondary border border-border rounded-lg cursor-pointer disabled:opacity-40 flex items-center gap-1 text-[11px]"
+                      title="Redo vertex (Ctrl+Y)"
+                    >
+                      <Redo2 size={12} />
+                      <span>Redo</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={handleCancelDrawing}
+                      className="px-2.5 py-1 bg-page hover:bg-surface text-secondary border border-border rounded-lg cursor-pointer text-[11px]"
+                      title="Discard current drawing (Esc)"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={finishDrawBoundary}
+                      disabled={drawingVertices.length < 3}
+                      className="px-3 py-1 bg-[#093C22] text-white rounded-lg font-semibold shadow-2xs cursor-pointer disabled:opacity-40 flex items-center gap-1 text-[11px]"
+                      title="Finish boundary polygon (Enter)"
+                    >
+                      <Check size={12} />
+                      <span>Finish Boundary</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -1111,29 +1633,55 @@ export default function StudentMap({
 
             {/* Drawing Road Active Banner */}
             {isDrawingRoad ? (
-              <div className="p-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-800 dark:text-amber-200 space-y-1.5">
+              <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-800 dark:text-amber-200 space-y-2">
                 <div className="flex items-center justify-between font-semibold">
                   <span>Tracing {getRoadVisuals(selectedRoadCategory).label}</span>
                   <span className="font-mono bg-amber-200/50 dark:bg-amber-800/40 px-2 py-0.5 rounded text-[10px]">
-                    {roadVertexCount} vertices
+                    {drawingVertices.length} {drawingVertices.length === 1 ? 'vertex' : 'vertices'}
                   </span>
                 </div>
                 <p className="text-[10px] text-amber-700 dark:text-amber-300">
-                  Click along aerial imagery to place line vertices. Double-click to complete route.
+                  Click along aerial imagery to place line vertices (minimum 2). Press Enter to finish.
                 </p>
-                <div className="flex items-center justify-end gap-1.5 pt-1">
-                  <button
-                    onClick={cancelDrawRoad}
-                    className="px-2.5 py-1 bg-page hover:bg-surface text-secondary border border-border rounded-lg cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={finishDrawRoad}
-                    className="px-3 py-1 bg-amber-600 text-white rounded-lg font-semibold shadow-2xs cursor-pointer"
-                  >
-                    Finish Route
-                  </button>
+                <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={handleUndo}
+                      disabled={drawingVertices.length === 0}
+                      className="px-2 py-1 bg-page hover:bg-surface text-secondary border border-border rounded-lg cursor-pointer disabled:opacity-40 flex items-center gap-1 text-[11px]"
+                      title="Undo last vertex (Ctrl+Z)"
+                    >
+                      <Undo2 size={12} />
+                      <span>Undo</span>
+                    </button>
+                    <button
+                      onClick={handleRedo}
+                      disabled={redoVertices.length === 0}
+                      className="px-2 py-1 bg-page hover:bg-surface text-secondary border border-border rounded-lg cursor-pointer disabled:opacity-40 flex items-center gap-1 text-[11px]"
+                      title="Redo vertex (Ctrl+Y)"
+                    >
+                      <Redo2 size={12} />
+                      <span>Redo</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={handleCancelDrawing}
+                      className="px-2.5 py-1 bg-page hover:bg-surface text-secondary border border-border rounded-lg cursor-pointer text-[11px]"
+                      title="Cancel route (Esc)"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={finishDrawRoad}
+                      disabled={drawingVertices.length < 2}
+                      className="px-3 py-1 bg-amber-600 text-white rounded-lg font-semibold shadow-2xs cursor-pointer disabled:opacity-40 flex items-center gap-1 text-[11px]"
+                      title="Finish route line (Enter)"
+                    >
+                      <Check size={12} />
+                      <span>Finish Route</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -1175,7 +1723,7 @@ export default function StudentMap({
 
       {/* OFFLINE TILE FALLBACK TOAST */}
       {tileError && (
-        <div className="absolute top-16 left-3 right-3 sm:left-auto sm:right-3 sm:max-w-md z-[900] bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 px-3 py-2 rounded-xl text-xs flex items-center justify-between shadow-xs">
+        <div className="export-exclude absolute top-16 left-3 right-3 sm:left-auto sm:right-3 sm:max-w-md z-[900] bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 px-3 py-2 rounded-xl text-xs flex items-center justify-between shadow-xs">
           <div className="flex items-center gap-2">
             <AlertTriangle size={15} className="shrink-0 text-amber-600" />
             <span>Offline Map Mode: Satellite and street tiles are cached or unavailable, but community boundaries and survey features remain fully operational.</span>
@@ -1186,7 +1734,7 @@ export default function StudentMap({
 
       {/* GPS LOCATING SPINNER */}
       {isLocating && (
-        <div className="absolute inset-0 bg-page/60 backdrop-blur-xs z-[2000] flex flex-col items-center justify-center text-xs font-semibold text-primary">
+        <div className="export-exclude absolute inset-0 bg-page/60 backdrop-blur-xs z-[2000] flex flex-col items-center justify-center text-xs font-semibold text-primary">
           <div className="w-7 h-7 border-2 border-[#093C22] border-t-transparent rounded-full animate-spin mb-2"></div>
           <div>Acquiring GPS fix...</div>
         </div>
@@ -1194,14 +1742,14 @@ export default function StudentMap({
 
       {/* LOCATION ERROR TOAST */}
       {locationError && (
-        <div className="absolute top-16 left-1/2 transform -translate-x-1/2 z-[1000] bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-xs flex items-center gap-2 shadow-sm">
+        <div className="export-exclude absolute top-16 left-1/2 transform -translate-x-1/2 z-[1000] bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-xs flex items-center gap-2 shadow-sm">
           <span>{locationError}</span>
           <button onClick={() => setLocationError(null)} className="font-bold text-red-900 cursor-pointer">&times;</button>
         </div>
       )}
 
       {/* BOTTOM RIGHT FLOATING CONTROLS */}
-      <div className="absolute bottom-6 right-4 z-[990] flex flex-col items-end gap-2">
+      <div className="export-exclude absolute bottom-6 right-4 z-[990] flex flex-col items-end gap-2">
         <button
           onClick={handleFitBounds}
           className="bg-surface p-2.5 rounded-full shadow-lg border border-border-strong text-primary hover:bg-page transition-colors cursor-pointer"
@@ -1220,24 +1768,227 @@ export default function StudentMap({
         </button>
       </div>
 
-      {/* BOTTOM LEFT: Scale, Compass, & Collapsible Legend */}
-      <div className="absolute bottom-6 left-4 z-[990] flex flex-col gap-2 max-w-xs pointer-events-auto">
-        <div className="bg-surface/95 backdrop-blur-md p-3 rounded-xl border border-border-strong shadow-md text-xs space-y-2">
+      {/* BOTTOM LEFT: Live GIS Measurements, Selected Feature Details, & Collapsible Legend */}
+      <div className="export-exclude absolute bottom-6 left-4 z-[990] flex flex-col gap-2 max-w-xs sm:max-w-sm w-full pointer-events-auto" data-testid="gis-measurements-panel">
+        <div className="bg-surface/95 backdrop-blur-md p-3.5 rounded-2xl border border-border-strong shadow-xl text-xs space-y-3">
           <div className="flex items-center justify-between font-bold text-primary">
             <div className="flex items-center gap-1.5" data-testid="compass-north">
-              <Compass size={14} className="text-[#093C22]" />
-              <span>GIS Register &mdash; {community.name}</span>
+              <Compass size={15} className="text-[#093C22]" />
+              <span className="font-semibold text-sm">GIS Register &mdash; {community.name}</span>
             </div>
             <button
               onClick={() => setShowLegend(!showLegend)}
-              className="text-muted hover:text-primary p-0.5 cursor-pointer"
+              className="text-muted hover:text-primary p-1 rounded-lg hover:bg-page transition-colors cursor-pointer"
+              title={showLegend ? "Collapse legend" : "Expand legend"}
             >
-              {showLegend ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+              {showLegend ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
             </button>
           </div>
 
+          {/* DYNAMIC MEASUREMENTS CARD */}
+          {liveDrawingMetrics ? (
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl space-y-1.5">
+              <div className="flex items-center justify-between font-semibold text-emerald-800 dark:text-emerald-200">
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                  {liveDrawingMetrics.type === 'BOUNDARY' ? 'Tracing Boundary...' : (isEditingRoad ? 'Editing Route Vertices...' : 'Tracing Route...')}
+                </span>
+                <span className="font-mono text-[10px] bg-emerald-200/60 dark:bg-emerald-800/60 px-2 py-0.5 rounded">
+                  {liveDrawingMetrics.vertexCount} vertices
+                </span>
+              </div>
+              {liveDrawingMetrics.type === 'BOUNDARY' ? (
+                <div className="font-mono text-[11px] text-emerald-900 dark:text-emerald-100 space-y-0.5">
+                  <div>Live Area: <strong>{liveDrawingMetrics.ha} ha</strong> ({liveDrawingMetrics.sqKm} km² / {liveDrawingMetrics.sqMeters} m²)</div>
+                  <div>Live Perimeter: <strong>{liveDrawingMetrics.perimeterKm} km</strong> ({liveDrawingMetrics.perimeterMeters} m)</div>
+                </div>
+              ) : (
+                <div className="font-mono text-[11px] text-emerald-900 dark:text-emerald-100 space-y-0.5">
+                  <div>Live Route Length: <strong>{liveDrawingMetrics.lenKm} km</strong> ({liveDrawingMetrics.lenMeters} m)</div>
+                </div>
+              )}
+            </div>
+          ) : selectedFeature ? (
+            <div className="p-3 bg-page rounded-xl border border-border space-y-2">
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200">
+                    {selectedFeature.category || selectedFeature.type}
+                  </span>
+                  <h4 className="font-bold text-xs text-primary mt-1">{selectedFeature.title}</h4>
+                </div>
+                <button
+                  onClick={() => setSelectedFeature(null)}
+                  className="p-1 text-muted hover:text-primary rounded-lg cursor-pointer"
+                  title="Deselect feature"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+
+              {selectedFeature.type === 'BOUNDARY' && areaStats && (
+                <div className="space-y-1 font-mono text-[11px] text-secondary">
+                  <div className="flex justify-between">
+                    <span>Enclosed Area:</span>
+                    <strong className="text-primary">{areaStats.hectares} ha ({areaStats.sqKm} km²)</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Perimeter:</span>
+                    <strong className="text-primary">{areaStats.perimeterKm} km ({areaStats.perimeterMeters} m)</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Vertex Count:</span>
+                    <strong className="text-primary">{boundaryVertexCount} vertices</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Centroid:</span>
+                    <strong className="text-primary">{areaStats.centroidLat}°, {areaStats.centroidLng}°</strong>
+                  </div>
+                </div>
+              )}
+
+              {selectedFeature.type === 'ROAD' && (
+                <div className="space-y-1 font-mono text-[11px] text-secondary">
+                  <div className="flex justify-between">
+                    <span>Route Length:</span>
+                    <strong className="text-primary">{selectedFeature.lengthKm || 'N/A'}</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Vertices:</span>
+                    <strong className="text-primary">{selectedFeature.vertexCount || 'N/A'} vertices</strong>
+                  </div>
+                  {selectedFeature.notes && (
+                    <p className="text-[10px] text-muted font-sans italic pt-0.5">
+                      &quot;{selectedFeature.notes}&quot;
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {selectedFeature.type === 'FEATURE' && (
+                <div className="space-y-1 font-mono text-[11px] text-secondary">
+                  <div className="flex justify-between">
+                    <span>Position:</span>
+                    <strong className="text-primary">{selectedFeature.coordinates}</strong>
+                  </div>
+                  {selectedFeature.accuracy && (
+                    <div className="flex justify-between">
+                      <span>GNSS Precision:</span>
+                      <strong className="text-primary">{selectedFeature.accuracy}</strong>
+                    </div>
+                  )}
+                  {selectedFeature.surveyId && (
+                    <div className="flex justify-between">
+                      <span>Survey Record:</span>
+                      <strong className="text-primary">{selectedFeature.surveyId}</strong>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Action Buttons for Selected Feature */}
+              <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-border">
+                {selectedFeature.type === 'BOUNDARY' && (
+                  <>
+                    <button
+                      onClick={startEditBoundary}
+                      className="px-2 py-1 bg-surface text-primary border border-border rounded-lg hover:bg-page font-medium cursor-pointer flex items-center gap-1 text-[11px]"
+                    >
+                      <Edit3 size={11} />
+                      <span>Edit Vertices</span>
+                    </button>
+                    <button
+                      onClick={handleClearBoundary}
+                      className="px-2 py-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg font-medium cursor-pointer flex items-center gap-1 text-[11px]"
+                    >
+                      <Trash2 size={11} />
+                      <span>Delete Boundary</span>
+                    </button>
+                  </>
+                )}
+
+                {selectedFeature.type === 'ROAD' && (
+                  <>
+                    {!isEditingRoad ? (
+                      <>
+                        <button
+                          onClick={() => startEditRoad(selectedFeature.id)}
+                          className="px-2 py-1 bg-surface text-primary border border-border rounded-lg hover:bg-page font-medium cursor-pointer flex items-center gap-1 text-[11px]"
+                        >
+                          <Edit3 size={11} />
+                          <span>Edit Vertices</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRoad(selectedFeature.id)}
+                          className="px-2 py-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg font-medium cursor-pointer flex items-center gap-1 text-[11px]"
+                        >
+                          <Trash2 size={11} />
+                          <span>Delete Route</span>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={cancelEditRoad}
+                          className="px-2 py-1 bg-page text-secondary border border-border rounded-lg hover:bg-surface font-medium cursor-pointer text-[11px]"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={saveEditRoad}
+                          className="px-2.5 py-1 bg-amber-600 text-white rounded-lg font-semibold shadow-2xs cursor-pointer flex items-center gap-1 text-[11px]"
+                        >
+                          <Check size={11} />
+                          <span>Save Edits</span>
+                        </button>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="p-2.5 bg-page rounded-xl border border-border space-y-1.5">
+              <div className="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
+                <span>Territory Summary</span>
+                <span>Active Coverage</span>
+              </div>
+              <div className="font-mono text-[11px] space-y-0.5 text-secondary">
+                <div className="flex justify-between">
+                  <span>Enclosed Area:</span>
+                  <strong className="text-primary">{areaStats ? `${areaStats.hectares} ha (${areaStats.sqKm} km²)` : 'No Boundary Set'}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Routes Mapped:</span>
+                  <strong className="text-primary">{roadFeatures.length} route{roadFeatures.length === 1 ? '' : 's'}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Survey Assets:</span>
+                  <strong className="text-primary">{features.filter(f => f.feature_type !== 'ROAD').length} point{features.filter(f => f.feature_type !== 'ROAD').length === 1 ? '' : 's'}</strong>
+                </div>
+              </div>
+              <div className="text-[10px] text-muted italic pt-1">
+                Click any boundary, route line, or survey marker on the map to inspect and edit measurements.
+              </div>
+              {(boundaryGeoJSON || roadFeatures.length > 0) && (
+                <div className="pt-2 border-t border-border flex items-center justify-between">
+                  <span className="text-[10px] text-muted">Drawings:</span>
+                  <button
+                    onClick={handleClearAllDrawings}
+                    className="px-2 py-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg font-medium cursor-pointer flex items-center gap-1 text-[10px]"
+                    title="Safeguard: Clears drawn boundaries and routes only. Survey points are never deleted."
+                  >
+                    <Trash2 size={11} />
+                    <span>Clear All Drawings</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* COLLAPSIBLE FIELD ASSET LEGEND */}
           {showLegend && (
-            <div className="space-y-2 pt-1 animate-in fade-in duration-100 text-[11px]">
+            <div className="space-y-2 pt-2 border-t border-border animate-in fade-in duration-100 text-[11px]">
               <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-secondary">
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-sm bg-[#093C22]"></span>
@@ -1264,77 +2015,10 @@ export default function StudentMap({
                   <span>Boundary</span>
                 </div>
               </div>
-
-              {areaStats && (
-                <div className="pt-2 border-t border-border space-y-0.5 text-[10px] font-mono">
-                  <div className="text-primary font-semibold">Area: {areaStats.hectares} ha ({areaStats.sqKm} km²)</div>
-                  <div className="text-secondary">Perimeter: {areaStats.perimeterKm} km ({areaStats.perimeterMeters} m)</div>
-                </div>
-              )}
             </div>
           )}
         </div>
       </div>
-
-      {/* FEATURE INSPECTOR DRAWER / CARD */}
-      {inspectedFeature && (
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-[1050] bg-surface/95 backdrop-blur-md p-4 rounded-2xl border border-border-strong shadow-2xl w-full max-w-md animate-in fade-in slide-in-from-bottom-2 text-xs space-y-2.5">
-          <div className="flex items-start justify-between">
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                  {inspectedFeature.category || inspectedFeature.type}
-                </span>
-                {inspectedFeature.accuracy && (
-                  <span className="text-[10px] text-muted">Accuracy: {inspectedFeature.accuracy}</span>
-                )}
-              </div>
-              <h4 className="font-bold text-sm text-primary">{inspectedFeature.title}</h4>
-            </div>
-            <button
-              onClick={() => setInspectedFeature(null)}
-              className="p-1 text-muted hover:text-primary rounded-lg transition-colors cursor-pointer"
-            >
-              <X size={15} />
-            </button>
-          </div>
-
-          {inspectedFeature.stats && (
-            <div className="p-2 bg-page rounded-lg border border-border font-mono text-[11px] text-primary">
-              {inspectedFeature.stats}
-            </div>
-          )}
-
-          {inspectedFeature.notes && (
-            <p className="text-secondary text-[11px] italic">
-              &quot;{inspectedFeature.notes}&quot;
-            </p>
-          )}
-
-          {inspectedFeature.surveyId && (
-            <div className="text-[11px] text-secondary flex items-center justify-between border-t border-border pt-2">
-              <span>Linked Survey Entity: <strong className="text-primary font-mono">{inspectedFeature.surveyId}</strong></span>
-            </div>
-          )}
-
-          {inspectedFeature.type === 'ROAD' && inspectedFeature.id && onDeleteFeature && (
-            <div className="flex justify-end pt-1">
-              <button
-                onClick={async () => {
-                  if (confirm('Delete this mapped road feature?')) {
-                    await onDeleteFeature(inspectedFeature.id!);
-                    setInspectedFeature(null);
-                  }
-                }}
-                className="px-2.5 py-1 text-red-600 hover:bg-red-50 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
-              >
-                <Trash2 size={12} />
-                <span>Delete Route</span>
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* MAIN MAP CONTAINER */}
       <MapContainer
@@ -1345,7 +2029,22 @@ export default function StudentMap({
       >
         <MapInstanceBridge onMapReady={handleMapReady} />
         <MapScaleControl />
-        <MapInteractions onMapClick={(latlng) => setSelectedLocation(latlng)} />
+        <MapInteractions
+          onMapClick={(latlng) => {
+            if (isDrawingBoundary || isDrawingRoad) {
+              setDrawingVertices(prev => [...prev, [latlng.lat, latlng.lng]]);
+              setRedoVertices([]);
+              setBoundaryValidationError(null);
+            } else {
+              setSelectedLocation(latlng);
+            }
+          }}
+          onMouseMove={(latlng) => {
+            if (isDrawingBoundary || isDrawingRoad) {
+              setHoverLatLng([latlng.lat, latlng.lng]);
+            }
+          }}
+        />
 
         {/* Dynamic Map Tile Layer based on mapStyle state */}
         {mapStyle === 'streets' && (
@@ -1396,8 +2095,78 @@ export default function StudentMap({
           />
         )}
 
+        {mapStyle === 'b_w' && (
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            subdomains="abcd"
+            crossOrigin="anonymous"
+            maxZoom={19}
+            eventHandlers={{ tileerror: () => setTileError(true) }}
+          />
+        )}
+
         {/* Community Boundary Layer Group */}
         <FeatureGroup ref={featureGroupRef} />
+
+        {/* Real-time Drawing Vertices and Lines */}
+        {(isDrawingBoundary || isDrawingRoad) && (
+          <>
+            {/* Placed Vertices */}
+            {drawingVertices.map((v, i) => (
+              <CircleMarker
+                key={`draw-vertex-${i}`}
+                center={v}
+                radius={i === 0 ? 6 : 4.5}
+                pathOptions={{
+                  color: i === 0 ? '#059669' : (isDrawingBoundary ? '#093C22' : '#ea580c'),
+                  fillColor: i === 0 ? '#34d399' : (isDrawingBoundary ? '#10b981' : '#f97316'),
+                  fillOpacity: 1,
+                  weight: 2
+                }}
+              />
+            ))}
+
+            {/* Placed Polyline */}
+            {drawingVertices.length > 1 && (
+              <Polyline
+                positions={drawingVertices}
+                pathOptions={{
+                  color: isDrawingBoundary ? '#093C22' : '#ea580c',
+                  weight: 3,
+                  dashArray: isDrawingBoundary ? '6, 4' : undefined,
+                  opacity: 0.95
+                }}
+              />
+            )}
+
+            {/* Live Pointer Preview Segment */}
+            {drawingVertices.length > 0 && hoverLatLng && (
+              <Polyline
+                positions={[drawingVertices[drawingVertices.length - 1], hoverLatLng]}
+                pathOptions={{
+                  color: isDrawingBoundary ? '#10b981' : '#f97316',
+                  weight: 2.5,
+                  dashArray: '5, 5',
+                  opacity: 0.85
+                }}
+              />
+            )}
+
+            {/* Polygon Closing Preview Segment back to vertex 0 */}
+            {isDrawingBoundary && drawingVertices.length >= 2 && hoverLatLng && (
+              <Polyline
+                positions={[hoverLatLng, drawingVertices[0]]}
+                pathOptions={{
+                  color: '#059669',
+                  weight: 1.5,
+                  dashArray: '2, 4',
+                  opacity: 0.55
+                }}
+              />
+            )}
+          </>
+        )}
 
         {/* Community Center Marker (When boundary is not yet drawn) */}
         {community.latitude && community.longitude && !boundaryGeoJSON && (
@@ -1439,7 +2208,7 @@ export default function StudentMap({
         {visibleFeatures.map(feature => {
           if (feature.feature_type === 'ROAD') return null;
           const associatedSurvey = getAssociatedSurvey(feature.id);
-          const icon = createFeatureIcon(feature.feature_type, Boolean(associatedSurvey));
+          const icon = createFeatureIcon(feature.feature_type, Boolean(associatedSurvey), mapStyle === 'b_w');
           const visuals = getFeatureVisuals(feature.feature_type);
           const featureName = (feature.metadata_json as Record<string, unknown> | null)?.facility_name ||
                              (feature.metadata_json as Record<string, unknown> | null)?.label;
@@ -1451,7 +2220,7 @@ export default function StudentMap({
               icon={icon}
               eventHandlers={{
                 click: () => {
-                  setInspectedFeature({
+                  setSelectedFeature({
                     id: feature.id,
                     type: 'FEATURE',
                     title: featureName ? String(featureName) : visuals.label,
@@ -1496,35 +2265,34 @@ export default function StudentMap({
 
         {/* Mapped Road / Path Infrastructure Lines */}
         {roadFeatures.map(rf => {
+          if (isEditingRoad && editingRoadId === rf.id) {
+            return null; // Rendered by interactive editable polyline and vertex handles instead
+          }
           const featureData = rf.metadata_json as unknown as GeoJSON.Feature<GeoJSON.LineString> | null;
           const coords = featureData?.geometry?.coordinates;
           if (!coords || !Array.isArray(coords)) return null;
           const latLngs = (coords as [number, number][]).map((c) => [c[1], c[0]] as [number, number]);
           const meta = rf.metadata_json as Record<string, unknown> | null;
           const category = String(meta?.category || 'LOCAL_ROAD');
-          const visuals = getRoadVisuals(category);
+          const isBW = mapStyle === 'b_w';
+          const visuals = getRoadVisuals(category, isBW);
           const roadTitle = String(meta?.label || visuals.label);
+          const isSelected = selectedFeature?.id === rf.id;
 
           return (
             <Polyline
               key={rf.id}
               positions={latLngs}
               pathOptions={{
-                color: visuals.color,
-                weight: visuals.weight,
+                color: isSelected ? (isBW ? '#000000' : '#2563eb') : visuals.color,
+                weight: isSelected ? visuals.weight + 2 : visuals.weight,
                 dashArray: visuals.dashArray,
                 opacity: 0.95
               }}
               eventHandlers={{
-                click: () => {
-                  setInspectedFeature({
-                    id: rf.id,
-                    type: 'ROAD',
-                    title: roadTitle,
-                    category: visuals.label,
-                    stats: `Length: ${meta?.length_km || 'N/A'} (${coords.length} vertices)`,
-                    notes: meta?.notes ? String(meta.notes) : undefined
-                  });
+                click: (e) => {
+                  L.DomEvent.stopPropagation(e);
+                  handleSelectRoad(rf);
                 }
               }}
             >
@@ -1543,6 +2311,62 @@ export default function StudentMap({
             </Polyline>
           );
         })}
+
+        {/* Active Editable Road Polyline & Draggable Vertex Handles */}
+        {isEditingRoad && editingRoadVertices.length > 0 && (
+          <>
+            <Polyline
+              positions={editingRoadVertices}
+              pathOptions={{
+                color: '#ea580c',
+                weight: 4,
+                dashArray: '6, 6',
+                opacity: 0.95
+              }}
+            />
+            {editingRoadVertices.map((vertex, idx) => (
+              <Marker
+                key={`road-edit-handle-${idx}`}
+                position={vertex}
+                draggable={true}
+                eventHandlers={{
+                  drag: (e) => {
+                    const newPos = e.target.getLatLng();
+                    setEditingRoadVertices(prev => {
+                      const updated = [...prev];
+                      updated[idx] = [newPos.lat, newPos.lng];
+                      return updated;
+                    });
+                  }
+                }}
+                icon={L.divIcon({
+                  className: 'road-vertex-handle',
+                  html: `
+                    <div style="
+                      width: 18px;
+                      height: 18px;
+                      border-radius: 50%;
+                      background-color: #ea580c;
+                      border: 2px solid #ffffff;
+                      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      color: #ffffff;
+                      font-size: 10px;
+                      font-weight: bold;
+                      cursor: grab;
+                    ">
+                      ${idx + 1}
+                    </div>
+                  `,
+                  iconSize: [18, 18],
+                  iconAnchor: [9, 9]
+                })}
+              />
+            ))}
+          </>
+        )}
       </MapContainer>
 
       {/* ROAD CREATION NAMING MODAL */}
@@ -1735,9 +2559,41 @@ export default function StudentMap({
                   </div>
                 )}
 
+                {/* Boundary Clipped Map Canvas Preview */}
+                {exportPreviewDataUrl ? (
+                  <div className="rounded-xl overflow-hidden border border-border bg-page/50 p-2.5 flex flex-col items-center space-y-1.5" data-testid="export-preview-container">
+                    <div className="text-[11px] font-semibold text-secondary flex items-center justify-between w-full px-1">
+                      <span>Clipped Territorial Boundary Map</span>
+                      {exportInteriorStats && (
+                        <span className="text-[10px] text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 px-2 py-0.5 rounded-full font-mono font-medium">
+                          Interior Features: {exportInteriorStats.featuresCount} points, {exportInteriorStats.roadsCount} routes
+                        </span>
+                      )}
+                    </div>
+                    <img
+                      src={exportPreviewDataUrl}
+                      alt="Clipped Boundary Map Preview"
+                      className="max-h-[340px] w-auto object-contain rounded-lg shadow-sm border border-border bg-white"
+                      data-testid="export-preview-img"
+                    />
+                  </div>
+                ) : isExporting ? (
+                  <div className="p-6 text-center text-xs text-muted border border-dashed border-border rounded-xl">
+                    <div className="w-5 h-5 border-2 border-[#093C22] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                    <span>Rendering clipped territorial boundary canvas...</span>
+                  </div>
+                ) : null}
+
                 {/* Features Inventory Breakdown Table */}
                 <div className="space-y-2">
-                  <h3 className="font-bold text-xs uppercase tracking-wider text-secondary">Field Assets & Surveys Inventory</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-xs uppercase tracking-wider text-secondary">Field Assets & Surveys Inventory</h3>
+                    {exportInteriorStats && (
+                      <span className="text-[10px] text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full font-mono">
+                        Filter: Interior Boundary Features Only
+                      </span>
+                    )}
+                  </div>
                   <table className="w-full text-left border-collapse border border-border text-xs">
                     <thead>
                       <tr className="bg-page text-secondary">

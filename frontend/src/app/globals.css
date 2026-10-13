@@ -32,23 +32,23 @@
 
 .dark {
   /* Core Backgrounds */
-  --color-page: #111827;
-  --color-surface: #1f2937;
-  --color-surface-elevated: #374151;
+  --color-page: #000000;
+  --color-surface: #0a0a0a;
+  --color-surface-elevated: #141414;
 
   /* Core Borders */
-  --color-border-subtle: #374151;
-  --color-border-strong: #4b5563;
+  --color-border-subtle: #1c1c1e;
+  --color-border-strong: #27272a;
 
   /* Typography */
-  --color-text-primary: #f9fafb;
-  --color-text-secondary: #d1d5db;
-  --color-text-muted: #9ca3af;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #a1a1aa;
+  --color-text-muted: #71717a;
 
   /* Brand Colors */
   --color-cfss-green: #0d5c34;
   --color-cfss-green-hover: #107542;
-  --color-cfss-green-soft: rgba(13, 92, 52, 0.15);
+  --color-cfss-green-soft: rgba(13, 92, 52, 0.25);
   
   /* Semantic Status Colors */
   --color-status-success: #22c55e;
@@ -124,4 +124,64 @@ textarea::placeholder {
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+/* Satellite and map tile protection in dark mode - never invert or filter */
+.leaflet-tile-pane,
+.leaflet-tile-container img,
+.leaflet-tile {
+  filter: none !important;
+}
+
+.app-brand-icon {
+  filter: none !important;
+}
+
+/* Leaflet zoom controls positioning and styling to guarantee visibility and clickability */
+.leaflet-top.leaflet-left {
+  top: 12px !important;
+  left: 12px !important;
+  z-index: 1000 !important;
+}
+
+.leaflet-control-zoom {
+  margin: 0 !important;
+  border: 1px solid var(--color-border-strong, #e5e7eb) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  border-radius: 10px !important;
+  overflow: hidden !important;
+}
+
+.dark .leaflet-control-zoom {
+  border-color: #27272a !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6) !important;
+}
+
+.leaflet-control-zoom a {
+  background-color: var(--color-surface, #ffffff) !important;
+  color: var(--color-text-primary, #111827) !important;
+  border-bottom: 1px solid var(--color-border-strong, #e5e7eb) !important;
+  width: 32px !important;
+  height: 32px !important;
+  line-height: 32px !important;
+  font-size: 16px !important;
+  font-weight: bold !important;
+  transition: all 0.15s ease !important;
+  cursor: pointer !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: var(--color-page, #f3f4f6) !important;
+  color: var(--color-cfss-green, #093C22) !important;
+}
+
+.dark .leaflet-control-zoom a {
+  background-color: #0a0a0a !important;
+  color: #ffffff !important;
+  border-bottom-color: #27272a !important;
+}
+
+.dark .leaflet-control-zoom a:hover {
+  background-color: #141414 !important;
+  color: #22c55e !important;
 }
