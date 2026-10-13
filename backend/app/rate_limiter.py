@@ -18,6 +18,7 @@ try:
     storage_uri = REDIS_URL
     logger.info("Redis connected for rate limiting")
 except Exception as e:
+    redis_client = None
     logger.error(f"Redis unavailable for rate limiting, degrading to memory: {e}")
     storage_uri = "memory://"
 

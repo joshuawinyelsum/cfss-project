@@ -23,7 +23,7 @@ class UserResponse(BaseModel):
     group_number: Optional[int] = None
     district: Optional[str] = None
     region: Optional[str] = None
-    
+
     class Config:
         from_attributes = True
 
@@ -68,42 +68,85 @@ class CommunityCreate(BaseModel):
     def validate_spatial_metadata(cls, v: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         if not v:
             return v
-            
+
         if not isinstance(v, dict):
             raise ValueError("spatial_metadata must be a JSON object")
-            
-        if v.get("type") != "Feature":
-            raise ValueError("spatial_metadata must be a GeoJSON Feature")
-            
-        geometry = v.get("geometry")
-        if not geometry or not isinstance(geometry, dict):
-            raise ValueError("GeoJSON Feature must contain a geometry object")
-            
-        geom_type = geometry.get("type")
-        if geom_type not in ("Polygon", "MultiPolygon"):
-            raise ValueError(f"Geometry type must be Polygon or MultiPolygon, got {geom_type}")
-            
-        coords = geometry.get("coordinates")
-        if not coords or not isinstance(coords, list) or len(coords) == 0:
-            raise ValueError("Geometry coordinates must be a non-empty array")
-            
-        # Basic validation for Polygon rings
-        if geom_type == "Polygon":
-            for ring in coords:
-                if not isinstance(ring, list) or len(ring) < 4:
-                    raise ValueError("Each LinearRing in a Polygon must have at least 4 positions")
-                first_pos = ring[0]
-                last_pos = ring[-1]
-                if first_pos != last_pos:
-                    raise ValueError("LinearRing is not closed (first and last positions do not match)")
-                for pos in ring:
-                    if not isinstance(pos, list) or len(pos) < 2:
-                        raise ValueError("Positions must be arrays of [longitude, latitude]")
-                    lng, lat = pos[0], pos[1]
-                    if not (isinstance(lng, (int, float)) and -180 <= lng <= 180):
-                        raise ValueError(f"Invalid longitude: {lng}")
-                    if not (isinstance(lat, (int, float)) and -90 <= lat <= 90):
-                        raise ValueError(f"Invalid latitude: {lat}")
+
+        if v.get("type") not in ("Feature", "FeatureCollection", "GeometryCollection"):
+            raise ValueError("spatial_metadata must be a GeoJSON Feature, FeatureCollection, or GeometryCollection")
+
+        def validate_position(pos: Any):
+            if not isinstance(pos, list) or len(pos) < 2:
+                raise ValueError("Positions must be arrays of [longitude, latitude]")
+            lng, lat = pos[0], pos[1]
+            if not (isinstance(lng, (int, float)) and -180 <= lng <= 180):
+                raise ValueError(f"Invalid longitude: {lng}")
+            if not (isinstance(lat, (int, float)) and -90 <= lat <= 90):
+                raise ValueError(f"Invalid latitude: {lat}")
+
+        def validate_ring(ring: Any):
+            if not isinstance(ring, list) or len(ring) < 4:
+                raise ValueError("Each LinearRing in a Polygon must have at least 4 positions")
+            first_pos = ring[0]
+            last_pos = ring[-1]
+            if first_pos != last_pos:
+                raise ValueError("LinearRing is not closed (first and last positions do not match)")
+            for pos in ring:
+                validate_position(pos)
+
+        def validate_geometry(geometry: Dict[str, Any]):
+            if not isinstance(geometry, dict):
+                raise ValueError("Geometry must be a JSON object")
+            geom_type = geometry.get("type")
+            if geom_type not in ("Polygon", "MultiPolygon", "LineString", "Point", "GeometryCollection"):
+                raise ValueError(f"Unsupported geometry type: {geom_type}")
+
+            if geom_type == "GeometryCollection":
+                geoms = geometry.get("geometries")
+                if not isinstance(geoms, list):
+                    raise ValueError("GeometryCollection must contain a geometries array")
+                for sub_geom in geoms:
+                    validate_geometry(sub_geom)
+                return
+
+            coords = geometry.get("coordinates")
+            if coords is None or not isinstance(coords, list) or len(coords) == 0:
+                raise ValueError("Geometry coordinates must be a non-empty array")
+
+            if geom_type == "Point":
+                validate_position(coords)
+            elif geom_type == "LineString":
+                if len(coords) < 2:
+                    raise ValueError("LineString must have at least 2 positions")
+                for pos in coords:
+                    validate_position(pos)
+            elif geom_type == "Polygon":
+                for ring in coords:
+                    validate_ring(ring)
+            elif geom_type == "MultiPolygon":
+                for poly in coords:
+                    if not isinstance(poly, list) or len(poly) == 0:
+                        raise ValueError("MultiPolygon must contain valid polygon coordinate arrays")
+                    for ring in poly:
+                        validate_ring(ring)
+
+        if v.get("type") == "Feature":
+            geometry = v.get("geometry")
+            if not geometry or not isinstance(geometry, dict):
+                raise ValueError("GeoJSON Feature must contain a geometry object")
+            validate_geometry(geometry)
+        elif v.get("type") == "FeatureCollection":
+            features = v.get("features")
+            if not isinstance(features, list):
+                raise ValueError("FeatureCollection must contain a features array")
+            for feat in features:
+                if not isinstance(feat, dict) or feat.get("type") != "Feature":
+                    raise ValueError("Each item in FeatureCollection must be a Feature")
+                geom = feat.get("geometry")
+                if geom and isinstance(geom, dict):
+                    validate_geometry(geom)
+        elif v.get("type") == "GeometryCollection":
+            validate_geometry(v)
 
         return v
 
@@ -120,7 +163,7 @@ class CommunityResponse(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     spatial_metadata: Optional[Dict[str, Any]] = None
-    
+
     class Config:
         from_attributes = True
 
@@ -170,7 +213,7 @@ class SurveyResponse(BaseModel):
     status: str
     data: Dict[str, Any]
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -189,7 +232,7 @@ class AdminSurveyListResponse(BaseModel):
 
 class AdminSurveyDetailResponse(AdminSurveyListResponse):
     responses: Dict[str, Any]
-    
+
 class AdminSurveyStatsCommunity(BaseModel):
     community_name: str
     count: int
@@ -353,3 +396,19 @@ class AuditLogResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class GeocodingResultItem(BaseModel):
+    place_id: Optional[Union[int, str]] = None
+    display_name: str
+    lat: float
+    lon: float
+    type: Optional[str] = None
+    importance: Optional[float] = None
+
+class GeocodingResponse(BaseModel):
+    query: str
+    results: List[GeocodingResultItem]
+    attribution: str
+    licence: str
+    provider: str
+    cached: bool

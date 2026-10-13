@@ -82,5 +82,6 @@ class TestProfileDataIntegrity:
         assert jane["faculty"] == "Science"
         assert jane["program"] == "cs"
 '''
-with open('test_stabilization.py', 'a', encoding='utf-8') as f:
-    f.write(test_code)
+if __name__ == '__main__':
+    with open('test_stabilization.py', 'a', encoding='utf-8') as f:
+        f.write(test_code)

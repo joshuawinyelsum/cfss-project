@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { ArrowLeft, Save, CheckCircle, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 
 import { syncEngine } from '@/lib/sync';
-import GpsCapture from '@/components/GpsCapture';
+import GpsCapture, { LocationData } from '@/components/GpsCapture';
 
 function QuestionnaireContent() {
   const { user, token } = useAuthStore();
@@ -28,6 +28,7 @@ function QuestionnaireContent() {
   const [record, setRecord] = useState<any>(null);
   const [questions, setQuestions] = useState<any[]>([]);
   const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [capturedLocation, setCapturedLocation] = useState<LocationData | null>(null);
 
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -55,7 +56,7 @@ function QuestionnaireContent() {
         const { normalizeSurveyType } = await import('@/lib/surveyType');
         const normalizedType = normalizeSurveyType(typeStr);
 
-        if (recordId === 'new') {
+        if (!recordId || recordId === 'new') {
           // Start a new survey draft locally
           try {
             const { db } = await import('@/lib/db');
@@ -149,6 +150,26 @@ function QuestionnaireContent() {
         setRecord(recordData);
         setQuestions(questionsData);
         setAnswers(answersObj);
+
+        // Load linked field feature if present
+        if (recordData?.field_feature_id) {
+          try {
+            const { db } = await import('@/lib/db');
+            const feat = await db.features.get(recordData.field_feature_id);
+            if (feat) {
+              setCapturedLocation({
+                latitude: feat.latitude,
+                longitude: feat.longitude,
+                accuracy: feat.accuracy_meters || 5,
+                timestamp: feat.captured_at || feat.created_at,
+                label: (feat.metadata_json as any)?.label,
+                provenance: (feat.metadata_json as any)?.provenance || 'GPS_CAPTURED'
+              });
+            }
+          } catch (e) {
+            console.warn("Could not load associated feature from Dexie", e);
+          }
+        }
       } catch (err: any) {
         setError(err.message || "Failed to load questionnaire");
       } finally {
@@ -253,13 +274,61 @@ function QuestionnaireContent() {
       const opType = isServerSynced ? 'UPDATE' : 'CREATE';
       const submittedAt = isSubmit ? (record.submitted_at || new Date().toISOString()) : record.submitted_at;
 
+      const { db } = await import('@/lib/db');
+      let featureId = record.field_feature_id || null;
+
+      const isFacility = ['EDUCATION', 'HEALTH', 'GOVERNANCE'].includes(record.survey_type.toUpperCase());
+      if (isFacility && (!capturedLocation || !capturedLocation.label || !capturedLocation.label.trim())) {
+        setError(`Facility Name Required: Please enter the institution name and establish its field location for this ${record.survey_type.toLowerCase()} survey.`);
+        setSaving(false);
+        setSubmitting(false);
+        return;
+      }
+
+      if (capturedLocation) {
+
+        if (!featureId) {
+          featureId = crypto.randomUUID();
+        }
+        const existingFeat = await db.features.get(featureId);
+        const featPayload: any = {
+          id: featureId,
+          student_id: user.id as number,
+          community_id: user.community_id as number,
+          feature_type: record.survey_type.toUpperCase(),
+          latitude: capturedLocation.latitude,
+          longitude: capturedLocation.longitude,
+          accuracy_meters: capturedLocation.accuracy,
+          metadata_json: {
+            survey_id: record.id,
+            entity_id: record.entity_id,
+            facility_name: isFacility ? capturedLocation.label?.trim() : undefined,
+            label: capturedLocation.label?.trim() || `${record.survey_type} Location`,
+            provenance: capturedLocation.provenance || 'GPS_CAPTURED'
+          },
+          sync_status: 'pending',
+          captured_at: capturedLocation.timestamp,
+          created_at: existingFeat?.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        await db.features.put(featPayload);
+        await syncEngine.queueOperation(
+          existingFeat ? 'UPDATE' : 'CREATE',
+          'FEATURE',
+          featureId,
+          featPayload,
+          token
+        );
+      }
+
       const payload = {
         id: record.id,
         survey_type: record.survey_type,
         community_id: user.community_id,
         student_id: user.id as number,
         entity_id: record.entity_id,
-        field_feature_id: record.field_feature_id || null,
+        field_feature_id: featureId,
         answers: formattedAnswers,
         status: (isSubmit ? 'SUBMITTED' : 'DRAFT') as 'SUBMITTED' | 'DRAFT',
         sync_status: 'pending' as const,
@@ -276,6 +345,7 @@ function QuestionnaireContent() {
       if (!isSubmit) {
         setRecord((prev: any) => ({
           ...prev,
+          field_feature_id: featureId,
           answers: formattedAnswers,
           status: 'DRAFT',
           sync_status: 'pending',
@@ -364,6 +434,21 @@ function QuestionnaireContent() {
             <div className="bg-emerald-600 h-2.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
           </div>
         </div>
+
+        {/* Geographical Field Location Capture */}
+        <GpsCapture
+          surveyType={typeStr}
+          initialLocation={capturedLocation}
+          onCapture={(loc) => {
+            setCapturedLocation(loc);
+            setHasUnsavedChanges(true);
+          }}
+          onClear={() => {
+            setCapturedLocation(null);
+            setHasUnsavedChanges(true);
+          }}
+          isReadonly={isReadonly}
+        />
 
         {/* Sections Tabs */}
         <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide">

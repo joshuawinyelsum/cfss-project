@@ -43,6 +43,9 @@ export interface LocalFeature {
 export interface LocalCommunity {
   id: number;
   name: string;
+  district?: string | null;
+  region?: string | null;
+  group_number?: number | null;
   latitude: number | null;
   longitude: number | null;
   spatial_metadata?: Record<string, unknown> | null;

@@ -247,7 +247,14 @@ export const syncEngine = {
         if (payload) {
           payload.sync_status = 'pending';
           payload.updated_at = new Date().toISOString();
-          await (store as any).put(payload);
+          if (operationType === 'UPDATE') {
+            await (store as any).update(targetId, payload);
+          } else {
+            if (entityType === 'COMMUNITY' && !payload.id) {
+              (payload as any).id = targetId;
+            }
+            await (store as any).put(payload);
+          }
         }
 
         // Check coalescing:
