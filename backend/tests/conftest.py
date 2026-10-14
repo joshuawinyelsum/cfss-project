@@ -35,7 +35,7 @@ for table in Base.metadata.tables.values():
 TEST_DB_URL = "sqlite+aiosqlite://"
 test_engine = create_async_engine(TEST_DB_URL, echo=False)
 TestSession = async_sessionmaker(
-    autocommit=False, autoflush=False, bind=test_engine, class_=AsyncSession
+    autocommit=False, autoflush=False, bind=test_engine, class_=AsyncSession, expire_on_commit=False
 )
 
 # Patch the module-level references so lifespan and other code use our test DB

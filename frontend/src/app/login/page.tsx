@@ -40,6 +40,11 @@ export default function LoginPage() {
           return;
         }
 
+        if (user.role === 'coordinator') {
+          router.push('/coordinator');
+          return;
+        }
+
         setIsVerifying(true);
         try {
           await api.get('/api/v2/students/me', {
@@ -93,6 +98,13 @@ export default function LoginPage() {
       if (role === 'admin') {
         setIsLoading(false);
         setError('Please use the Admin Portal (/admin/login) to log in as an administrator.');
+        return;
+      }
+
+      if (role === 'coordinator') {
+        const userData = { ...userRes.data, role: 'coordinator' };
+        setAuth(token, userData);
+        router.push('/coordinator');
         return;
       }
 

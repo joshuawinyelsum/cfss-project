@@ -591,7 +591,7 @@ export default function StudentMap({
       const perimeterKm = turf.length(boundaryGeoJSON as GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>, { units: 'kilometers' });
       const centroid = turf.centroid(boundaryGeoJSON as turf.AllGeoJSON);
 
-      const metrics = {
+      return {
         sqMeters: Math.round(areaSqMeters).toLocaleString(),
         hectares: (areaSqMeters / 10000).toFixed(2),
         sqKm: (areaSqMeters / 1000000).toFixed(3),
@@ -600,21 +600,22 @@ export default function StudentMap({
         centroidLat: centroid.geometry.coordinates[1].toFixed(5),
         centroidLng: centroid.geometry.coordinates[0].toFixed(5)
       };
-
-      if (onMetricsChange) {
-        onMetricsChange({
-          areaHa: metrics.hectares,
-          areaKm2: metrics.sqKm,
-          perimeterKm: metrics.perimeterKm,
-          centroid: [parseFloat(metrics.centroidLat), parseFloat(metrics.centroidLng)]
-        });
-      }
-
-      return metrics;
     } catch {
       return null;
     }
-  }, [boundaryGeoJSON, onMetricsChange, validatePolygon]);
+  }, [boundaryGeoJSON, validatePolygon]);
+
+  // Notify parent of updated metrics after render — must NOT be inside useMemo
+  useEffect(() => {
+    if (!onMetricsChange) return;
+    if (!areaStats) return;
+    onMetricsChange({
+      areaHa: areaStats.hectares,
+      areaKm2: areaStats.sqKm,
+      perimeterKm: areaStats.perimeterKm,
+      centroid: [parseFloat(areaStats.centroidLat), parseFloat(areaStats.centroidLng)]
+    });
+  }, [areaStats, onMetricsChange]);
 
   // Geodesic Vertex Count for Selected Boundary
   const boundaryVertexCount = useMemo(() => {

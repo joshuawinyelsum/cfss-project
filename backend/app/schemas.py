@@ -412,3 +412,132 @@ class GeocodingResponse(BaseModel):
     licence: str
     provider: str
     cached: bool
+
+
+# Coordinator System Schemas
+class CoordinatorCreate(BaseModel):
+    name: str
+    staff_id: str
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
+    faculty: Optional[str] = None
+    password: str
+
+class CoordinatorUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
+    faculty: Optional[str] = None
+    password: Optional[str] = None
+
+class CoordinatorAssignmentItem(BaseModel):
+    id: int
+    community_id: int
+    community_name: str
+    group_number: int
+    assigned_at: Optional[datetime] = None
+    is_active: bool = True
+    notes: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class CoordinatorResponse(BaseModel):
+    id: int
+    staff_id: str
+    name: str
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
+    faculty: Optional[str] = None
+    role: str
+    is_active: bool
+    created_at: Optional[datetime] = None
+    assignments: List[CoordinatorAssignmentItem] = []
+    assigned_communities_count: int = 0
+    assigned_groups: List[int] = []
+    assigned_students_count: int = 0
+    open_issues_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+class CoordinatorAssignRequest(BaseModel):
+    community_ids: List[int]
+    notes: Optional[str] = None
+
+class CoordinatorAssignGroupsRequest(BaseModel):
+    group_numbers: List[int]
+    notes: Optional[str] = None
+
+class CoordinatorStatusUpdate(BaseModel):
+    is_active: bool
+
+class FieldworkIssueCreate(BaseModel):
+    community_id: int
+    student_id: int
+    survey_id: Optional[str] = None
+    title: str
+    issue_type: str  # DATA_ANOMALY, SUSPICIOUS_SPEED, REPETITIVE_ANSWERS, GPS_INCONSISTENCY, MISSING_WORK, OTHER
+    severity: Optional[str] = "MEDIUM"  # LOW, MEDIUM, HIGH, CRITICAL
+    reason: str
+    action_requested: Optional[str] = None
+    deadline: Optional[datetime] = None
+    evidence: Optional[Dict[str, Any]] = None
+
+class FieldworkIssueUpdate(BaseModel):
+    fieldworker_explanation: Optional[str] = None
+    action_requested: Optional[str] = None
+    outcome: Optional[str] = None
+    status: Optional[str] = None  # OPEN, UNDER_INVESTIGATION, RESOLVED, ESCALATED
+    severity: Optional[str] = None
+    deadline: Optional[datetime] = None
+
+class FieldworkIssueResponse(BaseModel):
+    id: str
+    community_id: int
+    community_name: Optional[str] = None
+    group_number: Optional[int] = None
+    student_id: int
+    student_name: Optional[str] = None
+    student_index: Optional[str] = None
+    survey_id: Optional[str] = None
+    survey_type: Optional[str] = None
+    created_by_id: int
+    created_by_name: Optional[str] = None
+    title: str
+    issue_type: str
+    severity: str
+    status: str
+    reason: str
+    evidence: Optional[Dict[str, Any]] = None
+    fieldworker_explanation: Optional[str] = None
+    action_requested: Optional[str] = None
+    outcome: Optional[str] = None
+    deadline: Optional[datetime] = None
+    resolved_at: Optional[datetime] = None
+    resolved_by_id: Optional[int] = None
+    escalated_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class SurveyReviewRequest(BaseModel):
+    review_status: str  # VERIFIED | FLAGGED
+    review_notes: Optional[str] = None
+
+class CoordinatorOverviewStats(BaseModel):
+    assigned_communities_count: int
+    assigned_groups: List[int]
+    assigned_fieldworkers_count: int
+    surveys_total: int
+    surveys_submitted: int
+    surveys_verified: int
+    surveys_flagged: int
+    surveys_pending_review: int
+    open_issues_count: int
+    resolved_issues_count: int
+    gis_summary: Dict[str, Any]
+    recent_activity: List[Dict[str, Any]]
+

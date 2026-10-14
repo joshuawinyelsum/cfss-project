@@ -180,6 +180,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (pathname === '/admin') return 'Dashboard';
     if (pathname.startsWith('/admin/students')) return 'Students';
     if (pathname.startsWith('/admin/communities')) return 'Communities';
+    if (pathname.startsWith('/admin/coordinators')) return 'Coordinators';
     if (pathname.startsWith('/admin/whitelist')) return 'Whitelist';
     if (pathname.startsWith('/admin/registration')) return 'Registration Control';
     if (pathname.startsWith('/admin/activity')) return 'Activity Logs';
@@ -238,6 +239,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <NavSection title="Community Administration" />
         <NavItem href="/admin/communities" label="Communities & Groups" icon={Building2} pathname={pathname} />
+        <NavItem href="/admin/coordinators" label="Coordinators" icon={Users} pathname={pathname} />
 
         <NavSection title="System Administration" />
         <NavItem href="/admin/activity" label="Activity Logs" icon={History} pathname={pathname} />

@@ -128,10 +128,14 @@ app.add_middleware(
 )
 
 from app.routers.recovery_router import router as recovery_router
-from app.routers import student_spatial, auth_router, admin_router, student_router, admin_whitelist, auth_router_v2, admin_export, student_auth_router, student_surveys, student_settings, sync_router
+from app.routers import student_spatial, auth_router, admin_router, student_router, admin_whitelist, auth_router_v2, admin_export, student_auth_router, student_surveys, student_settings, sync_router, admin_coordinators, coordinator_router
 
 app.include_router(auth_router.router)
 app.include_router(admin_router.router)
+app.include_router(admin_coordinators.router)
+app.include_router(admin_coordinators.router, prefix="/api")
+app.include_router(coordinator_router.router)
+app.include_router(coordinator_router.router, prefix="/api")
 app.include_router(student_router.router)
 app.include_router(student_settings.router)
 app.include_router(admin_whitelist.router)

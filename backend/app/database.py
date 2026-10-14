@@ -16,7 +16,7 @@ engine = create_async_engine(
         "command_timeout": 15
     }
 )
-SessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=AsyncSession)
+SessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=AsyncSession, expire_on_commit=False)
 Base = declarative_base()
 
 

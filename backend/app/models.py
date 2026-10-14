@@ -152,8 +152,18 @@ class SurveyRecord(Base):
     last_synced_at = Column(DateTime(timezone=True), nullable=True)
     submitted_at = Column(DateTime(timezone=True), nullable=True)
     sync_error = Column(String, nullable=True)
+    review_status = Column(String, nullable=False, default="PENDING") # PENDING, VERIFIED, FLAGGED
+    review_notes = Column(String, nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    reviewed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+
+    community = relationship("Community", foreign_keys=[community_id])
+    created_by_student = relationship("User", foreign_keys=[created_by_student_id])
+    reviewed_by = relationship("User", foreign_keys=[reviewed_by_id])
+    answers = relationship("SurveyAnswer", back_populates="survey_record", cascade="all, delete-orphan")
+    field_feature = relationship("FieldFeature", foreign_keys=[field_feature_id])
 
 class AdminNotification(Base):
     __tablename__ = "admin_notifications"
@@ -184,6 +194,9 @@ class SurveyAnswer(Base):
     survey_record_id = Column(String, ForeignKey("survey_records.id", ondelete="CASCADE"), nullable=False, index=True)
     question_id = Column(String, ForeignKey("survey_questions.id"), nullable=False)
     answer = Column(JSON, nullable=True)
+
+    survey_record = relationship("SurveyRecord", back_populates="answers")
+    question = relationship("SurveyQuestion", foreign_keys=[question_id])
 
 
 @event.listens_for(User, "before_insert")
@@ -229,3 +242,54 @@ class FieldFeature(Base):
     captured_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+
+
+class CoordinatorAssignment(Base):
+    __tablename__ = "coordinator_assignments"
+    __table_args__ = (UniqueConstraint('coordinator_id', 'community_id', name='uq_coord_community_assignment'),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    coordinator_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    community_id = Column(Integer, ForeignKey("communities.id", ondelete="CASCADE"), index=True, nullable=False)
+    assigned_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    assigned_at = Column(DateTime(timezone=True), server_default=func.now())
+    is_active = Column(Boolean, default=True, nullable=False)
+    notes = Column(String, nullable=True)
+
+    coordinator = relationship("User", foreign_keys=[coordinator_id])
+    community = relationship("Community", foreign_keys=[community_id])
+    assigned_by = relationship("User", foreign_keys=[assigned_by_id])
+
+
+class FieldworkIssue(Base):
+    __tablename__ = "fieldwork_issues"
+
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    community_id = Column(Integer, ForeignKey("communities.id", ondelete="CASCADE"), index=True, nullable=False)
+    student_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    survey_id = Column(String, ForeignKey("survey_records.id", ondelete="SET NULL"), index=True, nullable=True)
+    created_by_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    title = Column(String, nullable=False)
+    issue_type = Column(String, nullable=False) # DATA_ANOMALY, SUSPICIOUS_SPEED, REPETITIVE_ANSWERS, GPS_INCONSISTENCY, MISSING_WORK, OTHER
+    severity = Column(String, nullable=False, default="MEDIUM") # LOW, MEDIUM, HIGH, CRITICAL
+    status = Column(String, nullable=False, default="OPEN") # OPEN, UNDER_INVESTIGATION, RESOLVED, ESCALATED
+    reason = Column(String, nullable=False)
+    evidence = Column(JSON, nullable=True)
+    fieldworker_explanation = Column(String, nullable=True)
+    action_requested = Column(String, nullable=True)
+    outcome = Column(String, nullable=True)
+    deadline = Column(DateTime(timezone=True), nullable=True)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    resolved_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    escalated_at = Column(DateTime(timezone=True), nullable=True)
+    escalated_to_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+
+    community = relationship("Community", foreign_keys=[community_id])
+    student = relationship("User", foreign_keys=[student_id])
+    survey = relationship("SurveyRecord", foreign_keys=[survey_id])
+    created_by = relationship("User", foreign_keys=[created_by_id])
+    resolved_by = relationship("User", foreign_keys=[resolved_by_id])
+    escalated_to = relationship("User", foreign_keys=[escalated_to_id])
+
